@@ -1,9 +1,10 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { PlanAWorkspace } from "../../src/features/recovery/plan-a/components/PlanAWorkspace";
+import { PlanAProposeAction } from "../../src/features/recovery/plan-a/components/PlanAProposeAction";
 import { adaptPlanAInputs, publishScenarioAReady } from "../../src/features/recovery/plan-a/integration";
-import type { PlanAPublisher, ScenarioAReadyRequest } from "../../src/features/recovery/plan-a/integration";
+import type { PlanAPublisher, ScenarioAReadyAcknowledgement, ScenarioAReadyRequest } from "../../src/features/recovery/plan-a/integration";
 import { buildPlanAScenario } from "../../src/features/recovery/plan-a/domain";
 import { makePlanAScenarioInput } from "./domain/happyPotatoFactory";
 import { makeIntegrationRead } from "./integrationFactory";
@@ -64,4 +65,28 @@ it("publishes only on explicit click, leaves PO drafts unsent and does not wire 
 it("shows publication pending instead of a fake proposal action without a dispatcher",()=>{
   const adapted=adaptPlanAInputs(makeIntegrationRead());if(!adapted.ok)throw Error(adapted.message);
   render(<MemoryRouter><PlanAWorkspace {...adapted.value}/></MemoryRouter>);expect(screen.getByText(/publication is pending the shared scenario dispatcher/)).toBeTruthy();expect(screen.queryByRole("button",{name:"Propose Plan A"})).toBeNull();
+});
+it("does not revive an in-flight publication notice after inputs change and are restored",async()=>{
+  const {publisher}=dependencies();
+  const deferred: {resolve?: (ack:ScenarioAReadyAcknowledgement)=>void}={};
+  const waiting=new Promise<ScenarioAReadyAcknowledgement>(resolve=>{deferred.resolve=resolve;});
+  const commit=vi.fn((_request:ScenarioAReadyRequest)=>waiting);
+  const deps={...publisher,commitScenarioA:commit};
+  const r=render(<PlanAProposeAction candidate={candidate()} publisher={deps} contextKey="original" localSensitivityActive={false}/>);
+  fireEvent.click(screen.getByRole("button",{name:"Propose Plan A"}));
+  r.rerender(<PlanAProposeAction publisher={deps} contextKey="changed" localSensitivityActive={false}/>);
+  r.rerender(<PlanAProposeAction publisher={deps} contextKey="original" localSensitivityActive={false}/>);
+  const request=commit.mock.calls[0]![0];
+  await act(async()=>{deferred.resolve?.({status:"STORED",idempotencyKey:request.idempotencyKey,snapshotRevision:request.expectedSnapshotRevision,storedScenario:request.scenario});await waiting;});
+  expect(screen.queryByText(/Scenario storage acknowledged/)).toBeNull();
+  expect(screen.getByText(/Previous publication result is stale/)).toBeTruthy();
+});
+it("preserves supplied Outlook offer provenance without claiming actual receipt (local contract only)",async()=>{
+  const {publisher,read,commitScenarioA}=dependencies();
+  read.offers![0]!.provenance="LIVE_CHANNEL";read.offers![0]!.evidenceRef="HP-MSG-OL-OFFER";
+  const input=makePlanAScenarioInput();input.candidateOffers[0]!.offer={...read.offers![0]!};
+  const built=buildPlanAScenario(input);if(!built.ok)throw Error(built.error.message);
+  expect((await publishScenarioAReady(built.value,publisher)).ok).toBe(true);
+  const event=commitScenarioA.mock.calls[0]![0];expect(event.scenario.evidenceRefs).toContain("HP-MSG-OL-OFFER");expect(event.detail.sourceLabels).toContain("LIVE_CHANNEL");
+  expect(event.detail.selectedOfferAssessment.deliveryWindow).toMatchObject({actualArrivalVerified:false,qualityAccepted:false});
 });

@@ -13,6 +13,6 @@ export function RecoveryProjection({ scenario }: { scenario: PlanAScenarioCandid
     ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     <details><summary>Outstanding conditions, assumptions and evidence</summary><ul className="pa-checks">{scenario.conditions.map(c => <li key={c.code}>{c.description}</li>)}{scenario.assumptions.map(a => <li key={a}>{a}</li>)}</ul><p>Evidence: {scenario.evidenceRefs.join(", ")}</p></details>
     <p className="pa-muted">{scenario.id} · Version {scenario.version} · Snapshot {scenario.snapshotFingerprint}</p>
-    <p>Physical inventory is unchanged. This local preview has not been published for comparison or approved.</p>
+    <p>Physical inventory is unchanged. Publication and approval status are tracked separately from this local calculation.</p>
   </section>;
 }

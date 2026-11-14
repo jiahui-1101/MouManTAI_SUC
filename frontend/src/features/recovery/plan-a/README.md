@@ -27,7 +27,9 @@ The ETA sensitivity copy never modifies caller-owned quotes or snapshots.
 For visual review with the single test-only factory, run Vite and open
 `/tests/plan-a/review.html`. This entry is not imported by the production application
 or included in its build. It exercises the same workspace as the production page
-without introducing runtime demo fixtures or a separate store.
+without introducing runtime demo fixtures or a separate store. The clearly labelled
+"Inject test publisher acknowledgement" checkbox exercises only a test double;
+it does not connect P5 or a root store.
 
 Phase 4 provides pure `createRfqDraft(DraftInput)` and
 `createInternalPoDraft(InternalPoInput)` generators, each returning `DraftResult`.
@@ -53,3 +55,9 @@ receive a matching authoritative storage acknowledgement. Local sensitivity prev
 cannot publish. Root selectors/storage and the actual P5 consumer remain pending.
 See [integration/README.md](./integration/README.md) for exact owner contracts,
 read-only remote findings, version policy, idempotency and acknowledgement requirements.
+
+Final acceptance fixes add Plan B navigation for an empty supplier list and prevent
+a delayed publication notice from reviving after an input-change/restore cycle.
+The supplied-Outlook-evidence contract is covered; real provider ingestion remains
+another owner's integration dependency. See the integration README for the newly
+available remote P2 interfaces and the production wiring checklist.

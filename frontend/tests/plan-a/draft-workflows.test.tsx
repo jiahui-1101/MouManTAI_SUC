@@ -22,7 +22,7 @@ it("creates and reopens separate idempotent draft records without supplier reque
   click("Create Internal PO Draft"); const po=text("Internal PO Draft content"); expect(po).toContain("RM255.00"); expect(po).toContain("NOT_APPROVED / NOT_SENT"); expect(po).toContain("HP-PO-1042");
   click("Create Internal PO Draft"); expect(text("Internal PO Draft content")).toBe(po);
   expect(screen.getAllByRole("article",{name:"Internal PO Draft"}).length).toBe(1);
-  expect(screen.getByText("Physical inventory is unchanged. This local preview has not been published for comparison or approved.")).toBeTruthy();
+  expect(screen.getByText("Physical inventory is unchanged. Publication and approval status are tracked separately from this local calculation.")).toBeTruthy();
   expect(fetch).not.toHaveBeenCalled(); expect(p).toEqual(before);
 });
 

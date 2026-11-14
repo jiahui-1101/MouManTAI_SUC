@@ -1,4 +1,4 @@
-# P3 shared integration seam — Phase 5
+# P3 shared integration seam — final handoff
 
 Status: **P3 implementation complete / shared integration pending**.
 This directory supplies adapters and an injectable acknowledged publication API.
@@ -75,24 +75,66 @@ for P5 selectors, and P5's stale approval/reapproval enforcement. P3 does not im
 them. The reported `externalSyncStatus`, `RECEIPT_CHECK`, `ESCALATED` and UNKNOWN /
 MEASURED verification-evidence extensions require shared/P5 owner alignment.
 
-## Repository evidence at Phase 5
+## Final repository evidence (Phase 6)
 
-Current P3 branch and `origin/main` do not contain the shared runtime or P5 consumer.
-Available remote heads are main, project foundation, P1 messaging and P3. No P5
-implementation is available to import or test; its reported 154 tests were not run.
+The P3 checkout still has no root runtime or P5 consumer. Remote `main` advanced
+through another team's PR #1 to `73381578f98211ced80aedb12e6b7a1bb9742957`.
+`origin/feature/feedme-portal-ui-integration` is at
+`f9d1e59e5b6a3c9e1f4324326757ff94a96dec20`. Both were inspected read-only;
+no merge, rebase, cherry-pick or source copying was performed by P3.
 
-Read-only inspection of `origin/feature/p1-mock-messaging` at
-`703a710b908cbdefc0151233a257cfa76c1a6d68` found:
+Newly available on remote main (not this checkout):
 
-- `frontend/src/data/fixtures/happyPotato.ts`: canonical business fixture.
-- `frontend/src/store/demoStore.ts`: messaging-focused `DemoState`, fingerprint,
-  `selectActiveIncident`, `selectOperationalSnapshot` and messaging dispatch.
-- No `SCENARIO_A_READY`, P2 impact selector, P5 slice or scenario consumer.
-- Incident lacks the shared `type`, `revision`, `snapshotFingerprint`; inventory
-  lots lack `availableAtLocal`; confirmed groups lack `status` and
-  `agreedRecipeVersion`; offers lack `evidenceRef`; supplier rows lack registry
-  qualification. These must be supplied by the responsible owners, not inferred by P3.
+- `frontend/src/types/{common,restaurant,index}.ts`: P2 restaurant contracts.
+- `frontend/src/data/fixtures/happyPotato.ts`: P2 canonical seed.
+- `frontend/src/services/mock/restaurantState.ts`: `RestaurantState`,
+  `selectIncident(state, incidentId)`, `selectOperationalSnapshot(state)`,
+  `selectCurrentImpact(state, incidentId)`, `reviseSnapshot`, `assessIncidentImpact`.
+- `frontend/src/services/mock/restaurantStore.ts`: `getP2State`, `subscribeP2`,
+  `useRestaurantStore`, `assessImpactAction`, `simulateChickenRecount`.
+- `frontend/src/features/impact/handoff.ts`: proposed `buildP3Handoff` and
+  `buildP5Handoff` contracts, explicitly pending team review.
+- Plan A and comparison pages remain placeholders there; no P5 consumer or
+  acknowledged `SCENARIO_A_READY` dispatcher was found.
 
-No remote branch was merged or cherry-picked. Tests using the existing canonical
-test factory establish local adapter/publisher contracts only. Mock acknowledgements
-and a mock idempotent consumer do not establish actual root storage or P5 integration.
+Read-only inspection also retains the Phase 5 P1 findings at
+`origin/feature/p1-mock-messaging` (`703a710b908cbdefc0151233a257cfa76c1a6d68`):
+`data/fixtures/happyPotato.ts` and messaging-focused `store/demoStore.ts`, with
+no scenario publication/P5 slice. These are separate owner implementations;
+Integrator must reconcile them rather than importing a second root into P3.
+
+## Production wiring checklist for Integrator
+
+- Bring approved shared/P2 code and P3 together through owner-reviewed integration.
+  Resolve the existing Plan A page and application styling changes under that review.
+- Subscribe the existing `pages/PlanA/PlanAPage.tsx` to canonical state. On the P2
+  surface above, select `restaurant` from `useRestaurantStore()`, then call
+  `selectIncident`, `selectOperationalSnapshot`, and `selectCurrentImpact` for the
+  active incident. Pass `impact.summary` only if non-null and authoritative on the
+  same snapshot; `P3ImpactHandoff` alone is an aggregate and cannot replace the raw
+  verified incident/snapshot/summary needed by the current adapter.
+- Map outlet, product requirement and business date/timezone/cutoff from approved
+  fixture/selectors. Supply an explicit demo clock and receiving buffer; never use
+  browser wall-clock time as an operational default.
+- Resolve P2 `PurchaseOrder.expectedKgMilli: number | null`: null must block, not
+  become zero. P2 quarantine, expiry, reservations, recipes and eligible-stock
+  semantics need shared alignment. Do not silently relabel an adjusted eligible
+  balance as physical accepted stock. P3's consistency check blocks mismatched
+  impact values; this is a safe blocker, not a complete general P2 allocation engine.
+- Supply source offers, registry approval status, evidence references, provenance,
+  per-offer spec/availability flags and externally assigned scenario metadata.
+  Do not derive missing approval/evidence fields from a name or quoted qualification.
+- Call `adaptPlanAInputs`. On success spread its value into `PlanAWorkspace`; on
+  failure show its pending/blocked message. The production page must not import
+  `tests/plan-a/*` or populate its own Happy Potato fixture.
+- Pass an authoritative `PlanAPublisher` only when the acknowledged root action
+  described above exists. Keep comparison/evidence navigation availability false
+  until the real consumers can use the supplied incident/evidence query context.
+- Connect `request.scenario` to P5's actual comparison slice and retain/map
+  supplemental conditions. Integrator/P5 own approval history, version allocation,
+  stale approval blocking and the reported P5 execution/evidence extensions.
+
+Tests using the canonical test factory and injected acknowledgements establish only
+local contracts. Actual root storage, actual P2 connection, actual P5 consumption
+and the P1 → P2 → P3 → P5 flow remain blocked in this branch. No reported external
+P5 tests were run or assumed successful.
