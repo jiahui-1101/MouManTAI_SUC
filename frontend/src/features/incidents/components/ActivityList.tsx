@@ -21,17 +21,21 @@ const PROVENANCE_LABEL: Record<string, string> = {
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-export function ActivityList({ events, emptyText = "No activity yet." }: { events: ActivityEvent[]; emptyText?: string }) {
+export function ActivityList({ events, emptyText = "No activity yet.", muted = false }: { events: ActivityEvent[]; emptyText?: string; muted?: boolean }) {
   if (events.length === 0) return <EmptyState title={emptyText} />;
   return (
-    <ol className="p2-activity">
+    <ol className={`p2-activity${muted ? " p2-activity--muted" : ""}`}>
       {[...events].reverse().map((e) => (
         <li key={e.id} className="p2-activity__item">
           <div className="p2-activity__head">
             <span className="p2-activity__type">{TYPE_LABEL[e.type]}</span>
-            <Badge tone={e.provenance === "LIVE_CHANNEL" ? "live" : e.provenance === "SIMULATED_CHANNEL" ? "sim" : "neutral"}>
-              {PROVENANCE_LABEL[e.provenance] ?? e.provenance}
-            </Badge>
+            {muted ? (
+              <span className="p2-activity__src">{PROVENANCE_LABEL[e.provenance] ?? e.provenance}</span>
+            ) : (
+              <Badge tone={e.provenance === "LIVE_CHANNEL" ? "live" : e.provenance === "SIMULATED_CHANNEL" ? "sim" : "neutral"}>
+                {PROVENANCE_LABEL[e.provenance] ?? e.provenance}
+              </Badge>
+            )}
             <time className="p2-activity__time" dateTime={e.recordedAtIso} title="Browser time when recorded">
               {time(e.recordedAtIso)}
             </time>

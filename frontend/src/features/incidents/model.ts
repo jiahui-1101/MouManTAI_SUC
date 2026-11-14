@@ -144,7 +144,7 @@ export function overviewCounts(state: RestaurantState): OverviewCounts {
 /* next action ---------------------------------------------------------------- */
 
 export type NextAction =
-  | { kind: "navigate"; label: string; description: string; to: string }
+  | { kind: "navigate"; label: string; description: string; to: string; beforeNavigate?: () => void }
   | { kind: "assess"; label: string; description: string; incidentId: string };
 
 export function nextActions(state: RestaurantState, incident: Incident | undefined): NextAction[] {
@@ -178,6 +178,22 @@ export function nextActions(state: RestaurantState, incident: Incident | undefin
     case "CLOSED":
       return [{ kind: "navigate", label: "View decision memory", description: "Incident closed.", to: "/decision-memory" }];
   }
+}
+
+/**
+ * Overview action queue: while an incident is still being worked out, go straight to the
+ * two recovery plans (no separate "assess impact" step). Normal operation → no actions.
+ */
+export function overviewActions(state: RestaurantState, incident: Incident | undefined, assess: (incidentId: string) => void): NextAction[] {
+  if (!incident || incident.status === "CLOSED") return [];
+  const early: IncidentStatus[] = ["DETECTED", "PENDING_VERIFICATION", "VERIFIED", "IMPACT_ASSESSED", "SCENARIOS_READY"];
+  if (!early.includes(incident.status)) return nextActions(state, incident);
+  const needsAssess = incident.status === "VERIFIED" || (incident.status === "IMPACT_ASSESSED" && impactStateOf(state, incident) === "STALE");
+  const beforeNavigate = needsAssess ? () => assess(incident.id) : undefined;
+  return [
+    { kind: "navigate", label: "Plan A · External supplier", description: "Source the missing chicken from alternative suppliers.", to: "/recovery/plan-a", beforeNavigate },
+    { kind: "navigate", label: "Plan B · Internal recovery", description: "No purchase: reallocate stock, adjust menu and prep.", to: "/recovery/plan-b", beforeNavigate },
+  ];
 }
 
 /* readiness ------------------------------------------------------------------ */
