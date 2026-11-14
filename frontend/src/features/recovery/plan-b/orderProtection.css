@@ -110,3 +110,12 @@
 .p4-dashboard .p4-order-list thead th:nth-child(2),
 .p4-dashboard .p4-order-list td.p4-order-price { text-align: right; }
 .p4-order-price { white-space: nowrap; font-weight: 600; }
+
+.p4-order-summary { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.p4-order-summary ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 112px), 1fr)); gap: 12px 8px; margin: 10px 0 0; padding: 0; list-style: none; }
+.p4-order-summary li { display: grid; align-content: start; justify-items: center; gap: 5px; text-align: center; }
+.p4-order-summary-circle { display: grid; place-content: center; justify-items: center; width: 94px; aspect-ratio: 1; gap: 2px; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); }
+.p4-order-summary-circle img { border-radius: 50%; object-fit: cover; }
+.p4-order-summary-circle strong { font-size: 18px; line-height: 1.1; }
+.p4-order-summary-total { background: var(--brand-primary-soft); color: var(--brand-primary-text); }
+.p4-order-summary-total strong { font-size: 15px; }

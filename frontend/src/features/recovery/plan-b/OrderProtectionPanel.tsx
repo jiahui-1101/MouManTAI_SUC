@@ -14,6 +14,7 @@ import "./orderProtection.css";
 type Plan = Extract<ReturnType<typeof calculatePlanB>, { status: "READY" }>;
 const pageSize = 6;
 const menuPrices = new Map(createHappyPotatoSeedSnapshot().menuItems.map(item => [item.id, item.priceSen]));
+const formatPrice = (sen: number) => "RM" + (sen / 100).toFixed(2);
 const menuPhotos: Record<string, string> = {
   "HP-MENU-CP": popcorn,
   "HP-MENU-CT": tenders,
@@ -123,6 +124,28 @@ export function OrderProtection({ plan }: { plan: Plan }) {
             <ul><li>✓ Order confirmed</li><li>{active.atRisk ? "○ Ingredients need review" : "✓ Ingredients reserved"}</li></ul>
         </aside>}
         </div>
+        <section className="p4-order-summary" aria-label="Confirmed sales summary">
+          <h3>Confirmed sales summary</h3>
+          <ul>
+            {plan.rows.map(row => <li key={row.id}>
+              <div className="p4-order-summary-circle">
+                {menuPhotos[row.id] && <img src={menuPhotos[row.id]} width={34} height={34} alt="" />}
+                <strong>{row.confirmed}</strong>
+                <small>portions</small>
+              </div>
+              <span>{row.short}</span>
+            </li>)}
+            <li>
+              <div className="p4-order-summary-circle p4-order-summary-total">
+                <strong>{plan.rows.every(row => !row.confirmed || menuPrices.has(row.id))
+                  ? formatPrice(plan.rows.reduce((sum, row) => sum + row.confirmed * (menuPrices.get(row.id) ?? 0), 0))
+                  : "—"}</strong>
+                <small>Total</small>
+              </div>
+              <span>Confirmed order value</span>
+            </li>
+          </ul>
+        </section>
       </>}
     </>}
   </div>;

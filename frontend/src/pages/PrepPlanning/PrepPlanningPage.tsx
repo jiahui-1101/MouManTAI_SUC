@@ -17,6 +17,7 @@ const lastDeadline = Math.max(...readyTimes) + 90;
 const clockValue = (minute: number) => [Math.floor(minute / 60), minute % 60].map(value => String(value).padStart(2, "0")).join(":");
 
 export function PrepPlanningPage() {
+  const [stationFilter, setStationFilter] = useState<"chicken" | "fries" | "all">("all");
   const linked = selectPlanBInput(useDemoState());
   const [recovery, setRecovery] = useState(true);
   const [editedBatches, setBatches] = useState(canonical);
@@ -39,14 +40,17 @@ export function PrepPlanningPage() {
   }
 
   const sharedPlan = linked.status === "READY" ? calculatePlanB(linked.input) : undefined;
-  const needsStockReview = linked.status === "STALE" || (sharedPlan !== undefined && (
+  const needsStockReview = recovery && (linked.status === "STALE" || (sharedPlan !== undefined && (
     sharedPlan.status !== "READY" || sharedPlan.scenario.feasibility !== "FEASIBLE" ||
     sharedPlan.chicken !== baseline.chicken || sharedPlan.fries !== baseline.fries ||
     sharedPlan.rows.some(row => !baseline.rows.some(original =>
       original.id === row.id && original.confirmed === row.confirmed && original.quota === row.quota &&
       original.chicken === row.chicken && original.fries === row.fries))
-  ));
+  )));
   const rows = baseline.rows;
+  const expectedDelivery = preview.incident?.ordered ?? 0;
+  const additionalDemand = rows.filter(row => row.chicken > 0).reduce((sum, row) => sum + row.forecast - row.confirmed, 0);
+  const additionalQuota = rows.filter(row => row.chicken > 0).reduce((sum, row) => sum + row.quota, 0);
   const { issues, affected: affectedOrders } = checkSchedule(batches);
   const readyGroups = readyTimes.map(ready => {
     const group = orders.filter(order => order.deadline === ready);
@@ -60,15 +64,17 @@ export function PrepPlanningPage() {
   const peakPortions = Math.max(1, ...readyGroups.map(group => group.portions));
   const conflicts = issues.filter(issue => issue.includes(" overlaps ")).length;
   const deadline = Math.max(...readyTimes);
-  const status = conflicts ? "Station Conflict" : issues.some(issue => issue.includes("misses")) ? "Deadline Risk" : issues.length || needsStockReview ? "Needs Review" : "Schedule Feasible";
-  const total = batches.reduce((sum, batch) => sum + batch.portions, 0);
+  const status = conflicts ? "Station Conflict" : issues.some(issue => issue.includes("misses")) ? "Deadline Risk" : issues.length ? "Needs Review" : "Demo Schedule Feasible";
+  const total = orders.reduce((sum, order) => sum + order.chickenPortions, 0);
   const menu = (batch: PrepBatch) => rows.find(row => row.id === batch.menuId);
+  const batchName = (batch: PrepBatch) => batch.ingredient === "fries" && menu(batch)?.chicken ? "Combo side fries" : menu(batch)?.name;
   const affected = (batch: PrepBatch) => issues.some(issue => issue.includes(batch.id));
   const trackStart = Math.floor(firstStart / 30) * 30;
   const trackEnd = Math.max(deadline + 10, ...batches.map(batch => batch.end + 5));
   const percent = (minutes: number) => minutes / (trackEnd - trackStart) * 100 + "%";
   const ticks = Array.from({ length: Math.ceil((trackEnd - trackStart) / 30) }, (_, index) => trackStart + index * 30);
-  const stations = [...new Set(batches.map(batch => batch.station))];
+  const visibleBatches = batches.filter(batch => stationFilter === "all" || batch.ingredient === stationFilter);
+  const stations = [...new Set(visibleBatches.map(batch => batch.station))];
 
   function select(id: string) {
     setSelection(id);
@@ -99,13 +105,13 @@ export function PrepPlanningPage() {
     <div className="prep-timeline">
       <div className="prep-axis">{ticks.map(tick => <span key={tick} style={{ left: percent(tick - trackStart) }}>{time(tick)}</span>)}</div>
       {stations.map(station => <section key={station} className="prep-station">
-        <strong>{station}</strong>
-        <div className="prep-track" style={{ height: 52 * batches.filter(batch => batch.station === station).length + 26 }}>
+        <strong>{visibleBatches.find(batch => batch.station === station)?.ingredient === "fries" ? "Fries fryer" : "Chicken fryer"} · {station}</strong>
+        <div className="prep-track" style={{ height: 52 * visibleBatches.filter(batch => batch.station === station).length + 26 }}>
           {ticks.map(tick => <i key={tick} className="prep-gridline" style={{ left: percent(tick - trackStart) }} />)}
           {readyTimes.map(ready => <div key={ready} className="prep-deadline" style={{ left: percent(ready - trackStart) }}><span>{clockValue(ready)} due</span></div>)}
-          {batches.filter(batch => batch.station === station).map((batch, index) => <div key={batch.id} className="prep-lane" style={{ top: 22 + index * 52 }}>
+          {visibleBatches.filter(batch => batch.station === station).map((batch, index) => <div key={batch.id} className="prep-lane" style={{ top: 22 + index * 52 }}>
             <span className="prep-lane-label">
-              <strong>{menu(batch)?.short}</strong>
+              <strong title={batchName(batch)}>{batch.ingredient === "fries" ? (menu(batch)?.chicken ? "Combo side fries" : "Regular Fries") : menu(batch)?.short}</strong>
               <span className="prep-lane-time">{time(batch.start)}–{time(batch.end)}</span>
               <small>{batch.portions} portions · {batch.demand === "New" ? "Extra" : "Confirmed"}</small>
             </span>
@@ -113,7 +119,7 @@ export function PrepPlanningPage() {
             className="prep-bar" data-demand={batch.demand} data-risk={affected(batch)}
             aria-pressed={active.id === batch.id} onClick={() => select(batch.id)}
             style={{ left: percent(batch.start - trackStart), width: percent(batch.end - batch.start) }}
-            aria-label={menu(batch)?.name + ", " + batch.portions + " " + batch.demand + " portions, " + time(batch.start) + " to " + time(batch.end)}
+            aria-label={batchName(batch) + ", " + batch.portions + " " + batch.demand + " portions, " + time(batch.start) + " to " + time(batch.end)}
             title={batch.id + " · " + time(batch.start) + "–" + time(batch.end) + (affected(batch) ? " · Needs review" : "")}>
             {affected(batch) && <AlertTriangle size={13} aria-label="Needs review" />}
           </button></div>)}
@@ -123,10 +129,10 @@ export function PrepPlanningPage() {
     <div className="prep-legend"><StatusBadge tone="info">Confirmed demand</StatusBadge><StatusBadge tone="simulated">Additional demand</StatusBadge></div>
   </div>;
 
-  const list = <Table caption="Proposed chicken batches · MYT" headers={["Batch", "Menu", "Portions", "Station", "Related orders", "Ready by", "Start", "End", "Minutes", "Validation"]}>
-    {batches.map(batch => <tr key={batch.id} onClick={() => select(batch.id)} data-selected={active.id === batch.id}>
+  const list = <Table caption="Proposed kitchen batches · MYT" headers={["Batch", "Menu", "Portions", "Station", "Related orders", "Ready by", "Start", "End", "Minutes", "Validation"]}>
+    {visibleBatches.map(batch => <tr key={batch.id} onClick={() => select(batch.id)} data-selected={active.id === batch.id}>
       <th scope="row"><Button size="sm" aria-pressed={active.id === batch.id} onClick={() => select(batch.id)}>{batch.id}</Button></th>
-      <td>{menu(batch)?.name}</td><td>{batch.portions}</td><td>{batch.station}</td><td>{batch.orderIds.map(id => "#" + id.slice(-3)).join(", ")}</td><td>{time(batch.deadline)}</td>
+      <td>{batchName(batch)}</td><td>{batch.portions}</td><td>{batch.station}</td><td>{batch.orderIds.map(id => "#" + id.slice(-3)).join(", ")}</td><td>{time(batch.deadline)}</td>
       <td>{time(batch.start)}</td><td>{time(batch.end)}</td><td>{batch.end - batch.start}</td><td>{affected(batch) ? "Needs review" : "Clear"}</td>
     </tr>)}
   </Table>;
@@ -148,7 +154,7 @@ export function PrepPlanningPage() {
       <DataPanel><Layers size={17} /><span>Confirmed orders</span><strong>{orders.length}</strong></DataPanel>
       <DataPanel><Utensils size={17} /><span>Confirmed portions</span><strong>{orders.reduce((sum, order) => sum + order.portions, 0)}</strong><small>{total} with chicken</small></DataPanel>
       <DataPanel><AlertTriangle size={17} /><span>Schedule issues</span><strong>{issues.length}</strong><small>{conflicts} overlapping pairs</small></DataPanel>
-      <DataPanel><Clock size={17} /><span>Generated batches</span><strong>{batches.length}</strong><small>Confirmed chicken queue</small></DataPanel>
+      <DataPanel><Clock size={17} /><span>Generated batches</span><strong>{batches.length}</strong><small>Chicken & fries components</small></DataPanel>
     </div>
     <DataPanel title="Orders by ready time">
       <ul className="prep-ready-chart">
@@ -167,24 +173,44 @@ export function PrepPlanningPage() {
         </li>)}
       </ul>
     </DataPanel>
+    <DataPanel title={recovery ? "Plan B · New-order capacity" : "Original forecast · Supply assumptions"}>
+      {recovery ? <div className="prep-mode-insight">
+        <strong>{additionalQuota} of {additionalDemand} potential new chicken portions</strong>
+        <meter min={0} max={Math.max(1, additionalDemand)} value={additionalQuota} aria-label="Proposed new chicken portions" />
+        <p>{additionalDemand - additionalQuota} forecast portions outside the plan. The timeline shows confirmed orders.</p>
+      </div> : <div className="prep-mode-insight">
+        <strong>{kg(baseline.chickenForecastGrams)} forecast demand / {kg(baseline.chicken + expectedDelivery)} expected supply</strong>
+        <meter min={0} max={Math.max(1, baseline.chicken + expectedDelivery, baseline.chickenForecastGrams)} value={baseline.chickenForecastGrams} aria-label="Forecast chicken demand in grams" />
+        <p>Forecast capacity depended on receiving {kg(expectedDelivery)}. The illustrative timeline shows confirmed orders.</p>
+      </div>}
+    </DataPanel>
     <div className="prep-columns">
-      <DataPanel title="Kitchen schedule" actions={recovery && <Button size="sm" disabled={batches === canonical && !draft} onClick={() => { setBatches(canonical); select(canonical[0]!.id); }}>Reset Schedule</Button>}>
+      <DataPanel title={recovery ? "Recovery kitchen schedule" : "Original confirmed queue"} actions={recovery && <Button size="sm" disabled={batches === canonical && !draft} onClick={() => { setBatches(canonical); select(canonical[0]!.id); }}>Reset Schedule</Button>}>
+        <div className="prep-actions prep-station-filter" role="group" aria-label="Kitchen stations">
+          {(["all", "chicken", "fries"] as const).map(ingredient => <Button key={ingredient} size="sm"
+            aria-pressed={stationFilter === ingredient} variant={stationFilter === ingredient ? "primary" : "secondary"}
+            onClick={() => {
+              setStationFilter(ingredient);
+              const first = batches.find(batch => batch.ingredient === ingredient);
+              if (first && active.ingredient !== ingredient) select(first.id);
+            }}>{ingredient === "all" ? "All stations" : ingredient === "fries" ? "Fries fryer" : "Chicken fryer"}</Button>)}
+        </div>
         <Tabs label="Schedule view" value={view} onChange={setView} tabs={[
           { id: "timeline", label: "Timeline", panel: timeline },
           { id: "list", label: "Batch List", panel: list },
         ]} />
       </DataPanel>
-      <DataPanel title="Batch Inspector">
+      <DataPanel title="Batch Inspector" className="prep-inspector-panel">
         <div className="prep-inspector">
           <StatusBadge tone="simulated">Proposed · {active.demand} demand</StatusBadge>
-          <div className="prep-selected"><small>{active.id}</small><h3>{menu(active)?.name}</h3><strong>{active.portions} portions</strong></div>
+          <div className="prep-selected"><small>{active.id}</small><h3>{batchName(active)}</h3><strong>{active.portions} portions</strong></div>
           <dl>
             <dt>Station</dt><dd>{active.station}</dd>
             <dt>Start–end</dt><dd>{time(active.start)}–{time(active.end)}</dd>
             <dt>Duration</dt><dd>{active.end - active.start} min</dd>
             <dt>Target ready</dt><dd>{time(active.deadline)}</dd>
             <dt>Orders</dt><dd>{active.orderIds.join(", ")}</dd>
-            <dt>Chicken</dt><dd>{kg(active.portions * (menu(active)?.chicken ?? 0))}</dd>
+            <dt>{active.ingredient === "fries" ? "Frozen fries" : "Chicken"}</dt><dd>{kg(active.portions * (menu(active)?.[active.ingredient] ?? 0))}</dd>
           </dl>
           {issues.filter(issue => issue.includes(active.id)).map(issue => <p key={issue} className="prep-error">{issue}</p>)}
           {recovery && (draft ? <form className="prep-edit" onSubmit={apply}>
@@ -197,11 +223,29 @@ export function PrepPlanningPage() {
         </div>
       </DataPanel>
     </div>
-    <AlertBanner title={status} tone={issues.length ? "danger" : needsStockReview ? "warning" : "info"}>
-      {issues.length ? <ul>{issues.map(issue => <li key={issue}>{issue}</li>)}</ul> : <p>Chicken batches meet their linked ready times with no detected station conflicts.</p>}
-      {needsStockReview && <p>Shared stock or allocations changed. Review Plan B before using this baseline schedule.</p>}
-      <p>Fries capacity pending validation, including Combo sides.</p>
-      <p>Demo assumptions: {kitchenAssumptions.maxPortions} portions per chicken batch, {kitchenAssumptions.minutes} minutes per batch. Confirmed chicken: {kg(baseline.confirmedChicken)}. {baseline.rows.filter(row => row.chicken > 0).reduce((sum, row) => sum + row.quota, 0)} potential new portions are outside this confirmed queue.</p>
-    </AlertBanner>
+    <DataPanel title="Schedule checks">
+      {issues.length > 0 && <AlertBanner title={status} tone="danger">
+        <p>Adjust the affected batch or use Reset Schedule to restore the generated plan.</p>
+        <details>
+          <summary>{issues.length} scheduling issues · {affectedOrders.size} affected orders</summary>
+          <ul>{issues.map(issue => <li key={issue}>{issue}</li>)}</ul>
+        </details>
+      </AlertBanner>}
+      {needsStockReview && <AlertBanner title="Shared stock check pending" tone="warning">
+        {linked.status === "STALE" ? "Refresh the shared impact assessment before using this demo schedule." : "Compare the current Plan B stock and allocations with this demo schedule before using it."}
+      </AlertBanner>}
+      <dl className="prep-check-strip">
+        <div><dt>Kitchen batches</dt><dd><StatusBadge tone={issues.length ? "danger" : "success"}>
+          {issues.length ? "Needs review" : "On time · no overlaps"}
+        </StatusBadge></dd></div>
+        <div><dt>Fries station</dt><dd><StatusBadge tone="warning">Demo capacity</StatusBadge></dd><small>Regular Fries and Combo sides · actual capacity unverified</small></div>
+        <div><dt>Chicken reserved for confirmed demand</dt><dd>{kg(baseline.confirmedChicken)}</dd></div>
+      </dl>
+      <details className="prep-check-assumptions">
+        <summary>Demo batch rules</summary>
+        <p>Up to {kitchenAssumptions.maxPortions} portions per batch · {kitchenAssumptions.minutes} min per generated batch.</p>
+        {recovery && <p>{baseline.rows.filter(row => row.chicken > 0).reduce((sum, row) => sum + row.quota, 0)} potential new portions are outside the confirmed queue.</p>}
+      </details>
+    </DataPanel>
   </div></PageContainer>;
 }
