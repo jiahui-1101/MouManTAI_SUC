@@ -11,19 +11,29 @@ type Tab = "stock" | "orders" | "menu";
 
 const defaultFries = preview.lots.find(lot => lot.ingredient === "fries")?.grams ?? 0;
 
-function MenuUsageChart({ items }: { items: { name: string; grams: number; required: number; portions: number }[] }) {
+function MenuUsageChart({ items, available, shortageStock }: { available: number; shortageStock?: number; items: { name: string; grams: number; required: number; portions: number }[] }) {
   const step = Math.max(1, Math.ceil(Math.max(0, ...items.map(item => Math.max(item.grams, item.required))) / 4000));
   const scale = step * 4000;
+  const required = items.reduce((sum, item) => sum + item.required, 0);
+  const coverage = shortageStock !== undefined && required > 0;
+  let cumulativeDemand = 0;
+  let cumulativeCoverage = 0;
   return <figure className="p4-usage-chart">
-    <figcaption>Usage by menu · kg <small>Solid: planned · Outline: confirmed demand</small></figcaption>
+    <figcaption>Usage by menu · kg <small>{coverage ? "Solid: proportional stock coverage · Outline: confirmed demand" : "Solid: planned · Outline: confirmed demand"}</small></figcaption>
+    <div className="p4-chart-stock"><label>Available stock <strong>{kg(available)}</strong></label><meter aria-label="Available stock in grams" min={0} max={Math.max(available, required, 1) + required} value={available} /></div>
     <div className="p4-usage-axis" aria-hidden="true">{[4, 3, 2, 1, 0].map(tick => <span key={tick}>{tick * step}</span>)}</div>
     <ul className="p4-usage-plot">
-      {items.map(item => <li key={item.name}>
-        <div className="p4-usage-column"><div className="p4-usage-required" style={{ height: (item.required / scale * 100) + "%" }} /><div className="p4-usage-fill" style={{ height: (item.grams / scale * 100) + "%" }}>
-          <strong>{kg(item.grams)}</strong>
+      {items.map(item => {
+        cumulativeDemand += item.required;
+        const covered = coverage ? Math.floor((shortageStock ?? 0) * cumulativeDemand / required) : 0;
+        const grams = coverage ? covered - cumulativeCoverage : item.grams;
+        cumulativeCoverage = covered;
+        return <li key={item.name}>
+        <div className="p4-usage-column"><div className="p4-usage-required" style={{ height: (item.required / scale * 100) + "%" }} /><div className="p4-usage-fill" style={{ height: (grams / scale * 100) + "%" }}>
+          <strong>{kg(grams)}</strong>
         </div></div>
-        <div className="p4-usage-category">{item.name}<small>{item.portions} planned · {kg(item.required)} required</small></div>
-      </li>)}
+        <div className="p4-usage-category">{item.name}<small>{coverage ? "Coverage estimate" : item.portions + " planned"} · {kg(item.required)} required</small></div>
+      </li>; })}
     </ul>
   </figure>;
 }
@@ -89,7 +99,7 @@ export function PlanBPage() {
       </div>
       <div className="p4-allocation-legend"><span><i className="is-confirmed"/>Confirmed orders <b>{kg(confirmedAllocated)}</b></span><span><i className="is-new"/>Additional combos <b>{kg(additionalAllocated)}</b></span><span><i className="is-left"/>Remaining <b>{kg(Math.max(0, result.residual))}</b></span></div></div></div>
 
-      <MenuUsageChart items={protectedOrders.map(row => ({ name: row.short, portions: row.protected + row.quota, required: row.confirmed * row.chicken, grams: (row.protected + row.quota) * row.chicken }))} />
+      <MenuUsageChart available={result.chicken} shortageStock={breach ? Math.min(result.chicken, result.confirmedChicken) : undefined} items={protectedOrders.map(row => ({ name: row.short, portions: row.protected + row.quota, required: row.confirmed * row.chicken, grams: (row.protected + row.quota) * row.chicken }))} />
       </div>
       <aside className="p4-simulation"><h3>What if chicken stock changes?</h3>
         <label htmlFor="demo-chicken-stock">Accepted chicken stock <strong>{kg(chickenGrams)}</strong></label>
@@ -99,7 +109,7 @@ export function PlanBPage() {
         <div data-shortage={result.deficit > 0}><strong>{kg(result.deficit || result.residual)}</strong><span>{result.deficit > 0 ? "Short for confirmed orders" : "Left after planned use"}</span></div>
         <div><strong>+{combo?.quota ?? 0}</strong><span>Happy Combos</span></div>
         <div><strong>{kg(result.confirmedChicken)}</strong><span>Needed for confirmed meals</span></div>
-      </div></aside></div>
+      </div><p className="p4-sim-note">{breach ? "Review confirmed orders before accepting new chicken orders." : `${kg(result.assigned)} allocated to ${scenario.forecastChickenPortionsServed} planned meals. Each additional Happy Combo needs 100 g of chicken and 180 g of fries.`}</p></aside></div>
       <div className="p4-stock-workspace p4-ingredient p4-ingredient--fries"><section className="p4-stock-visual" aria-labelledby="fries-allocation">
         <div className="p4-ingredient-heading"><h3 id="fries-allocation" className="p4-ingredient-title"><Utensils size={20} aria-hidden="true" /> Frozen fries stock</h3><small>Stock lot · {input.lots.filter(lot => lot.ingredient === "fries").map(lot => lot.id).join(", ")}</small></div>
         <div className="p4-stock-meter"><div className="p4-available"><strong>{kg(result.fries)} <small>available</small></strong></div><div className="p4-meter-detail"><div className="p4-stock p4-stock-green" aria-hidden="true">
@@ -108,7 +118,7 @@ export function PlanBPage() {
         </div>
         <div className="p4-allocation-legend"><span><i className="is-confirmed"/>Confirmed <b>{kg(friesReserved)}</b></span><span><i className="is-new"/>New <b>{kg(friesExtra)}</b></span><span><i className="is-left"/>Remaining <b>{kg(friesRemaining)}</b></span></div></div></div>
 
-        <MenuUsageChart items={friesRows.map(row => ({ name: row.short, portions: row.protected + row.quota, required: row.confirmed * row.fries, grams: (row.protected + row.quota) * row.fries }))} />
+        <MenuUsageChart available={result.fries} shortageStock={friesDeficit > 0 ? result.fries : undefined} items={friesRows.map(row => ({ name: row.short, portions: row.protected + row.quota, required: row.confirmed * row.fries, grams: (row.protected + row.quota) * row.fries }))} />
       </section>
       <aside className="p4-simulation" aria-labelledby="fries-what-if">
         <h3 id="fries-what-if">What if fries stock changes?</h3>
@@ -121,7 +131,7 @@ export function PlanBPage() {
           <div><strong>+{regularFries?.quota ?? 0}</strong><span>Regular Fries</span></div>
           <div><strong>+{combo?.quota ?? 0}</strong><span>Happy Combos</span></div>
         </div>
-      </aside></div>
+      <p className="p4-sim-note">{friesDeficit > 0 ? "Review the confirmed Combo and Regular Fries commitments." : `${kg(result.confirmedFries)} required for confirmed meals. Extra portions depend on fryer capacity.`}</p></aside></div>
     </section>}
 
     {tab === "orders" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-orders" aria-labelledby="p4-tab-orders">

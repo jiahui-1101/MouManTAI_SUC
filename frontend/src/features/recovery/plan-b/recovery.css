@@ -297,3 +297,9 @@
 .p4-usage-column { position: relative; }
 .p4-usage-required { position: absolute; bottom: 0; width: 66%; max-width: 70px; border: 1px dashed var(--ingredient-accent); border-radius: 5px 5px 0 0; }
 .p4-usage-chart figcaption small { display: block; font-weight: 400; }
+
+.p4-chart-stock { grid-column: 1 / -1; display: grid; gap: 3px; margin-bottom: 18px; }
+.p4-chart-stock label { display: flex; justify-content: space-between; font-size: 11px; }
+.p4-chart-stock meter { width: 100%; height: 9px; }
+.p4-chart-stock meter::-webkit-meter-optimum-value { background: var(--ingredient-chart); }
+.p4-sim-note { border-top: 1px solid var(--line); padding-top: 8px; }
