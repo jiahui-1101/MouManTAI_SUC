@@ -48,10 +48,11 @@ export function IncidentDetail({ incident, onClose }: { incident: Incident; onCl
   const onTabKey = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
     const i = TABS.findIndex(([id]) => id === tab);
     const next = e.key === "ArrowRight" ? (i + 1) % TABS.length : e.key === "ArrowLeft" ? (i - 1 + TABS.length) % TABS.length : -1;
-    if (next < 0) return;
+    const nextTab = TABS[next];
+    if (!nextTab) return;
     e.preventDefault();
-    setTab(TABS[next][0]);
-    document.getElementById(`incident-tab-${TABS[next][0]}`)?.focus();
+    setTab(nextTab[0]);
+    document.getElementById(`incident-tab-${nextTab[0]}`)?.focus();
   };
 
   useEffect(() => {
