@@ -2,11 +2,11 @@
 
 ## Status
 
-**Milestone:** Shared mock supplier inbox complete
+**Milestone:** Mock messaging inbox, channels and settings complete
 
 **Branch:** `feature/p1-mock-messaging` (created from `main`)
 
-**Implementation:** Parser and polished `/inbox` complete; remaining P1 pages are not part of this increment
+**Implementation:** Parser, polished `/inbox`, mock-only `/channels`, and mock-only `/settings` complete
 
 ## Authoritative inputs
 
@@ -79,7 +79,7 @@ The user's scope override takes precedence where the documents discuss real or r
 - [x] Implement the canonical P1 inbox contract/fixture from the shared mock-data document.
 - [x] Implement and test offline inbox behavior: channel filters/counts, search, selection/read state, empty state, immutable detail, provenance, processing timeline, incident correlation, unverified/unmatched messages, duplicate suppression, and Message Intelligence navigation.
 - [ ] Implement and test rule extraction and review behavior.
-- [ ] Implement and test display-only channel/settings behavior.
+- [x] Implement and test mock-only channel/settings behavior.
 - [x] Run full tests, typecheck, and production build for the parser milestone.
 
 ## Inbox implementation notes
@@ -95,9 +95,18 @@ The user's scope override takes precedence where the documents discuss real or r
 - Desktop split view collapses to a stacked tablet/mobile layout while preserving keyboard-accessible controls.
 - No provider SDK, network integration, OAuth, API, credential, or backend work was added.
 
+## Channels and settings implementation notes
+
+- `/channels` presents WhatsApp, Outlook, and Telegram strictly as synthetic fixture sources with shared-store message counts, last fixture event, provenance, and available canonical scenarios.
+- Demo controls load the three-channel, review-state, or empty fixture into the existing shared inbox store and can reset the shared demo state.
+- `/settings` presents all four fictional suppliers from the shared registry and the canonical deterministic extraction summary.
+- In-memory preferences control unread-first ordering and processing-timeline visibility in `/inbox`; reset restores fixtures, read state, and defaults.
+- Registered suppliers that are not assigned to `HP-PO-1042` remain blocked from verifying its canonical message.
+- No connection status, OAuth, webhook, provider API, credential field, live-message control, or simulation API was added.
+
 ## Latest verification
 
-- `npm test`: 35 tests passed across 3 test files.
+- `npm test`: 40 tests passed across 5 test files.
 - `npm run typecheck`: passed.
 - `npm run build`: passed with Vite 8.3.8.
 - No dependencies or external services were added.
