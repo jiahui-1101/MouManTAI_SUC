@@ -1,4 +1,5 @@
 import { Mail, MessageCircle, RotateCcw, Send } from "lucide-react";
+import { Link } from "react-router-dom";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
 import { DEMO_FIXTURES, type InboxChannel, inboxStore, useInboxState } from "../../features/messaging/inboxStore";
@@ -15,7 +16,7 @@ function fixtureTime(iso?: string) {
 }
 
 export function ChannelsPage() {
-  const { messages, activeFixture } = useInboxState();
+  const { messages, activeFixture, loadStatus } = useInboxState();
   return <PageContainer title={titleFor("/channels")}>
     <div className="channels__hero"><div><p className="inbox__eyebrow">Synthetic message sources</p><p>Explore predefined Happy Potato message fixtures without connecting provider accounts.</p></div><span className="inbox__mode">SIMULATED_CHANNEL only</span></div>
     <div className="channels__grid">
@@ -36,7 +37,7 @@ export function ChannelsPage() {
       <button className="demo-controls__reset" type="button" onClick={() => inboxStore.reset()}><RotateCcw aria-hidden="true" size={16} /> Reset shared demo</button>
       <button type="button" onClick={() => inboxStore.setMockLoadStatus("LOADING")}>Show mock loading in Inbox</button>
       <button type="button" onClick={() => inboxStore.setMockLoadStatus("ERROR")}>Show mock error in Inbox</button>
-      <p className="demo-controls__status" role="status">Active fixture: <strong>{DEMO_FIXTURES[activeFixture].label}</strong> · {messages.length} messages loaded</p>
+      <p className="demo-controls__status" role="status">Active fixture: <strong>{DEMO_FIXTURES[activeFixture].label}</strong> · {messages.length} messages loaded · Mock load state: <strong>{loadStatus ?? "READY"}</strong>{loadStatus && <> · <button type="button" onClick={() => inboxStore.setMockLoadStatus()}>Clear mock state</button> · <Link to="/inbox">View in Inbox</Link></>}</p>
     </section>
   </PageContainer>;
 }

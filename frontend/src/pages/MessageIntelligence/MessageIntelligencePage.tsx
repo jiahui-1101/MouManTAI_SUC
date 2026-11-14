@@ -38,7 +38,7 @@ export function MessageIntelligencePage() {
   const [params] = useSearchParams();
   const messageId = params.get("message");
 
-  if (state.loadStatus === "LOADING") return <PageContainer title={TITLE}><p role="status" aria-busy="true">Loading local mock fixture…</p></PageContainer>;
+  if (state.loadStatus === "LOADING") return <PageContainer title={TITLE}><p role="status" aria-busy="true">Loading local mock fixture…</p><button type="button" className="mi-button" onClick={() => demoStore.setMockLoadStatus()}>Finish mock loading</button></PageContainer>;
   if (state.loadStatus === "ERROR") return <PageContainer title={TITLE}><p role="alert">Mock fixture loading failed. No provider was contacted.</p><button type="button" className="mi-button" onClick={() => demoStore.setMockLoadStatus()}>Retry local fixture</button></PageContainer>;
   if (!messageId) {
     return <PageContainer title={TITLE}><div className="inbox__empty mi-empty"><strong>No message selected</strong><p>Choose a simulated message to review.</p>
@@ -59,6 +59,7 @@ function Workspace({ message }: { message: InboxMessage }) {
   const [errors, setErrors] = useState<DraftErrors>({});
   const [note, setNote] = useState("");
   const [status, setStatus] = useState("");
+  useEffect(() => { if (!message.read) demoStore.select(message.id); }, [message.id, message.read]);
   useEffect(() => { setViewed(latest.version); setDraft(draftFromValues(latest.values)); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest.id]);
 

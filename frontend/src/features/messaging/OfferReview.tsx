@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { demoStore, selectOfferReviewVersions, useDemoState, type InboxMessage } from "../../store/demoStore";
 import { segmentRawText } from "./segmentRawText";
@@ -14,6 +14,7 @@ export function OfferReview({ message }: { message: InboxMessage }) {
   const versions = selectOfferReviewVersions(state, message.id);
   const evidence = selectSupplierOfferEvidence(state).find((o) => o.messageId === message.id);
   const blockers = offerQualificationBlockers(message.senderRegistryId, parse);
+  useEffect(() => { if (!message.read) demoStore.select(message.id); }, [message.id, message.read]);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
@@ -53,7 +54,7 @@ export function OfferReview({ message }: { message: InboxMessage }) {
         <EvidencePanel messageId={message.id} />
       </section>
       <section className="settings-card" aria-labelledby="ofr-history"><header><h2 id="ofr-history">Review history</h2></header>
-        <ol className="mi-history" aria-label="Offer review versions">{versions.map((v) => <li key={v.id}><button type="button"><strong>v{v.version} · {v.method} · {v.qualification}</strong><span>{v.decision} by {v.actor} · {v.createdAtIso}</span>{v.note && <span>Note: {v.note}</span>}</button></li>)}</ol>
+        <ol className="mi-history" aria-label="Offer review versions">{versions.map((v) => <li key={v.id}><div className="mi-history__item"><strong>v{v.version} · {v.method} · {v.qualification}</strong><span>{v.decision} by {v.actor} · {v.createdAtIso}</span>{v.note && <span>Note: {v.note}</span>}</div></li>)}</ol>
       </section>
     </div>
   </div>;

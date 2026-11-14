@@ -273,3 +273,4 @@ ul { padding: 0; list-style: none; }
 .mi-handoff dt { color: var(--ink-2); font-size: 11px; text-transform: uppercase; }
 .mi-handoff dd { margin: 0; font-weight: 600; }
 .mi-confirm p { margin: 0 0 8px; }
+.mi-history__item { display: grid; gap: 2px; padding: 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); font-size: 12px; }
