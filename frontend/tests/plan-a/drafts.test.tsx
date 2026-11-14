@@ -32,3 +32,6 @@ it("blocks stale or modified proposals rather than preserving obsolete totals",(
   const input=draftInput(); expect(createInternalPoDraft({...input,scenarioIsCurrent:false})).toMatchObject({ok:false,error:{code:"STALE_SCENARIO"}});
   input.proposal.additionalCostSen=1; expect(createInternalPoDraft(input)).toMatchObject({ok:false,error:{code:"STALE_SCENARIO"}});
 });
+it("rejects invalid quoted amounts instead of formatting them as usable RFQ pricing",()=>{
+  expect(createRfqDraft({...draftInput(),candidate:makeOfferB({offer:{pricePerKgSen:-100}})})).toMatchObject({ok:false,error:{code:"INVALID_COST"}});
+});

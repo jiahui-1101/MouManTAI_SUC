@@ -10,6 +10,9 @@ function prepare(input: DraftInput) {
   const need = deriveRecoverySourcingNeed(input.source);
   if (!need.ok) return need;
   const assessment = assessOffer({ candidate: input.candidate, need: need.value, businessClock: input.source.businessClock });
+  if (assessment.reasonCodes.includes("INVALID_COST")) {
+    return { ok: false as const, error: { code: "INVALID_COST", message: "Correct invalid or unsafe quoted amounts before generating a draft." } };
+  }
   if (input.candidate.supplier.status !== "APPROVED_DEMO_SUPPLIER" || assessment.status === "INCOMPATIBLE") {
     return { ok: false as const, error: { code: "OFFER_NOT_ELIGIBLE", message: "Select a qualified demo supplier whose offer meets the hard product, quantity and delivery constraints.", reasons: assessment.reasonCodes } };
   }
@@ -74,7 +77,7 @@ export function createInternalPoDraft(input: InternalPoInput): DraftResult {
   const offer = input.candidate.offer;
   const proposal = fresh.value;
   const id = `demo:po:${encodeURIComponent(prepared.need.incidentId)}:${encodeURIComponent(offer.id)}:${encodeURIComponent(proposal.snapshotFingerprint)}:r${prepared.need.snapshotRevision}:v${proposal.version}`;
-  const reviewRequirements = [...rfq.value.reviewRequirements, "Manager decision and approval are required through P5 before any simulated execution.", ...proposal.conditions.map(condition => condition.description)];
+  const reviewRequirements = [...new Set([...rfq.value.reviewRequirements, "Manager decision and approval are required through P5 before any simulated execution.", ...proposal.conditions.map(condition => condition.description)])];
   const text = [
     "DEMO ONLY — INTERNAL PO DRAFT — NOT_APPROVED / NOT_SENT",
     `Replacement draft reference: ${id} (local demo ID; not an issued supplier PO)`,

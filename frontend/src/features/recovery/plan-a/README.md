@@ -29,5 +29,21 @@ For visual review with the single test-only factory, run Vite and open
 or included in its build. It exercises the same workspace as the production page
 without introducing runtime demo fixtures or a separate store.
 
-Phase 4 adds RFQ/PO drafts. Phase 5 supplies shared selectors and
+Phase 4 provides pure `createRfqDraft(DraftInput)` and
+`createInternalPoDraft(InternalPoInput)` generators, each returning `DraftResult`.
+They revalidate source and quote data; PO drafts additionally recompute and compare
+the caller proposal against its supplied metadata. `PlanADraftActions` keeps at most
+one document per type in local React state. Identical creation reopens that record.
+Changed inputs mark records STALE permanently until explicit regeneration, including
+when old inputs are restored. Closing the panel keeps the local record; unmounting
+the workspace clears it. No browser storage or global draft store is used.
+
+Draft status is DRAFT or NEEDS_REVIEW (plus local NOT_CREATED / STALE). Approval and
+transmission remain NOT_APPROVED / NOT_SENT. Unknown contact authorization and quote
+validity remain explicit review requirements. Clipboard success is reported only
+after `writeText` resolves; failed or unavailable copy leaves selectable text.
+Local `demo:rfq:` and `demo:po:` references are deterministic identifiers, not
+provider messages, supplier-issued POs or cryptographic snapshot fingerprints.
+
+Phase 5 supplies shared selectors and
 `SCENARIO_A_READY` publishing; these remain integration-lead dependencies.
