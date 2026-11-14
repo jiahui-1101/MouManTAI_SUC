@@ -1,5 +1,6 @@
 import { Package, PackageX, UtensilsCrossed } from "lucide-react";
 import type { RecoverySourcingNeed } from "../domain";
+import { DetailFacts } from "./DetailContent";
 import { kg } from "./presentation";
 
 export function SupplyNeedSummary({ need }: { need: RecoverySourcingNeed }) {
@@ -18,6 +19,9 @@ export function SupplyNeedSummary({ need }: { need: RecoverySourcingNeed }) {
       <dd>{kg(value).slice(0, -2)}<span>kg</span></dd>
     </div>)}</dl>
     <dl className="pa-supporting-facts"><div><dt>Supplier-reported PO shortfall</dt><dd>{kg(need.poShortfallKgMilli)}</dd></div><div><dt>Prep cutoff</dt><dd>{need.requiredReceiptCutoffLocal} MYT</dd></div></dl>
-    <details><summary>Original delivery</summary><p>Original PO: {kg(need.originalExpectedKgMilli)} planned · {kg(need.claimedIncomingKgMilli)} supplier-claimed today. Supplier claims are not accepted stock.</p></details>
+    <details><summary>Original delivery</summary><div className="pa-disclosure-body"><DetailFacts items={[
+      ["Planned PO delivery", kg(need.originalExpectedKgMilli)], ["Supplier-claimed today", kg(need.claimedIncomingKgMilli)],
+      ["PO shortfall", kg(need.poShortfallKgMilli)],
+    ]}/><p className="pa-detail-note">Supplier claims do not change accepted stock.</p></div></details>
   </section>;
 }
