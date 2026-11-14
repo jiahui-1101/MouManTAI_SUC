@@ -81,30 +81,29 @@
 .demo-controls__status strong { color: var(--text-primary); }
 .p1-link { color: var(--brand-primary-text); font-weight: 600; }
 
-/* Mock messaging settings */
-.settings__hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; color: var(--ink-2); }
-.settings__grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 14px; }
-.settings-card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 20px; }
-.settings-card > header { display: flex; align-items: center; gap: 9px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
-.settings-card h2 { margin: 0; font-family: var(--font-heading); font-size: 18px; }
-.settings-card header p, .settings__reset p { color: var(--ink-2); }
-.registry-list { display: grid; gap: 8px; margin-top: 14px; }
-.registry-list article { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
-.registry-list article div { display: grid; }
-.registry-list article div span { color: var(--ink-2); font-size: 11px; }
-.registry-list__status { color: var(--brand); font-size: 10px; font-weight: 700; text-align: right; }
-.rule-summary { display: grid; gap: 9px; margin: 14px 0 0; }
+/* ===== Settings ===== */
+.settings__hero { margin-bottom: 14px; }
+.settings__grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: 16px; }
+.settings-card > header { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--border-default); color: var(--brand-primary-text); }
+.settings-card h2 { margin: 0; color: var(--text-primary); font-size: 15px; font-weight: 700; }
+.settings-card header p { margin: 2px 0 0; color: var(--text-secondary); font-size: 12.5px; }
+.registry-list { display: grid; gap: 8px; margin-top: 12px; }
+.registry-list article { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.registry-list article div { display: grid; min-width: 0; font-size: 13.5px; }
+.registry-list article div span { color: var(--text-secondary); font-family: var(--font-mono); font-size: 11.5px; }
+.rule-summary { display: grid; gap: 10px; margin: 12px 0 0; }
 .rule-summary div { display: grid; gap: 2px; }
-.rule-summary dt { color: var(--ink-2); font-size: 11px; text-transform: uppercase; }
-.rule-summary dd { margin: 0; font-weight: 600; }
-.settings-card--preferences { margin-top: 14px; }
-.setting-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--line); }
-.setting-toggle span { display: grid; }
-.setting-toggle small { color: var(--ink-2); }
-.setting-toggle input { width: 19px; height: 19px; accent-color: var(--brand); }
+.rule-summary dt { color: var(--text-secondary); font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+.rule-summary dd { margin: 0; font-size: 13.5px; font-weight: 600; }
+.settings-card--preferences { margin-top: 16px; }
+.setting-toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border-default); cursor: pointer; }
+.setting-toggle span { display: grid; gap: 2px; font-size: 13.5px; }
+.setting-toggle small { color: var(--text-secondary); font-size: 12.5px; }
+.setting-toggle input { flex: 0 0 auto; width: 18px; height: 18px; accent-color: var(--action-primary); }
+.setting-toggle input:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
 .settings__reset { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-top: 14px; }
-.settings__reset button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; }
-.settings__privacy { margin-top: 14px; padding: 12px; border-left: 3px solid var(--brand); background: var(--brand-soft); }
+.settings__reset p { margin: 2px 0 0; color: var(--text-secondary); font-size: 12.5px; }
+.settings__privacy { margin-top: 16px; }
 
 @media (max-width: 1023px) {
   .inbox__workspace { grid-template-columns: 1fr; }
