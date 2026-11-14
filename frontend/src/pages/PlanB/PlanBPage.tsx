@@ -78,7 +78,6 @@ export function PlanBPage() {
       <div className="p4-hero-status"><span><Package size={15}/> No new purchase</span><span>{breach ? <><AlertTriangle size={15}/> BREACH_RISK · review needed</> : <><Check size={15}/> {feasible ? "Plan feasible under demo assumptions" : "Schedule needs review"}</>}</span><span>Mock data · {preview.date} MYT</span></div>
     </header>
 
-    {breach && <div className="p4-breach" role="alert"><AlertTriangle aria-hidden="true"/><div><strong>Confirmed demand is under-provisioned</strong><p>{protectedOrders.reduce((n, row) => n + row.confirmed, 0)} confirmed portions require {kg(result.confirmedChicken)}. Available stock is {kg(result.chicken)},.{result.deficit > 0 && <> Chicken has a {kg(result.deficit)} shortfall.</>}{friesDeficit > 0 && <> Frozen fries have a {kg(friesDeficit)} shortfall.</>} Full protection is not possible. Review and renegotiate affected orders manually.</p></div></div>}
 
     <section className="p4-kpi-strip" aria-label="Plan B summary">
       <article><span className="p4-kpi-icon"><Package/></span><div><small>Available stock</small><strong>{kg(result.chicken)}</strong><span>Accepted chicken</span></div></article>
@@ -93,43 +92,50 @@ export function PlanBPage() {
 
     {tab === "stock" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-stock" aria-labelledby="p4-tab-stock">
       <div className="p4-section-heading"><div><h2>Stock Allocation</h2></div><span className={`p4-pill ${breach ? "p4-risk-pill" : "p4-ready-pill"}`}>{breach ? "BREACH_RISK" : feasible ? "Plan Feasible*" : "Schedule needs review"}</span></div>
-      <div className="p4-stock-workspace p4-ingredient p4-ingredient--chicken"><div className="p4-stock-visual"><div className="p4-ingredient-heading"><h3 className="p4-ingredient-title"><Drumstick size={20} aria-hidden="true" /> Chicken stock<small className="p4-lot-label">Stock lot · {input.lots.filter(lot => lot.ingredient === "chicken").map(lot => lot.id).join(", ")}</small></h3></div>
+      <div className="p4-stock-workspace p4-ingredient p4-ingredient--chicken p4-ingredient-card"><div className="p4-stock-visual p4-ingredient-summary"><div className="p4-ingredient-heading"><h3 className="p4-ingredient-title"><Drumstick size={20} aria-hidden="true" /> Chicken stock<small className="p4-lot-label">Stock lot · {input.lots.filter(lot => lot.ingredient === "chicken").map(lot => lot.id).join(", ")}</small></h3></div>
       <div className="p4-stock-meter"><div className="p4-available"><strong>{kg(result.chicken)} <small>available</small></strong></div><div className="p4-meter-detail"><div className="p4-stock p4-stock-green" role="img" aria-label={`Chicken allocation: confirmed ${kg(confirmedAllocated)}, new ${kg(additionalAllocated)}, left ${kg(Math.max(0, result.residual))}`}>
         <span style={{ width: `${result.chicken ? confirmedAllocated / result.chicken * 100 : 0}%` }}/><span style={{ width: `${result.chicken ? additionalAllocated / result.chicken * 100 : 0}%` }}/>
       </div>
       <div className="p4-allocation-legend"><span><i className="is-confirmed"/>Confirmed orders <b>{kg(confirmedAllocated)}</b></span><span><i className="is-new"/>Additional combos <b>{kg(additionalAllocated)}</b></span><span><i className="is-left"/>Remaining <b>{kg(Math.max(0, result.residual))}</b></span></div></div></div>
 
-      <MenuUsageChart available={result.chicken} shortageStock={breach ? Math.min(result.chicken, result.confirmedChicken) : undefined} items={protectedOrders.map(row => ({ name: row.short, portions: row.protected + row.quota, required: row.confirmed * row.chicken, grams: (row.protected + row.quota) * row.chicken }))} />
       </div>
-      <aside className="p4-simulation"><h3>What if chicken stock changes?</h3>
-        <label htmlFor="demo-chicken-stock">Accepted chicken stock <strong>{kg(chickenGrams)}</strong></label>
-        <input id="demo-chicken-stock" type="range" min="0" max="15000" step="250" value={chickenGrams} onChange={event => setChickenGrams(Number(event.target.value))} aria-valuetext={kg(chickenGrams)}/>
-
-      <div className="p4-fries-results" aria-live="polite">
-        <div data-shortage={result.deficit > 0}><strong>{kg(result.deficit || result.residual)}</strong><span>{result.deficit > 0 ? "Short for confirmed orders" : "Left after planned use"}</span></div>
-        <div><strong>+{combo?.quota ?? 0}</strong><span>Happy Combos</span></div>
-        <div><strong>{kg(result.confirmedChicken)}</strong><span>Needed for confirmed meals</span></div>
-      </div><p className="p4-sim-note">{breach ? "Review confirmed orders before accepting new chicken orders." : `${kg(result.assigned)} allocated to ${scenario.forecastChickenPortionsServed} planned meals. Each additional Happy Combo needs 100 g of chicken and 180 g of fries.`}</p></aside></div>
-      <div className="p4-stock-workspace p4-ingredient p4-ingredient--fries"><section className="p4-stock-visual" aria-labelledby="fries-allocation">
-        <div className="p4-ingredient-heading"><h3 id="fries-allocation" className="p4-ingredient-title"><Utensils size={20} aria-hidden="true" /> Frozen fries stock</h3><small>Stock lot · {input.lots.filter(lot => lot.ingredient === "fries").map(lot => lot.id).join(", ")}</small></div>
+      {result.deficit > 0 && <div className="p4-ingredient-alert" role="status"><AlertTriangle size={16} aria-hidden="true" /><strong>Chicken shortfall · {kg(result.deficit)}</strong><span>Confirmed orders at risk</span></div>}
+      <MenuUsageChart available={result.chicken} shortageStock={breach ? Math.min(result.chicken, result.confirmedChicken) : undefined} items={protectedOrders.map(row => ({ name: row.short, portions: row.protected + row.quota, required: row.confirmed * row.chicken, grams: (row.protected + row.quota) * row.chicken }))} />
+      <aside className="p4-simulation p4-chicken-simulation">
+        <h3>What if chicken stock changes?</h3>
+        <label htmlFor="demo-chicken-stock">Simulated chicken stock <strong>{kg(chickenGrams)}</strong></label>
+        <input id="demo-chicken-stock" type="range" min="0" max="15000" step="250" value={chickenGrams}
+          onChange={event => setChickenGrams(Number(event.target.value))} aria-valuetext={kg(chickenGrams)} />
+        <div className="p4-fries-results p4-five-results" aria-live="polite">
+          <div><strong>{kg(result.deficit ? result.chicken : result.assigned)}</strong><span>{result.deficit ? "Stock available for confirmed demand" : "Planned Chicken Use"}</span></div>
+          <div data-shortage={result.deficit > 0}><strong>{kg(result.deficit || result.residual)}</strong><span>{result.deficit ? "Chicken Shortfall" : "Stock Remaining"}</span></div>
+          <div><strong>+{combo?.quota ?? 0}</strong><span>Extra Happy Combos</span><small>Up to {(combo?.forecast ?? 0) - (combo?.confirmed ?? 0)} new portions</small></div>
+          <div data-estimate={chickenGrams > 10000}><strong>RM{(Math.max(0, chickenGrams - 10000) * 16 / 1000).toFixed(2)}</strong><span>Hypothetical Purchase Cost</span><small>RM16/kg above 10 kg</small></div>
+          <div data-shortage={breach}><strong>{breach ? "At Risk" : "Covered"}</strong><span>Confirmed Orders Covered</span><small>{protectedOrders.reduce((sum, row) => sum + row.confirmed, 0)} chicken portions · {kg(result.confirmedChicken)} required</small></div>
+        </div>
+        <p className="p4-sim-note">{breach ? "Review confirmed orders. New chicken orders stay paused." : "Ingredients cover confirmed demand. Prep timing still needs to be checked."}</p>
+      </aside></div>
+      <div className="p4-stock-workspace p4-ingredient p4-ingredient--fries p4-ingredient-card"><section className="p4-stock-visual p4-ingredient-summary" aria-labelledby="fries-allocation">
+        <div className="p4-ingredient-heading"><h3 id="fries-allocation" className="p4-ingredient-title"><Utensils size={20} aria-hidden="true" /> Frozen fries stock<small className="p4-lot-label">Stock lot · {input.lots.filter(lot => lot.ingredient === "fries").map(lot => lot.id).join(", ")}</small></h3></div>
         <div className="p4-stock-meter"><div className="p4-available"><strong>{kg(result.fries)} <small>available</small></strong></div><div className="p4-meter-detail"><div className="p4-stock p4-stock-green" aria-hidden="true">
           <span style={{ width: (result.fries ? friesReserved / result.fries * 100 : 0) + "%" }} />
           <span style={{ width: (result.fries ? friesExtra / result.fries * 100 : 0) + "%" }} />
         </div>
         <div className="p4-allocation-legend"><span><i className="is-confirmed"/>Confirmed <b>{kg(friesReserved)}</b></span><span><i className="is-new"/>New <b>{kg(friesExtra)}</b></span><span><i className="is-left"/>Remaining <b>{kg(friesRemaining)}</b></span></div></div></div>
 
-        <MenuUsageChart available={result.fries} shortageStock={friesDeficit > 0 ? result.fries : undefined} items={friesRows.map(row => ({ name: row.short, portions: row.protected + row.quota, required: row.confirmed * row.fries, grams: (row.protected + row.quota) * row.fries }))} />
       </section>
+      {friesDeficit > 0 && <div className="p4-ingredient-alert" role="status"><AlertTriangle size={16} aria-hidden="true" /><strong>Fries shortfall · {kg(friesDeficit)}</strong><span>Confirmed orders at risk</span></div>}
+              <MenuUsageChart available={result.fries} shortageStock={friesDeficit > 0 ? result.fries : undefined} items={friesRows.map(row => ({ name: row.short, portions: row.protected + row.quota, required: row.confirmed * row.fries, grams: (row.protected + row.quota) * row.fries }))} />
       <aside className="p4-simulation" aria-labelledby="fries-what-if">
         <h3 id="fries-what-if">What if fries stock changes?</h3>
-        <label htmlFor="demo-fries-stock">Accepted fries stock <strong>{kg(friesGrams)}</strong></label>
+        <label htmlFor="demo-fries-stock">Simulated fries stock <strong>{kg(friesGrams)}</strong></label>
         <input id="demo-fries-stock" type="range" min="0" max="40000" step="50" value={friesGrams}
           onChange={event => setFriesGrams(Number(event.target.value))} aria-valuetext={kg(friesGrams)} />
 
-        <div className="p4-fries-results" aria-live="polite">
+        <div className="p4-fries-results p4-five-results" aria-live="polite">
           <div data-shortage={friesDeficit > 0}><strong>{kg(friesDeficit || friesRemaining)}</strong><span>{friesDeficit > 0 ? "Short for confirmed orders" : "Left after planned use"}</span></div>
-          <div><strong>+{regularFries?.quota ?? 0}</strong><span>Regular Fries</span></div>
-          <div><strong>+{combo?.quota ?? 0}</strong><span>Happy Combos</span></div>
+          <div><strong>{kg(friesDeficit > 0 ? result.fries : result.friesAssigned)}</strong><span>{friesDeficit > 0 ? "Stock available for confirmed demand" : "Planned Fries Use"}</span></div><div><strong>+{regularFries?.quota ?? 0}</strong><span>Regular Fries</span></div>
+          <div><strong>+{combo?.quota ?? 0}</strong><span>Happy Combos</span></div><div data-shortage={friesDeficit > 0}><strong>{friesDeficit > 0 ? "At Risk" : "Covered"}</strong><span>Confirmed Fries Demand</span><small>{kg(result.confirmedFries)} required</small></div>
         </div>
       <p className="p4-sim-note">{friesDeficit > 0 ? "Review the confirmed Combo and Regular Fries commitments." : `${kg(result.confirmedFries)} required for confirmed meals. Extra portions depend on fryer capacity.`}</p></aside></div>
     </section>}
