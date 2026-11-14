@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
 import { CANONICAL_PO_REGISTRY, CANONICAL_SUPPLIER_REGISTRY } from "../../features/messaging/mockMessageRegistry";
-import { parseMockSupplierMessage, type EvidenceSpan } from "../../features/messaging/mockMessageRuleExtractor";
+import { parseMockSupplierMessage } from "../../features/messaging/mockMessageRuleExtractor";
 import {
   QUANTITY_UNITS,
   REVIEW_INCIDENT_TYPES,
@@ -17,6 +17,9 @@ import {
 } from "../../features/messaging/messageReview";
 import { demoStore, incidentLinkBlockers, selectExtractionVersions, useDemoState, type InboxMessage } from "../../store/demoStore";
 import { IncidentHandoff } from "../../features/messaging/IncidentHandoff";
+import { EvidencePanel } from "../../features/messaging/EvidencePanel";
+import { OfferReview } from "../../features/messaging/OfferReview";
+import { segmentRawText } from "../../features/messaging/segmentRawText";
 
 const TITLE = titleFor("/message-intelligence");
 const FIELD_LABELS: Record<string, string> = {
@@ -28,20 +31,7 @@ const fmtTime = (iso: string) => new Intl.DateTimeFormat("en-GB", { dateStyle: "
 const fmtChange = (v: string | number | null, field: CandidateField) =>
   v === null ? "empty" : field === "expectedKgMilli" || field === "claimedDeliveryKgMilli" ? kg(v as number) : String(v);
 
-/** Splits raw text into plain and evidence segments using exact offsets; overlapping spans are skipped. */
-export function segmentRawText(rawText: string, spans: readonly EvidenceSpan[]) {
-  const sorted = [...spans].filter((s) => rawText.slice(s.start, s.end) === s.text).sort((a, b) => a.start - b.start);
-  const out: { text: string; span?: EvidenceSpan }[] = [];
-  let cursor = 0;
-  for (const span of sorted) {
-    if (span.start < cursor) continue;
-    if (span.start > cursor) out.push({ text: rawText.slice(cursor, span.start) });
-    out.push({ text: rawText.slice(span.start, span.end), span });
-    cursor = span.end;
-  }
-  if (cursor < rawText.length) out.push({ text: rawText.slice(cursor) });
-  return out;
-}
+export { segmentRawText } from "../../features/messaging/segmentRawText";
 
 export function MessageIntelligencePage() {
   const state = useDemoState();
@@ -57,7 +47,7 @@ export function MessageIntelligencePage() {
   }
   const message = state.messages.find((m) => m.id === messageId);
   if (!message) return <PageContainer title={TITLE}><div role="alert" className="inbox__empty mi-empty"><strong>Message not found</strong><p>{messageId} is not in the active offline fixture.</p><Link to="/inbox">Back to inbox</Link></div></PageContainer>;
-  return <PageContainer title={TITLE}><Workspace key={message.id} message={message} /></PageContainer>;
+  return <PageContainer title={TITLE}>{message.kind === "SUPPLIER_OFFER" ? <OfferReview key={message.id} message={message} /> : <Workspace key={message.id} message={message} />}</PageContainer>;
 }
 
 function Workspace({ message }: { message: InboxMessage }) {
@@ -175,6 +165,7 @@ function Workspace({ message }: { message: InboxMessage }) {
         <div id="mi-blockers" className="mi-blockers">{blockers.length ? <><strong>Confirmation disabled:</strong><ul>{blockers.map((b) => <li key={b}>{b}</li>)}</ul></> : <span>Safe to {linkMode ? "link" : "confirm"}: verified sender, matched {state.incident.poId}, compatible incident type, source evidence present.</span>}</div>
         {linked && <p className="message-detail__correlation">Linked to <strong>{state.incident.id}</strong> ({state.incident.status}). <Link to="/inbox">Back to inbox</Link></p>}
         <IncidentHandoff />
+        <EvidencePanel messageId={message.id} />
       </form>
       <section className="settings-card" aria-labelledby="mi-history">
         <header><h2 id="mi-history">Review history</h2></header>
