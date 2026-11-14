@@ -182,3 +182,76 @@ The user's scope override takes precedence where the documents discuss real or r
 - Contract: `docs/development/P1_EVIDENCE_API.md`. Tests: `evidenceHandoff.test.tsx`, `offerEvidenceUi.test.tsx`; 69/69 tests, typecheck, build pass.
 - Remaining dependency: P2/P3/P5 consumer pages are not built; they must read these selectors (see API doc).
 - Push: still blocked from this session; push from a local terminal.
+
+## Final P1 QA and UI interaction audit (2026-11-14)
+
+Verification: `npm test` 85/85 (13 files), `npm run typecheck` pass, `npm run build` pass. Real-browser (Chromium/Playwright) journeys on iPhone 13, 820px tablet and 1440px desktop: no horizontal overflow on any P1 page, zero runtime errors, keyboard-only confirm/link works. Tests run in a Linux copy because local `node_modules` are Windows binaries.
+
+### Fixes from QA
+- Typed `INCIDENT_VERIFIED` / `MESSAGE_EXTRACTION_REVIEWED` events now recorded in `state.publishedEvents` (`selectPublishedEvents`) with message IDs and `HP-SNAP-001` rev 1 (P1-FR15).
+- Message Intelligence overflowed 91px on mobile — fixed.
+- Offer review history rendered dead `<button>`s — now non-interactive items.
+- Message Intelligence loading state had no exit — added "Finish mock loading".
+- Opening a message directly in Message Intelligence now marks it read/selected in shared state (consistency with Inbox).
+- Channels mock loading/error buttons gave no feedback on that page — now shows state, "Clear mock state" and "View in Inbox".
+
+### Interactive control checklist (tests: `p1UiAudit.test.tsx`, `p1FinalQa.test.tsx`, existing suites)
+| ID | Page · control | Result |
+|---|---|---|
+| C-01 | Inbox · All/WhatsApp/Outlook/Telegram filters + counts | PASS |
+| C-02 | Inbox · search box + no-results state | PASS |
+| C-03 | Inbox · message card click (select + read in DemoState) | PASS |
+| C-04 | Inbox · ArrowUp/ArrowDown card navigation + focus | PASS |
+| C-05 | Inbox · "Open in Message Intelligence" link | PASS |
+| C-06 | Inbox · "Finish mock loading" | PASS |
+| C-07 | Inbox · "Retry local fixture" | PASS |
+| C-08 | Inbox · empty state "Choose a demo scenario" link | PASS |
+| C-09 | Inbox · "Impact Explorer" link (only after verification) | PASS |
+| C-10 | MI · message picker links (no `?message`) | PASS |
+| C-11 | MI · missing message "Back to inbox" | PASS |
+| C-12 | MI · loading finish / error retry / empty "Load a demo scenario" | PASS |
+| C-13 | MI · supplier, PO, incident type, qty, unit, ETA, ETA time, note inputs | PASS |
+| C-14 | MI · Confirm disabled while dirty, with reason | PASS |
+| C-15 | MI · Save correction validation errors (nothing saved) | PASS |
+| C-16 | MI · Confirm blocked on contradiction/unsafe identity/unmatched PO/unresolved | PASS |
+| C-17 | MI · Discard edits button + Esc | PASS |
+| C-18 | MI · Save with no change refused | PASS |
+| C-19 | MI · history version buttons + ↑/↓/Home/End | PASS |
+| C-20 | MI · "View latest" | PASS |
+| C-21 | MI · Reject / Mark unresolved (reason required) | PASS |
+| C-22 | MI · reopen via save, Confirm & verify incident, form locks after | PASS |
+| C-23 | MI · Link to existing incident → Cancel / Confirm link | PASS |
+| C-24 | MI · incident handoff panel + "Open Impact Explorer" | PASS |
+| C-25 | MI · audit evidence panel + "Back to inbox" | PASS |
+| C-26 | MI offer · Qualify / Reject offer / Mark unresolved (reason required) | PASS |
+| C-27 | MI offer · review history (read-only list) | PASS |
+| C-28 | MI offer · "Plan A" link | PASS |
+| C-29 | Channels · 4 scenario buttons (aria-pressed) | PASS |
+| C-30 | Channels · Reset shared demo | PASS |
+| C-31 | Channels · Show mock loading / error in Inbox | PASS |
+| C-32 | Channels · Clear mock state / View in Inbox | PASS |
+| C-33 | Settings · Show unread first toggle → Inbox ordering | PASS |
+| C-34 | Settings · Show processing timeline toggle → Inbox | PASS |
+| C-35 | Settings · Reset demo | PASS |
+| C-36 | Sidebar · Inbox, Message Intelligence, Channels, Settings links | PASS |
+
+### End-to-end journeys
+| Journey | Result |
+|---|---|
+| Inbox → MI → confirm WA → link OL + TG → one HP-INC-001, 3 messages, 20 kg, stock 10 kg | PASS (jsdom + real browser) |
+| Human correction → versioned HUMAN_CORRECTION, raw unchanged, unsafe confirm blocked | PASS |
+| Reject/unresolved → reopen → confirm | PASS |
+| Ingest → duplicate suppressed → scenario switch → reset to pending | PASS |
+| Spoof / unknown sender / unmatched PO never verify | PASS |
+| Supplier offer scenario → Inbox → MI → qualify → P3 selector | PASS |
+| Navigation away/back preserves reviews, evidence and incident | PASS |
+| Keyboard-only and mobile journeys | PASS |
+
+### Requirement audit
+- P1-FR01–FR19: PASS (FR15 now includes published snapshot reference; FR19 links to P2 without computing totals).
+- P1-T01, T03–T09, T12: PASS. P1-T02, T10, T11: OUT_OF_SCOPE (real provider envelopes, live bridge, replay channel — excluded by mock-only scope; simulated loading/error/retry covered).
+- Architecture: one `useSyncExternalStore` store; only `demoStore.ts` imports the business fixture; HP-OFFER-002 defined once; dependencies limited to react, react-dom, react-router-dom, lucide-react; no fetch/WebSocket/OAuth/webhook/provider SDK (enforced by test).
+
+### Remaining external dependencies (not P1-owned)
+- P2 `/impact`, P3 `/recovery/plan-a`, P5 pages are empty; they do not yet consume `selectActiveIncident`, `selectPublishedEvents`, `selectSupplierOfferEvidence`, `selectIncidentEvidence`/`selectMessageEvidence`, or call `acknowledgeIncidentHandoff()`. Handoff therefore correctly shows "awaiting P2 consumer".
+- Push to GitHub must be done from a local terminal (blocked from the agent environment).
