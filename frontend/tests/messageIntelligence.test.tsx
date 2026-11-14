@@ -20,9 +20,11 @@ const versions = (id = "HP-MSG-WA-001") => selectExtractionVersions(demoStore.ge
 
 describe("Message Intelligence page", () => {
   it("shows empty, missing, loading and error states", () => {
-    renderAt("/message-intelligence");
-    expect(screen.getByText("No message selected")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /HP-MSG-WA-001/ })).toBeTruthy();
+    const router = renderAt("/message-intelligence");
+    // No ?message: the review queue opens the shared selection instead of an empty picker.
+    expect(router.state.location.search).toBe("?message=HP-MSG-WA-001");
+    expect(screen.getByTestId("raw-text")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Open review HP-MSG-OL-001/ })).toBeTruthy();
     cleanup();
     open("HP-MSG-NOPE");
     expect(screen.getByRole("alert").textContent).toContain("HP-MSG-NOPE");
@@ -173,5 +175,25 @@ describe("Message Intelligence page", () => {
     await act(async () => { await router.navigate("/message-intelligence?message=HP-MSG-WA-001"); });
     expect(within(screen.getByRole("list", { name: "Extraction versions" })).getAllByRole("button")).toHaveLength(2);
     expect(screen.getByText(/v2 · RULE_EXTRACTION · UNRESOLVED/)).toBeTruthy();
+  });
+});
+
+describe("Review queue", () => {
+  it("lists active reviews, searches, opens items and moves confirmed ones to history", () => {
+    const router = renderAt("/message-intelligence");
+    const queue = () => within(screen.getByRole("list", { name: "Review queue items" }));
+    expect(screen.getByText("5 active")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search review queue"), { target: { value: "not allowlisted" } });
+    expect(queue().getAllByRole("listitem")).toHaveLength(1);
+    fireEvent.click(queue().getByRole("link", { name: /Open review HP-MSG-SPOOF/ }));
+    expect(router.state.location.search).toBe("?message=HP-MSG-SPOOF");
+    fireEvent.change(screen.getByLabelText("Search review queue"), { target: { value: "" } });
+    fireEvent.click(queue().getByRole("link", { name: /Open review HP-MSG-WA-001/ }));
+    fireEvent.click(screen.getByRole("button", { name: /confirm & verify incident/i }));
+    expect(screen.getByText("4 active")).toBeTruthy();
+    expect(queue().queryByRole("link", { name: /HP-MSG-WA-001/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    expect(queue().getByText("In incident HP-INC-001")).toBeTruthy();
+    expect(queue().getByRole("link", { name: /Open review HP-MSG-WA-001/ }).getAttribute("aria-current")).toBe("page");
   });
 });

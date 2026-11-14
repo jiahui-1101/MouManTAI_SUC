@@ -1,6 +1,6 @@
 import "../p1.css";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
 import { CANONICAL_PO_REGISTRY, CANONICAL_SUPPLIER_REGISTRY } from "../../features/messaging/mockMessageRegistry";
@@ -20,6 +20,7 @@ import { demoStore, incidentLinkBlockers, selectExtractionVersions, useDemoState
 import { IncidentHandoff } from "../../features/messaging/IncidentHandoff";
 import { EvidencePanel } from "../../features/messaging/EvidencePanel";
 import { OfferReview } from "../../features/messaging/OfferReview";
+import { ReviewQueue } from "../../features/messaging/ReviewQueue";
 import { segmentRawText } from "../../features/messaging/segmentRawText";
 
 const TITLE = titleFor("/message-intelligence");
@@ -37,18 +38,31 @@ export { segmentRawText } from "../../features/messaging/segmentRawText";
 export function MessageIntelligencePage() {
   const state = useDemoState();
   const [params] = useSearchParams();
-  const messageId = params.get("message");
+  const navigate = useNavigate();
+  const requested = params.get("message");
+  // Without ?message, open the current shared selection (or the first queue item) instead of an empty picker.
+  const fallback = state.messages.find((m) => m.id === state.selectedId)?.id ?? state.messages[0]?.id ?? null;
+  useEffect(() => {
+    if (!requested && fallback && !state.loadStatus) navigate(`/message-intelligence?message=${fallback}`, { replace: true });
+  }, [requested, fallback, navigate, state.loadStatus]);
 
-  if (state.loadStatus === "LOADING") return <PageContainer title={TITLE}><p role="status" aria-busy="true">Loading local mock fixture…</p><button type="button" className="fm-btn fm-btn--ghost" onClick={() => demoStore.setMockLoadStatus()}>Finish mock loading</button></PageContainer>;
-  if (state.loadStatus === "ERROR") return <PageContainer title={TITLE}><p role="alert">Mock fixture loading failed. No provider was contacted.</p><button type="button" className="fm-btn fm-btn--ghost" onClick={() => demoStore.setMockLoadStatus()}>Retry local fixture</button></PageContainer>;
-  if (!messageId) {
-    return <PageContainer title={TITLE}><div className="fm-empty mi-empty"><strong>No message selected</strong><p>Choose a simulated message to review.</p>
-      {state.messages.length === 0 ? <Link to="/channels">Load a demo scenario</Link> : <ul className="mi-picker">{state.messages.map((m) => <li key={m.id}><Link to={`/message-intelligence?message=${m.id}`}>{m.id} · {m.senderDisplay}</Link></li>)}</ul>}
-    </div></PageContainer>;
+  if (state.loadStatus === "LOADING") return <PageContainer title={TITLE}><div className="fm-panel p1-state"><p role="status" aria-busy="true">Loading local mock fixture…</p><button type="button" className="fm-btn fm-btn--primary" onClick={() => demoStore.setMockLoadStatus()}>Finish mock loading</button></div></PageContainer>;
+  if (state.loadStatus === "ERROR") return <PageContainer title={TITLE}><div className="fm-panel p1-state"><p role="alert">Mock fixture loading failed. No provider was contacted.</p><button type="button" className="fm-btn fm-btn--primary" onClick={() => demoStore.setMockLoadStatus()}>Retry local fixture</button></div></PageContainer>;
+  if (state.messages.length === 0) {
+    return <PageContainer title={TITLE}><div className="fm-empty mi-empty"><strong>No messages to review</strong><p>The active demo scenario has no supplier messages.</p><Link to="/channels">Load a demo scenario</Link></div></PageContainer>;
   }
+  const messageId = requested ?? fallback;
   const message = state.messages.find((m) => m.id === messageId);
-  if (!message) return <PageContainer title={TITLE}><div role="alert" className="fm-empty mi-empty"><strong>Message not found</strong><p>{messageId} is not in the active offline fixture.</p><Link to="/inbox">Back to inbox</Link></div></PageContainer>;
-  return <PageContainer title={TITLE}>{message.kind === "SUPPLIER_OFFER" ? <OfferReview key={message.id} message={message} /> : <Workspace key={message.id} message={message} />}</PageContainer>;
+  return <PageContainer title={TITLE}>
+    <div className="mi-layout">
+      <ReviewQueue state={state} selectedId={message?.id ?? null} />
+      <div className="mi-layout__detail">
+        {!message
+          ? <div role="alert" className="fm-empty mi-empty"><strong>Message not found</strong><p>{messageId} is not in the active offline fixture.</p><Link to="/inbox">Back to inbox</Link></div>
+          : message.kind === "SUPPLIER_OFFER" ? <OfferReview key={message.id} message={message} /> : <Workspace key={message.id} message={message} />}
+      </div>
+    </div>
+  </PageContainer>;
 }
 
 function Workspace({ message }: { message: InboxMessage }) {
