@@ -23,7 +23,7 @@ describe("route configuration", () => {
 });
 
 /** Routes whose pages have been implemented; all others must still be empty shells. */
-const IMPLEMENTED = new Set(["/overview", "/incidents", "/impact"]);
+const IMPLEMENTED = new Set(["/overview", "/incidents", "/impact", "/recovery/plan-a", "/recovery/plan-b", "/prep-planning"]);
 
 describe("pages", () => {
   it.each(NAV_ITEMS.map((item) => [item.path, item.title]))("%s shows heading %s", (path, title) => {
@@ -41,6 +41,11 @@ describe("pages", () => {
     },
   );
 
+  it("shows the Plan A waiting workspace rather than an empty shell", () => {
+    renderAt("/recovery/plan-a");
+    expect(screen.getByText("External supply workspace is waiting")).toBeTruthy();
+  });
+
   it("shows the Plan B allocation and menu proposal", () => {
     renderAt("/recovery/plan-b");
     expect(heading()).toBe("Plan B — Internal Recovery");
@@ -56,12 +61,12 @@ describe("pages", () => {
     expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
     expect(screen.getByText(/0.75 kg shortfall/)).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Order Protection" }));
-    expect(screen.getByText("At risk · review")).toBeTruthy();
+    expect(within(screen.getByRole("tabpanel", { name: "Order Protection" })).getAllByText("At risk · review").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Menu Recovery" }));
     expect(screen.getAllByText("At risk").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Stock Allocation" }));
     fireEvent.click(screen.getByRole("button", { name: "Reset Demo" }));
-    expect(screen.getByText("10.00 kg", { selector: "strong" })).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "Plan B summary" })).getByText("10.00 kg", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("Plan Feasible*")).toBeTruthy();
   });
 
