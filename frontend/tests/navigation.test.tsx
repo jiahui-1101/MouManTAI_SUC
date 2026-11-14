@@ -53,9 +53,9 @@ describe("pages", () => {
     expect(screen.getByText("External supply workspace is waiting")).toBeTruthy();
   });
 
-  it("shows Plan B pending until P1 verification and P2 impact exist", () => {
+  it("opens the local Plan B demo before P1 verification", () => {
     renderAt("/recovery/plan-b");
-    expect(screen.getByText("Waiting for a verified supplier incident and stock snapshot.")).toBeTruthy();
+    expect(screen.getByText("LOCAL DEMO")).toBeTruthy();
   });
 
   it("shows the Plan B allocation and menu proposal", () => {
@@ -75,7 +75,8 @@ describe("pages", () => {
     expect(screen.getByText("Chicken shortfall · 0.75 kg")).toBeTruthy();
     expect(screen.getByText(/Chicken shortfall · 0.75 kg/)).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Order Protection" }));
-    expect(within(screen.getByRole("tabpanel", { name: "Order Protection" })).getAllByText("At risk · review").length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText("Status"), { target: { value: "risk" } });
+    expect(within(screen.getByRole("tabpanel", { name: "Order Protection" })).getAllByText("At Risk").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Menu Recovery" }));
     expect(screen.getAllByText("At risk").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Stock Allocation" }));

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, StatusBadge } from "../../../components/ui";
-import { allocateDemoOrders } from "./orderProtection";
+import { allocateDemoOrders } from "./orderCoverage";
 import { kg, Table, time } from "./RecoveryView";
 import type { calculatePlanB } from "./planB";
 import "./orderProtection.css";

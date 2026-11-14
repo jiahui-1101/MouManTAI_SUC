@@ -44,7 +44,8 @@ describe("Plan B shared inputs", () => {
     verifyAndAssess();
     app("/recovery/plan-b");
     act(() => simulateChickenRecount(8000));
-    expect(screen.getByText(/The input snapshot changed/)).toBeTruthy();
+    expect(screen.getByText("LOCAL DEMO")).toBeTruthy();
+    expect(screen.getByTestId("plan-b-reason")).toBeTruthy();
     act(() => assessImpactAction("HP-INC-001"));
     expect(within(screen.getByRole("region", { name: "Plan B summary" })).getByText("8.00 kg", { selector: "strong" })).toBeTruthy();
   });
