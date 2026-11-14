@@ -530,7 +530,10 @@ export function createRestaurantStoreAdapter(
           poId: inc.poId,
           poExpectedKgMilli: po?.expectedKgMilli ?? 20000,
           poClaimedKgMilli: claim?.claimedDeliveryTodayKgMilli ?? 0,
-          poShortfallKgMilli: handoff.payload.summary.demandGapKgMilli,
+          // PO shortfall (supplier vs PO) is a different metric from the forecast gap — never substitute one for the other.
+          poShortfallKgMilli:
+            p2.restaurant.impacts[inc.id]?.poShortfallKgMilli ??
+            (po?.expectedKgMilli != null ? po.expectedKgMilli - (claim?.claimedDeliveryTodayKgMilli ?? 0) : undefined),
           forecastGapKgMilli: handoff.payload.summary.demandGapKgMilli,
         };
       }

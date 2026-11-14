@@ -48,6 +48,30 @@ describe('comparison (P5-T01, P5-T02)', () => {
 });
 
 describe('selection (P5-T03/T04)', () => {
+  it('enforces infeasible guard: FEASIBLE and CONDITIONAL succeed; INFEASIBLE and UNKNOWN fail with SCENARIO_INFEASIBLE', () => {
+    const h = makeHarness();
+
+    // 1. FEASIBLE (Plan B default) -> ok
+    h.env.scenarios.B = { ...h.env.scenarios.B!, feasibility: 'FEASIBLE' };
+    const rFeasible = h.p5().chooseRecoveryScenario('B');
+    expect(rFeasible.ok).toBe(true);
+
+    // 2. CONDITIONAL (Plan A default) -> ok
+    h.env.scenarios.A = { ...h.env.scenarios.A!, feasibility: 'CONDITIONAL' };
+    const rConditional = h.p5().chooseRecoveryScenario('A');
+    expect(rConditional.ok).toBe(true);
+
+    // 3. INFEASIBLE -> fails with SCENARIO_INFEASIBLE
+    h.env.scenarios.B = { ...h.env.scenarios.B!, feasibility: 'INFEASIBLE' };
+    const rInfeasible = h.p5().chooseRecoveryScenario('B');
+    expect(rInfeasible).toMatchObject({ ok: false, error: 'SCENARIO_INFEASIBLE' });
+
+    // 4. UNKNOWN -> fails with SCENARIO_INFEASIBLE
+    h.env.scenarios.A = { ...h.env.scenarios.A!, feasibility: 'UNKNOWN' };
+    const rUnknown = h.p5().chooseRecoveryScenario('A');
+    expect(rUnknown).toMatchObject({ ok: false, error: 'SCENARIO_INFEASIBLE' });
+  });
+
   it('selecting A or B creates no approval and no tasks', () => {
     const h = makeHarness();
     expect(h.p5().chooseRecoveryScenario('A').ok).toBe(true);

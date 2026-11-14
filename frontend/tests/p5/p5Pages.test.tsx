@@ -86,11 +86,16 @@ describe("Recovery Comparison", () => {
       }),
     );
     show(ctx, <ComparisonView />);
-    const a = screen.getByTestId("plan-A");
-    const b = screen.getByTestId("plan-B");
+    // Decision strip (above the fold) shows store-driven values
+    expect(screen.getByTestId("strip-A-spend").textContent).toContain("RM123.45 (projected)");
+    expect(screen.getByTestId("strip-A-giveup").textContent).toContain("RM123.45");
+    expect(screen.getByTestId("strip-B-giveup").textContent).toContain("99 forecast portions can't be offered today");
+    // Full comparison details keep the long-form wording
+    const a = screen.getByTestId("plan-A-details");
+    const b = screen.getByTestId("plan-B-details");
     expect(a.textContent).toContain("RM123.45 projected additional landed cost");
     expect(a.textContent).toContain("150 (conditional)");
-    expect(a.textContent).toContain("CONDITIONAL");
+    expect(a.textContent).toContain("Conditional — depends on supplier delivery");
     expect(b.textContent).toContain("99 — forecast only, not confirmed-order breaches");
     expect(b.textContent).toContain("RM0.00 new purchase (not total operating cost)");
     expect(b.textContent).toContain("60 planned");
@@ -100,9 +105,9 @@ describe("Recovery Comparison", () => {
   it("shows PO shortfall and forecast gap as two separate cards; null impact → not available", () => {
     const ctx = setup();
     show(ctx, <ComparisonView />);
-    expect(screen.getByTestId("impact-po-shortfall").textContent).toContain("Supplier PO shortfall: 20kg");
-    expect(screen.getByTestId("impact-po-shortfall").textContent).toContain("HP-PO-1042 expected 20kg, supplier claims 0kg today");
-    expect(screen.getByTestId("impact-forecast-gap").textContent).toContain("Forecast chicken demand gap: 12kg");
+    expect(screen.getByTestId("impact-po-shortfall").textContent).toContain("Supplier won't deliver: 20kg");
+    expect(screen.getByTestId("impact-po-shortfall").textContent).toContain("HP-PO-1042 expected 20kg, supplier says 0kg today");
+    expect(screen.getByTestId("impact-forecast-gap").textContent).toContain("Actually short for today's forecast: 12kg");
     act(() => ctx.world.update((s) => void (s.impact = null)));
     expect(text()).toContain("Impact summary not available yet");
     expect(screen.queryByTestId("impact-po-shortfall")).toBeNull();
@@ -123,8 +128,8 @@ describe("Recovery Comparison", () => {
     show(ctx, <ComparisonView />);
     expect(btn("Choose Plan A").disabled).toBe(true);
     expect(btn("Choose Plan B").disabled).toBe(true);
-    expect(screen.getAllByText("Plans were calculated on different snapshots").length).toBe(2);
-    expect(screen.getByRole("alert").textContent).toContain("different snapshots");
+    expect(screen.getAllByText("Plans were calculated on different data versions").length).toBe(2);
+    expect(screen.getByRole("alert").textContent).toContain("different data versions");
   });
 
   it("stale scenario: Choose disabled with STALE text", () => {
@@ -132,7 +137,7 @@ describe("Recovery Comparison", () => {
     show(ctx, <ComparisonView />);
     act(() => ctx.world.changeFingerprint());
     expect(btn("Choose Plan A").disabled).toBe(true);
-    expect(within(screen.getByTestId("plan-A")).getAllByText(/STALE — recalculation required/).length).toBeGreaterThan(0);
+    expect(within(screen.getByTestId("plan-A")).getAllByText(/Numbers changed — recalculation required/).length).toBeGreaterThan(0);
   });
 
   it.each(["A", "B"] as const)("Choose %s saves selection only — no approval, no tasks (P5-T03/T04)", (st) => {
@@ -142,7 +147,8 @@ describe("Recovery Comparison", () => {
     expect(ctx.p5().selection?.strategy).toBe(st);
     expect(ctx.p5().approvals).toHaveLength(0);
     expect(ctx.p5().actions).toHaveLength(0);
-    expect(screen.getByTestId("selection-panel").textContent).toContain(`Plan ${st} selected — not approved yet.`);
+    expect(screen.getByTestId("selection-panel").textContent).toContain(`Plan ${st} chosen — not approved yet.`);
+    expect(screen.getByRole("button", { name: `✓ Plan ${st} chosen` })).toBeTruthy();
     expect(screen.getByTestId("selection-panel").querySelector('a[href="/approvals"]')).toBeTruthy();
   });
 
@@ -227,7 +233,10 @@ describe("Approvals", () => {
     ctx.world.setRole("ViewerAuditor");
     show(ctx, <ApprovalsView />);
     typeReason("x");
-    expect(screen.getByTestId("approval-blocker").textContent).toContain("DEMO_FORBIDDEN");
+    const card = screen.getByTestId("approval-blocker");
+    expect(card.textContent).toContain("Only the Owner can approve this plan");
+    expect(card.textContent).toContain("The viewer role is read-only.");
+    expect(within(card).getByTestId("p5-blocker-details").textContent).toContain("DEMO_FORBIDDEN");
     expect(btn("Approve").disabled).toBe(true);
   });
 
@@ -235,8 +244,11 @@ describe("Approvals", () => {
     const ctx = setup();
     selectAs(ctx, "B");
     show(ctx, <ApprovalsView />);
-    fireEvent.change(screen.getByLabelText("Demo role — not real access control"), { target: { value: "OperationsManager" } });
-    expect(screen.getByTestId("approval-blocker").textContent).toContain("OperationsManager cannot approve MENU_LIMIT_TASK");
+    fireEvent.change(screen.getByTestId("p5-role-select"), { target: { value: "OperationsManager" } });
+    const card = screen.getByTestId("approval-blocker");
+    expect(card.textContent).toContain("Only the Owner can approve this plan");
+    expect(card.textContent).toContain("Operations Manager can't sign this off because it changes what customers can order today.");
+    expect(within(card).getByTestId("p5-blocker-details").textContent).toContain("OperationsManager cannot approve MENU_LIMIT_TASK");
     expect(btn("Approve").disabled).toBe(true);
   });
 
@@ -271,7 +283,8 @@ describe("Approvals", () => {
     selectAs(ctx, "A");
     show(ctx, <ApprovalsView />);
     typeReason("x");
-    expect(screen.getByTestId("approval-blocker").textContent).toContain("APPROVAL_EXPIRED");
+    expect(screen.getByTestId("approval-blocker").textContent).toContain("Too late for Plan A");
+    expect(screen.getByTestId("approval-blocker").textContent).toContain("now 10:50");
     expect(btn("Approve").disabled).toBe(true);
     act(() => selectAs(ctx, "B"));
     expect(screen.queryByTestId("approval-blocker")).toBeNull();
@@ -284,7 +297,10 @@ describe("Approvals", () => {
     show(ctx, <ApprovalsView />);
     expect(screen.queryByTestId("approval-blocker")).toBeNull();
     fireEvent.click(btn("Change snapshot fingerprint"));
-    expect(screen.getByTestId("approval-blocker").textContent).toContain("STALE_SCENARIO");
+    expect(screen.getByTestId("approval-blocker").textContent).toContain(
+      "The numbers changed — this plan must be recalculated before it can be approved",
+    );
+    expect(within(screen.getByTestId("approval-blocker")).getByTestId("p5-blocker-cta").getAttribute("href")).toBe("/recovery/compare");
     expect(btn("Approve").disabled).toBe(true);
   });
 
@@ -334,7 +350,7 @@ describe("Approvals", () => {
     expect(within(item).getByText(/Chosen Plan — Plan B/i)).toBeTruthy();
     expect(within(item).getByText(/Alternative Plan — Plan A/i)).toBeTruthy();
     expect(within(item).getByText(/Governance & Audit Metadata/i)).toBeTruthy();
-    expect(within(item).getByText(/SIMULATED_ACTION/i)).toBeTruthy();
+    expect(within(item).getByTitle("SIMULATED_ACTION").textContent).toBe("Simulated action");
 
     // Collapse details
     fireEvent.click(toggle);
@@ -359,15 +375,15 @@ describe("Execution Tracker (/execution)", () => {
     const cards = screen.getAllByTestId(/^p5-task-card-/);
     expect(cards).toHaveLength(7);
     expect(screen.queryByTestId("p5-po-draft-content")).toBeNull();
-    expect(screen.getByTestId("p5-progress-text").textContent).toContain("0 of 7 tasks awaiting evidence");
+    expect(screen.getByTestId("p5-progress-text").textContent).toContain("0 of 7 tasks waiting for proof");
   });
 
   it("Plan A approved → PO_DRAFT card shows 'NOT SENT'", () => {
     const ctx = setup();
     approvePlan(ctx, "A");
     show(ctx, <ExecutionView />);
-    expect(screen.getByTestId("p5-po-draft-content").textContent).toContain("Local PO draft — NOT SENT");
-    expect(screen.getByTestId("p5-receipt-check-content").textContent).toContain("Awaiting simulated receipt");
+    expect(screen.getByTestId("p5-po-draft-content").textContent).toContain("Local purchase order draft — NOT SENT");
+    expect(screen.getByTestId("p5-receipt-check-content").textContent).toContain("Waiting for the simulated delivery and quality check before 10:45");
   });
 
   it("KitchenLead can't simulate a MENU task (visible reason) but can simulate PREP", () => {
@@ -382,7 +398,7 @@ describe("Execution Tracker (/execution)", () => {
     const menuBtn = screen.getByTestId(`p5-simulate-btn-${menuTask.id}`) as HTMLButtonElement;
     expect(menuBtn.disabled).toBe(true);
     const blockerText = screen.getByTestId(`p5-task-blocker-${menuTask.id}`).textContent;
-    expect(blockerText).toContain("KitchenLead cannot execute MENU_LIMIT_TASK — allowed: Owner, OperationsManager");
+    expect(blockerText).toContain("Only Owner or Operations Manager can do this menu limit");
 
     // Prep task simulate button enabled
     const prepBtn = screen.getByTestId(`p5-simulate-btn-${prepTask.id}`) as HTMLButtonElement;
@@ -409,8 +425,9 @@ describe("Execution Tracker (/execution)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Advance step" }));
 
     // Card advanced to SIMULATED_EXECUTION
-    expect(screen.getByTestId(`p5-task-state-${prepTask.id}`).textContent).toBe("SIMULATED_EXECUTION");
-    expect(screen.getByTestId(`p5-task-audit-${prepTask.id}`).textContent).toContain("APPROVED → SIMULATED_EXECUTION");
+    expect(screen.getByTestId(`p5-task-state-${prepTask.id}`).textContent).toBe("In progress (simulated)");
+    expect(screen.getByTestId(`p5-task-state-${prepTask.id}`).getAttribute("title")).toBe("SIMULATED_EXECUTION");
+    expect(screen.getByTestId(`p5-task-audit-${prepTask.id}`).textContent).toContain("Ready to start → In progress (simulated)");
     expect(screen.getByTestId(`p5-task-audit-${prepTask.id}`).textContent).toContain("Start kitchen prep");
 
     // Step 2: Simulate next step to AWAITING_EVIDENCE
@@ -419,7 +436,7 @@ describe("Execution Tracker (/execution)", () => {
     typeReason("Kitchen finished batch cooking", d2);
     fireEvent.click(within(d2).getByRole("button", { name: "Advance step" }));
 
-    expect(screen.getByTestId(`p5-task-state-${prepTask.id}`).textContent).toBe("AWAITING_EVIDENCE");
+    expect(screen.getByTestId(`p5-task-state-${prepTask.id}`).textContent).toBe("Done — needs proof");
     expect(screen.getByTestId(`p5-record-evidence-link-${prepTask.id}`)).toBeTruthy();
 
     // Verify simulate button is gone from AWAITING_EVIDENCE, state never reaches VERIFIED
@@ -433,7 +450,7 @@ describe("Execution Tracker (/execution)", () => {
     act(() => ctx.world.changeFingerprint());
     show(ctx, <ExecutionView />);
     expect(screen.getByTestId("p5-execution-blocked-banner").textContent).toContain(
-      "Execution blocked: Snapshot changed since approval. Re-calculation and re-approval required.",
+      "The numbers changed — this plan must be recalculated before it can be executed",
     );
     const simulateBtns = screen.getAllByRole("button", { name: "Simulate next step" }) as HTMLButtonElement[];
     expect(simulateBtns.every((b) => b.disabled)).toBe(true);
@@ -444,9 +461,8 @@ describe("Execution Tracker (/execution)", () => {
     approvePlan(ctx, "A");
     act(() => ctx.world.setClock("10:50"));
     show(ctx, <ExecutionView />);
-    expect(screen.getByTestId("p5-execution-blocked-banner").textContent).toContain(
-      "Execution blocked: Approval expired at 10:45 on demo clock. Re-calculation and re-approval required.",
-    );
+    expect(screen.getByTestId("p5-execution-blocked-banner").textContent).toContain("Too late for Plan A");
+    expect(screen.getByTestId("p5-execution-blocked-banner").textContent).toContain("The 10:45 cutoff has passed on the demo clock (now 10:50)");
   });
 
   it("menu task shows 'not synced'; after MENU_UPDATE applied evidence → 'Manually confirmed (demo evidence)'; never 'SYNCED'", () => {
@@ -456,7 +472,7 @@ describe("Execution Tracker (/execution)", () => {
     const menuTask = ctx.p5().actions.find((a) => a.actionType === "MENU_LIMIT_TASK")!;
 
     expect(screen.getByTestId(`p5-task-sync-${menuTask.id}`).textContent).toBe(
-      "Awaiting manual update — not synced to any POS",
+      "Waiting for staff to update the POS by hand",
     );
 
     act(() => {
@@ -467,7 +483,7 @@ describe("Execution Tracker (/execution)", () => {
     });
 
     expect(screen.getByTestId(`p5-task-sync-${menuTask.id}`).textContent).toBe(
-      "Manually confirmed (demo evidence)",
+      "Staff confirmed the change (demo)",
     );
     expect(text()).not.toMatch(/\bSYNCED\b/);
   });
@@ -480,12 +496,14 @@ describe("Outcome Verification (/outcomes)", () => {
     show(ctx, <OutcomesView />);
     expect(screen.getByTestId("p5-outcome-badge").textContent).toBe("Simulated Outcome: UNVERIFIED");
     const checklist = screen.getByTestId("p5-missing-evidence-list");
-    expect(checklist.textContent).toContain("HP-BATCH-B-01");
-    expect(checklist.textContent).toContain("HP-BATCH-B-02");
-    expect(checklist.textContent).toContain("HP-BATCH-B-03");
-    expect(checklist.textContent).toContain("HP-BATCH-B-04");
-    expect(checklist.textContent).toContain("MENU_UPDATE");
-    expect(checklist.textContent).toContain("ORDER_FULFILMENT");
+    expect(checklist.textContent).toContain("Prep batch 1 of 4: not confirmed yet");
+    expect(checklist.textContent).toContain("Prep batch 2 of 4");
+    expect(checklist.textContent).toContain("Prep batch 3 of 4");
+    expect(checklist.textContent).toContain("Prep batch 4 of 4");
+    expect(checklist.textContent).toContain("Menu limit for Chicken Popcorn: not confirmed yet");
+    expect(checklist.textContent).toContain("Confirmed orders served: not recorded yet");
+    expect(checklist.textContent).not.toMatch(/MENU_UPDATE|ORDER_FULFILMENT|HP-BATCH/);
+    expect(screen.getByTestId("p5-outcome-why").textContent).toContain("waiting for evidence (0 of 8 items recorded)");
   });
 
   it("B 3/4 batches → not SUCCESS (P5-T10)", () => {
@@ -516,7 +534,8 @@ describe("Outcome Verification (/outcomes)", () => {
     show(ctx, <OutcomesView />);
     fireEvent.click(btn("Verify simulated outcome"));
     expect(screen.getByTestId("p5-outcome-badge").textContent).toBe("Simulated Outcome: FAILED");
-    expect(text()).toContain("RECEIPT_LATE: arrival 11:00 after 10:45 cutoff");
+    expect(text()).toContain("Chicken arrived 11:00 — after the 10:45 cutoff");
+    expect(text()).not.toContain("RECEIPT_LATE");
   });
 
   it("Waste Unknown → table shows UNKNOWN, never '0kg' (P5-T13)", () => {
@@ -525,7 +544,7 @@ describe("Outcome Verification (/outcomes)", () => {
     seedEvidence(ctx.rt.store, ctx.world, "B_COMPLETE");
     show(ctx, <OutcomesView />);
     const wasteCell = screen.getByTestId("p5-actual-waste");
-    expect(wasteCell.textContent).toContain("UNKNOWN");
+    expect(wasteCell.textContent).toMatch(/unknown/i);
     expect(wasteCell.textContent).not.toContain("0kg");
   });
 
@@ -544,12 +563,12 @@ describe("Outcome Verification (/outcomes)", () => {
 
     // Revision history lists revision 2 and revision 1
     const revHistory = screen.getByTestId("p5-revision-history");
-    expect(revHistory.textContent).toContain("rev 2");
-    expect(revHistory.textContent).toContain("rev 1");
+    expect(revHistory.textContent).toContain("Revision 2");
+    expect(revHistory.textContent).toContain("Revision 1");
 
     // Freshness is OUT_OF_DATE until re-verify
     expect(screen.getByTestId("p5-freshness-badge").textContent).toContain(
-      "Evidence changed since last verification — re-verify",
+      "Evidence changed since the last check — verify again.",
     );
 
     // Re-verify clears freshness warning
@@ -562,7 +581,7 @@ describe("Outcome Verification (/outcomes)", () => {
     approvePlan(ctx, "B");
     act(() => ctx.world.setRole("ViewerAuditor"));
     show(ctx, <OutcomesView />);
-    expect(screen.getByTestId("p5-role-forbidden-alert").textContent).toContain("ViewerAuditor cannot record");
+    expect(screen.getByTestId("p5-role-forbidden-alert").textContent).toContain("Viewer (audit only) can't record this");
     expect((screen.getByTestId("p5-submit-evidence-btn") as HTMLButtonElement).disabled).toBe(true);
     // Verify button is still available to evaluate
     const verifyBtn = btn("Verify simulated outcome");
@@ -591,7 +610,7 @@ describe("Outcome Verification (/outcomes)", () => {
     expect(ctx.p5().decisionMemory).toHaveLength(1);
     fireEvent.click(saveBtn);
     expect(ctx.p5().decisionMemory).toHaveLength(1);
-    expect(screen.getByTestId("p5-live").textContent).toContain("Already saved to Decision Memory.");
+    expect(screen.getByTestId("p5-live").textContent).toContain("Already in Decision Memory.");
   });
 });
 
@@ -644,11 +663,12 @@ describe("Decision Memory (/decision-memory)", () => {
 
     // Assert lessons split into facts and interpretations with labels
     const facts = screen.getByTestId("p5-deterministic-facts");
-    expect(facts.textContent).toContain("DETERMINISTIC_FACT");
+    expect(facts.textContent).toContain("Fact");
+    expect(facts.querySelector('[title="DETERMINISTIC_FACT"]')).toBeTruthy();
     expect(facts.textContent).toContain("Plan B protected 60 confirmed portions with 0kg new purchase.");
 
     const interpretations = screen.getByTestId("p5-demo-interpretations");
-    expect(interpretations.textContent).toContain("DEMO_INTERPRETATION");
+    expect(interpretations.querySelector('[title="DEMO_INTERPRETATION"]')).toBeTruthy();
     expect(interpretations.textContent).toContain("Demo interpretation:");
   });
 });

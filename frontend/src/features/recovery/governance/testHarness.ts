@@ -10,6 +10,7 @@ export interface Harness {
   p5: () => P5State['p5'];
   state: () => P5State;
   events: P5Event[];
+  deps: P5Deps;
   env: {
     snapshot: SnapshotRef;
     scenarios: { A: RecoveryScenarioWithActions | null; B: RecoveryScenarioWithActions | null };
@@ -54,6 +55,7 @@ export function makeHarness(opts: { A?: boolean; B?: boolean } = {}): Harness {
     p5: () => store.getState().p5,
     state: () => store.getState(),
     events,
+    deps,
     env,
     changeSnapshot(fingerprint) {
       env.snapshot = { ...env.snapshot, fingerprint, revision: env.snapshot.revision + 1 };
