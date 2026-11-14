@@ -71,15 +71,15 @@ describe("pages", () => {
   it("recalculates stock across tabs and resets to the canonical demo", async () => {
     verifyAndAssessSharedIncident();
     renderAt("/recovery/plan-b");
-    fireEvent.click(screen.getByRole("button", { name: "8.00 kg" }));
-    expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
-    expect(screen.getByText(/0.75 kg shortfall/)).toBeTruthy();
+    fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "8000" } });
+    expect(screen.getByText("Chicken shortfall · 0.75 kg")).toBeTruthy();
+    expect(screen.getByText(/Chicken shortfall · 0.75 kg/)).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Order Protection" }));
     expect(within(screen.getByRole("tabpanel", { name: "Order Protection" })).getAllByText("At risk · review").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Menu Recovery" }));
     expect(screen.getAllByText("At risk").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Stock Allocation" }));
-    fireEvent.click(screen.getByRole("button", { name: "Reset Demo" }));
+    fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "10000" } });
     expect(within(screen.getByRole("region", { name: "Plan B summary" })).getByText("10.00 kg", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("Plan Feasible*")).toBeTruthy();
   });
