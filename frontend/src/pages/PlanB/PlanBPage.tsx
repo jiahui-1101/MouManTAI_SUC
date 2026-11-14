@@ -1,11 +1,12 @@
+import { adaptPlanAInputs } from "../../features/recovery/plan-a/integration";
+import { selectPlanAInputRead } from "../../integration/planAShared";
 import { MenuRecoveryPanel } from "../../features/recovery/plan-b/MenuRecoveryPanel";
 import { OrderProtection } from "../../features/recovery/plan-b/OrderProtectionPanel";
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { AlertTriangle, Check, Drumstick, Utensils, Package, ShieldCheck, Soup, Layers } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { calculatePlanB } from "../../features/recovery/plan-b/planB";
-import { preview as demoPreview } from "../../features/recovery/plan-b/preview";
 import { useDemoState } from "../../store/demoStore";
 import { selectPlanBInput } from "../../integration/planBShared";
 import type { PlanInput } from "../../features/recovery/plan-b/planB";
@@ -42,24 +43,25 @@ function MenuUsageChart({ items, available, shortageStock }: { available: number
 }
 
 export function PlanBPage() {
-  const shared = selectPlanBInput(useDemoState());
-  const [params] = useSearchParams();
-  if (params.get("view") !== "recovery") return <PageContainer title="Plan B — Internal Recovery">
-    <section className="p4-panel p4-landing">
-      <span className="p4-landing-icon"><ShieldCheck size={24} aria-hidden="true" /></span>
-      <h2>No incident · Working well</h2>
-      <p>In this demo view, operations are running normally and no recovery plan is needed.</p>
-      <Link className="fm-btn fm-btn--primary" to="?view=recovery">Open Plan B recovery <span aria-hidden="true">→</span></Link>
-    </section>
-  </PageContainer>;
-  if (shared.status !== "READY") {
-    const chicken = demoPreview.lots.find(lot => lot.ingredient === "chicken")?.grams ?? 0;
-    return <PlanBWorkspace key="local-demo" preview={demoPreview} baselineChicken={chicken} demoReason={shared.reason} />;
+  const state = useDemoState();
+  const activation = useMemo(() => adaptPlanAInputs(selectPlanAInputRead(state)), [state]);
+  const shared = useMemo(() => selectPlanBInput(state), [state]);
+  if (!activation.ok || shared.status !== "READY") {
+    const reason = shared.status !== "READY" ? shared.reason : !activation.ok ? activation.message : "";
+    return <PageContainer title="Plan B — Internal Recovery">
+      <section className="p4-panel p4-landing" role="status">
+        <span className="p4-landing-icon"><ShieldCheck size={24} aria-hidden="true" /></span>
+        <h2>Internal recovery workspace is waiting</h2>
+        <p>Verify the supplier incident and complete the current impact assessment to open recovery planning.</p>
+        <p data-testid="plan-b-reason">{reason}</p>
+        <div><Link to="/incidents">View incidents</Link> · <Link to="/impact">View impact</Link></div>
+      </section>
+    </PageContainer>;
   }
   return <PlanBWorkspace key={shared.input.fingerprint} preview={shared.input} baselineChicken={shared.sharedChickenGrams} />;
 }
 
-function PlanBWorkspace({ preview, baselineChicken, demoReason }: { preview: PlanInput; baselineChicken: number; demoReason?: string }) {
+function PlanBWorkspace({ preview, baselineChicken }: { preview: PlanInput; baselineChicken: number }) {
   const defaultFries = preview.lots.find(lot => lot.ingredient === "fries")?.grams ?? 0;
   const [chickenGrams, setChickenGrams] = useState(baselineChicken);
   const [friesGrams, setFriesGrams] = useState(defaultFries);
@@ -88,12 +90,11 @@ function PlanBWorkspace({ preview, baselineChicken, demoReason }: { preview: Pla
 
   return <PageContainer title="Plan B — Internal Recovery"><main className="p4 p4-dashboard">
     <header className="p4-green-hero">
-      <div className="p4-brandline"><span>HAPPY POTATO <span>/ OPERATIONS</span></span><span className="p4-demo-tag">{demoReason ? "LOCAL DEMO" : "DEMO DATA"}</span></div>
+      <div className="p4-brandline"><span>HAPPY POTATO <span>/ OPERATIONS</span></span><span className="p4-demo-tag">DEMO DATA</span></div>
       <p className="p4-kicker">PLAN B · INTERNAL RECOVERY</p>
       <h2>Make the most of your available stock.</h2>
       <p>Chicken delivery disruption · {preview.incident?.id} · Happy Potato — Demo Outlet</p>
       <div className="p4-hero-status"><span><Package size={15}/> No new purchase</span><span>{breach ? <><AlertTriangle size={15}/> BREACH_RISK · review needed</> : <><Check size={15}/> {feasible ? "Plan feasible under demo assumptions" : "Schedule needs review"}</>}</span><span>Mock data · {preview.date} MYT</span></div>
-      {demoReason && <p data-testid="plan-b-reason">Local demo · {demoReason} · <Link to="/incidents" style={{ color: "inherit" }}>Open incidents</Link></p>}
     </header>
 
 

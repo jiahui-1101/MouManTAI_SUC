@@ -47,7 +47,7 @@ export function NotWiredNotice() {
 
 export function LiveRegion({ message }: { message: string }) {
   return (
-    <div aria-live="polite" role="status" className="p5-muted" data-testid="p5-live">
+    <div aria-live="polite" role="status" className="p5-sr-only" data-testid="p5-live">
       {message}
     </div>
   );
@@ -125,7 +125,7 @@ export function EscalationPanel({ onMessage }: { onMessage: (m: string) => void 
           <Button variant="secondary" disabled={viewer} onClick={() => setOpen(true)}>
             Revise constraints
           </Button>
-          {viewer && <span className="p5-reason">ViewerAuditor is read-only.</span>}
+          {viewer && <span className="p5-reason">Viewer (audit only) is read-only.</span>}
         </div>
       )}
       {open && (

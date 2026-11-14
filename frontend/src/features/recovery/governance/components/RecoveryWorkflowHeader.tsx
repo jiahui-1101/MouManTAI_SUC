@@ -1,10 +1,122 @@
+import { useEffect, useId, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { DataPanel, StatusBadge } from '../../../../components/ui';
-import { shortFingerprint } from '../format';
-import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
+import { formatKgMilli, shortFingerprint } from '../format';
+import { ALL_ROLES, ROLE_LABELS, TRUTH_LABELS } from '../labels';
+import type { DemoRole } from '../p5Contracts';
+import { useP5Runtime, useP5Store, useP5Ui, useP5World } from '../p5Store';
 import { selectWorkflowSteps, type WorkflowStepId } from '../selectors';
-import { RoleSwitcher } from './common';
+import { P5Details } from './P5Details';
+import { PresentationToggle, ShortcutsDialog, usePresentationShortcuts } from './PresentationControls';
 import './p5.css';
+
+/**
+ * One quiet incident bar: the "why" (the supplier disruption) in words, demo clock, acting role and
+ * presentation toggle. Truth labels stay visible as small pills; audit IDs move into Details.
+ */
+export function P5ContextBar() {
+  const w = useP5World();
+  const p5 = useP5Store((s) => s.p5);
+  const { adapter } = useP5Runtime();
+  const roleId = useId();
+  const presenting = useP5Ui((st) => st.presentationMode);
+  const [shortcutMsg, setShortcutMsg] = useState('');
+  usePresentationShortcuts(setShortcutMsg);
+  useEffect(() => {
+    if (!shortcutMsg) return undefined;
+    const t = setTimeout(() => setShortcutMsg(''), 6000);
+    return () => clearTimeout(t);
+  }, [shortcutMsg]);
+  useEffect(() => {
+    document.body.dataset.p5Presenting = presenting ? 'true' : 'false';
+    return () => {
+      delete document.body.dataset.p5Presenting;
+    };
+  }, [presenting]);
+
+  const impact = w.impact;
+  const incident = w.wired && w.incidentId ? adapter.deps.getActiveIncident?.() ?? null : null;
+  const poId = impact?.poId ?? incident?.poId;
+  const sel = p5.selection;
+  const activeApproval = [...p5.approvals].reverse().find((a) => a.state === 'APPROVED');
+  const scenarioText = sel
+    ? `${sel.scenarioId} v${sel.version}`
+    : activeApproval
+    ? `${activeApproval.scenarioId} v${activeApproval.scenarioVersion}`
+    : '—';
+
+  const headline = !w.incidentId
+    ? 'No supplier disruption reported yet'
+    : impact && impact.poShortfallKgMilli !== undefined
+    ? `Supplier can't deliver ${formatKgMilli(impact.poShortfallKgMilli)} of chicken today${poId ? ` (${poId})` : ''}`
+    : `Supplier disruption reported${poId ? ` on ${poId}` : ''} — impact not assessed yet`;
+
+  return (
+    <section className="fm-panel p5-card p5-context-bar" aria-label="Incident context" data-testid="p5-context-bar">
+      <div className="p5-context-bar__row">
+        <p className="p5-context-bar__headline">
+          <span aria-hidden="true">🐔 </span>
+          <strong>{headline}</strong>
+          <span className="p5-muted"> · Happy Potato</span>
+        </p>
+        <PresentationToggle />
+      </div>
+      <div className="p5-context-bar__row">
+        <div className="p5-context-bar__controls">
+          {w.clock && (
+            <span className="p5-muted">
+              Demo clock <strong className="p5-mono">{w.clock}</strong>
+            </span>
+          )}
+          {w.wired && (
+            <label htmlFor={roleId} className="p5-context-bar__role" title="Demo role — not real access control">
+              <span>Acting as (demo)</span>
+              <select
+                id={roleId}
+                className="fm-select"
+                value={w.role ?? ''}
+                onChange={(e) => adapter.setRole(e.target.value as DemoRole)}
+                data-testid="p5-role-select"
+              >
+                {ALL_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {ROLE_LABELS[r].label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+        <div className="p5-context-bar__truth">
+          <span className="p5-pill p5-pill--sim" title={`SIMULATED_CALCULATION — ${TRUTH_LABELS.SIMULATED_CALCULATION.explain}`}>
+            {TRUTH_LABELS.SIMULATED_CALCULATION.label}
+          </span>
+          <span className="p5-pill" title={`SYNTHETIC_BUSINESS — ${TRUTH_LABELS.SYNTHETIC_BUSINESS.explain}`}>
+            {TRUTH_LABELS.SYNTHETIC_BUSINESS.label}
+          </span>
+        </div>
+      </div>
+      <div className="p5-context-bar__row p5-context-bar__foot">
+        <span className="p5-muted p5-context-bar__disclaimer">
+          Not a production food-safety or procurement authorization system.
+        </span>
+        {shortcutMsg && (
+          <span className="p5-context-bar__status" role="status" data-testid="p5-shortcut-status">
+            {shortcutMsg}
+          </span>
+        )}
+        <P5Details summary="Audit details" testId="p5-context-details">
+          Incident {w.incidentId ?? '—'} · Plan {scenarioText}
+          {w.snapshot && (
+            <>
+              {' '}· Snapshot {w.snapshot.id} rev {w.snapshot.revision} · Fingerprint{' '}
+              <abbr title={w.snapshot.fingerprint}>{shortFingerprint(w.snapshot.fingerprint)}</abbr>
+            </>
+          )}
+        </P5Details>
+      </div>
+    </section>
+  );
+}
 
 interface RecoveryWorkflowHeaderProps {
   currentStep?: WorkflowStepId;
@@ -12,7 +124,6 @@ interface RecoveryWorkflowHeaderProps {
 
 export function RecoveryWorkflowHeader({ currentStep: propStep }: RecoveryWorkflowHeaderProps) {
   const location = useLocation();
-  const w = useP5World();
   const p5 = useP5Store((s) => s.p5);
   const { adapter } = useP5Runtime();
 
@@ -32,80 +143,10 @@ export function RecoveryWorkflowHeader({ currentStep: propStep }: RecoveryWorkfl
   const currentIndex = Math.max(0, stepOrder.indexOf(currentStep));
   const currentStepItem = steps.find((s) => s.id === currentStep) ?? steps.compare;
 
-  const sel = p5.selection;
-  const activeApproval = [...p5.approvals].reverse().find((a) => a.state === 'APPROVED');
-  const scenarioText = sel
-    ? `${sel.scenarioId} v${sel.version}`
-    : activeApproval
-    ? `${activeApproval.scenarioId} v${activeApproval.scenarioVersion}`
-    : null;
-
   return (
     <header className="p5-workflow-header p5-stack" data-testid="p5-workflow-header">
-      {/* Context Bar */}
-      <DataPanel className="p5-card p5-stack p5-card--accent-brand">
-        <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <div className="p5-row" style={{ flexWrap: 'wrap', gap: '8px 12px' }}>
-            <span>
-              Incident <strong className="p5-mono">{w.incidentId ?? '—'}</strong>
-            </span>
-            <span>·</span>
-            <span>
-              Plan:{' '}
-              <strong className="p5-mono">
-                {sel ? `Plan ${sel.strategy}` : 'No plan selected'}
-              </strong>
-            </span>
-            {scenarioText && (
-              <>
-                <span>·</span>
-                <span>
-                  Scenario <strong className="p5-mono">{scenarioText}</strong>
-                </span>
-              </>
-            )}
-            {w.snapshot && (
-              <>
-                <span>·</span>
-                <span>
-                  Snapshot <strong className="p5-mono">{w.snapshot.id}</strong> rev {w.snapshot.revision}
-                </span>
-                <span>·</span>
-                <span>
-                  Fingerprint{' '}
-                  <abbr className="p5-mono" title={w.snapshot.fingerprint}>
-                    {shortFingerprint(w.snapshot.fingerprint)}
-                  </abbr>
-                </span>
-              </>
-            )}
-            {w.clock && (
-              <>
-                <span>·</span>
-                <span>
-                  Demo clock <strong className="p5-mono">{w.clock}</strong>
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="p5-row" style={{ alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <StatusBadge tone="simulated" title="SIMULATED_CALCULATION">
-            SIMULATED_CALCULATION · Demo calculation
-          </StatusBadge>
-          <StatusBadge tone="neutral" title="SYNTHETIC_BUSINESS">
-            SYNTHETIC_BUSINESS · Happy Potato • Demo data
-          </StatusBadge>
-        </div>
-
-        <p className="p5-muted" style={{ fontSize: '12px' }}>
-          Not a production food-safety or procurement authorization system.
-        </p>
-      </DataPanel>
-
-      {/* Role Switcher */}
-      <RoleSwitcher />
+      <P5ContextBar />
+      <ShortcutsDialog />
 
       {/* Stepper */}
       <nav aria-label="Recovery workflow stepper" className="p5-stepper">

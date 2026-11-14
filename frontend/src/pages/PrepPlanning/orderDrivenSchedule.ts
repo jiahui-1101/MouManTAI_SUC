@@ -3,30 +3,32 @@ import { preview } from "../../features/recovery/plan-b/preview";
 import { eligibleLots, type Batch } from "../../features/recovery/plan-b/planB";
 
 export const kitchenAssumptions = { maxPortions: 10, minutes: 6, earliest: 630 };
-const station = preview.batches[0]?.station ?? "";
+const stations = { chicken: preview.batches[0]?.station ?? "", fries: preview.stations.find(id => id === "HP-FRY-FRIES-A") ?? "" };
 const stock = eligibleLots(preview);
 const grams = (ingredient: string) => stock.filter(lot => lot.ingredient === ingredient).reduce((sum, lot) => sum + (lot.grams ?? 0), 0);
 export const orders = (allocateDemoOrders(preview.menus, grams("chicken"), grams("fries")) ?? [])
   .map((order, index) => ({ ...order, deadline: 690 + Math.floor(index / 4) * 30 }));
 export const readyTimes = [...new Set(orders.map(order => order.deadline))];
-export type PrepBatch = Batch & { orderIds: string[] };
+export type PrepBatch = Batch & { orderIds: string[]; ingredient: "chicken" | "fries" };
 
 export function generateSchedule(): PrepBatch[] {
   const batches: PrepBatch[] = [];
-  let cursor = Infinity;
-  for (const deadline of [...readyTimes].reverse()) {
-    cursor = Math.min(cursor, deadline);
-    for (const menu of preview.menus.filter(item => item.chicken > 0)) {
-      const portions = orders.filter(order => order.deadline === deadline).flatMap(order =>
-        Array.from({ length: order.items.find(item => item.menuId === menu.id)?.portions ?? 0 }, () => order.id));
-      for (let offset = 0; offset < portions.length; offset += kitchenAssumptions.maxPortions) {
-        const group = portions.slice(offset, offset + kitchenAssumptions.maxPortions);
-        const end = cursor;
-        const start = Math.max(kitchenAssumptions.earliest, end - kitchenAssumptions.minutes);
-        batches.push({ id: "HP-SIM-B" + String(batches.length + 1).padStart(2, "0"),
-          menuId: menu.id, station, start, end, deadline, portions: group.length,
-          orderIds: [...new Set(group)], demand: "Confirmed", status: "PLANNED" });
-        cursor = start;
+  for (const ingredient of ["chicken", "fries"] as const) {
+    let cursor = Infinity;
+    for (const deadline of [...readyTimes].reverse()) {
+      cursor = Math.min(cursor, deadline);
+      for (const menu of preview.menus.filter(item => item[ingredient] > 0)) {
+        const portions = orders.filter(order => order.deadline === deadline).flatMap(order =>
+          Array.from({ length: order.items.find(item => item.menuId === menu.id)?.portions ?? 0 }, () => order.id));
+        for (let offset = 0; offset < portions.length; offset += kitchenAssumptions.maxPortions) {
+          const group = portions.slice(offset, offset + kitchenAssumptions.maxPortions);
+          const end = cursor;
+          const start = Math.max(kitchenAssumptions.earliest, end - kitchenAssumptions.minutes);
+          batches.push({ id: "HP-SIM-B" + String(batches.length + 1).padStart(2, "0"),
+            menuId: menu.id, station: stations[ingredient], ingredient, start, end, deadline, portions: group.length,
+            orderIds: [...new Set(group)], demand: "Confirmed", status: "PLANNED" });
+          cursor = start;
+        }
       }
     }
   }
@@ -37,7 +39,7 @@ export function checkSchedule(batches: PrepBatch[]) {
   const issues: string[] = [];
   const affected = new Set<string>();
   for (const [index, batch] of batches.entries()) {
-    if (!station || batch.station !== station || batch.portions > kitchenAssumptions.maxPortions ||
+    if (!stations[batch.ingredient] || batch.station !== stations[batch.ingredient] || batch.portions > kitchenAssumptions.maxPortions ||
         !Number.isInteger(batch.start) || !Number.isInteger(batch.end) ||
         batch.start < kitchenAssumptions.earliest || batch.end <= batch.start) {
       issues.push(batch.id + " has invalid timing or station capacity.");

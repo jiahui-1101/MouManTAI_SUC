@@ -97,3 +97,74 @@ export function preflightExecution(
   }
   return null;
 }
+
+export interface AdvanceSkip {
+  actionId: string;
+  actionType: ExecutionAction['actionType'];
+  targetId?: string;
+  error: P5ErrorCode;
+  detail: string;
+}
+
+export interface AdvancePlan {
+  /** Tasks the current role may advance exactly one step now. */
+  eligible: ExecutionAction[];
+  skipped: AdvanceSkip[];
+}
+
+/**
+ * Pure: which tasks of the latest approved plan the CURRENT role can advance one step,
+ * using the same preflight as simulateExecutionAction. Tasks already awaiting evidence are
+ * neither eligible nor reported as skipped (nothing left to do for them here).
+ */
+export function planAdvanceMyTasks(
+  state: { actions: readonly ExecutionAction[]; approvals: readonly ApprovalRecord[] },
+  deps: Pick<P5Deps, 'getSnapshot' | 'getScenario' | 'getCurrentRole' | 'getDemoClockLocal'>,
+): AdvancePlan {
+  const approval = [...state.approvals].reverse().find((a) => a.state === 'APPROVED');
+  if (!approval) return { eligible: [], skipped: [] };
+  const eligible: ExecutionAction[] = [];
+  const skipped: AdvanceSkip[] = [];
+  for (const action of state.actions.filter((a) => a.approvalId === approval.id)) {
+    if (!nextExecutionState(action.state)) continue;
+    const blocker = preflightExecution(state, deps, action.id);
+    if (blocker) {
+      skipped.push({ actionId: action.id, actionType: action.actionType, targetId: action.targetId, error: blocker.error, detail: blocker.detail });
+    } else {
+      eligible.push(action);
+    }
+  }
+  return { eligible, skipped };
+}
+
+export interface AdvanceResult {
+  advanced: ExecutionAction[];
+  skipped: AdvanceSkip[];
+}
+
+/**
+ * Demo-speed execution that stays governed: advances every eligible task by exactly ONE step,
+ * by calling the existing simulateExecutionAction per task (same reason, one audit entry each).
+ * Never reaches VERIFIED (simulateExecutionAction cannot). A repeated call advances the next step.
+ */
+export function advanceMyTasks(
+  state: {
+    actions: readonly ExecutionAction[];
+    approvals: readonly ApprovalRecord[];
+    simulateExecutionAction(actionId: string, expectedApprovalId: string, reason: string): Result<ExecutionAction>;
+  },
+  deps: Pick<P5Deps, 'getSnapshot' | 'getScenario' | 'getCurrentRole' | 'getDemoClockLocal'>,
+  reason: string,
+): Result<AdvanceResult> {
+  const r = reason.trim();
+  if (!r) return fail('MISSING_REASON', 'A reason is required.');
+  const plan = planAdvanceMyTasks(state, deps);
+  const advanced: ExecutionAction[] = [];
+  const skipped = [...plan.skipped];
+  for (const action of plan.eligible) {
+    const res = state.simulateExecutionAction(action.id, action.approvalId, r);
+    if (res.ok) advanced.push(res.value);
+    else skipped.push({ actionId: action.id, actionType: action.actionType, targetId: action.targetId, error: res.error, detail: res.detail });
+  }
+  return ok({ advanced, skipped });
+}

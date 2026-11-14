@@ -2,84 +2,115 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, StatusBadge } from '../../../../components/ui';
 import { isApprovalExpired } from '../../../approvals/approvalLogic';
-import { preflightExecution } from '../../../approvals/executionLogic';
-import { hasCapability } from '../../../approvals/permissions';
+import { advanceMyTasks, planAdvanceMyTasks, preflightExecution, type AdvanceSkip } from '../../../approvals/executionLogic';
 import { formatKgMilli, formatSenAsRM, shortFingerprint } from '../format';
-import type { ActionType, ApprovalRecord, DemoRole, ExecutionAction, RecoveryScenarioWithActions } from '../p5Contracts';
+import {
+  ALL_ROLES,
+  ACTION_TYPE_LABELS,
+  EXECUTION_STATE_LABELS,
+  SYNC_STATUS_LABELS,
+  TRUTH_LABELS,
+  batchLabelFrom,
+  demoTime,
+  executionRefusal,
+  roleLabel,
+  roleList,
+} from '../labels';
+import type { ActionType, DemoRole, ExecutionAction, ExecutionAuditEntry, P5ErrorCode, RecoveryScenarioWithActions } from '../p5Contracts';
+import type { P5Deps } from '../p5Deps';
 import { BENIGN_ERRORS, p5ErrorMessage } from '../p5Errors';
 import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
 import { selectExecutionTasks } from '../selectors';
+import { hasCapability } from '../../../approvals/permissions';
+import { BlockerCard, blockerView } from './BlockerCard';
 import { ReasonDialog } from './Dialog';
 import { EscalationPanel, LiveRegion, NotWiredNotice } from './common';
+import { P5Details } from './P5Details';
 import { RecoveryWorkflowHeader } from './RecoveryWorkflowHeader';
 import { P5DevControls } from './P5DevControls';
 import './p5.css';
-
-const MENU_NAMES: Record<string, string> = {
-  'HP-MENU-CP': 'Chicken Poppers',
-  'HP-MENU-CT': 'Chicken Tender',
-  'HP-MENU-HC': 'Hot Crispy Chicken',
-};
-
-const ALL_ROLES: readonly DemoRole[] = [
-  'Owner',
-  'OperationsManager',
-  'ProcurementOfficer',
-  'KitchenLead',
-  'ViewerAuditor',
-];
 
 function allowedRolesFor(actionType: ActionType): DemoRole[] {
   return ALL_ROLES.filter((r) => hasCapability(r, { kind: 'EXECUTE', actionType }));
 }
 
-interface SimulateDialogState {
-  open: boolean;
-  actionId: string;
+/** Menu display name from the data layer (P2 menu / mock world), falling back to the ID. Never hardcoded here. */
+export function menuDisplayName(deps: Pick<P5Deps, 'resolveMenuDisplayName'>, menuId: string | undefined): string {
+  if (!menuId) return 'Menu item';
+  return deps.resolveMenuDisplayName?.(menuId) ?? menuId;
+}
+
+/** "Advanced 4 tasks · 3 skipped (not allowed for Kitchen Lead)". */
+export function advanceSummary(advanced: number, skipped: readonly AdvanceSkip[], role: DemoRole): string {
+  const head = `Advanced ${advanced} task${advanced === 1 ? '' : 's'}`;
+  if (skipped.length === 0) return head;
+  const why: Partial<Record<P5ErrorCode, string>> = {
+    DEMO_FORBIDDEN: `not allowed for ${roleLabel(role)}`,
+    STALE_SCENARIO: 'the numbers changed',
+    APPROVAL_EXPIRED: 'too late on the demo clock',
+  };
+  const reasons = [...new Set(skipped.map((s) => why[s.error] ?? 'not available'))];
+  return `${head} · ${skipped.length} skipped (${reasons.join('; ')})`;
 }
 
 export function ExecutionView() {
   const p5 = useP5Store((s) => s.p5);
   const w = useP5World();
+  const { adapter, store } = useP5Runtime();
   const [live, setLive] = useState('');
-  const [simulateDialog, setSimulateDialog] = useState<SimulateDialogState>({ open: false, actionId: '' });
+  const [summary, setSummary] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<{ kind: 'one'; actionId: string } | { kind: 'all' } | null>(null);
 
-  // Find latest approved approval
   const activeApproval = [...p5.approvals].reverse().find((a) => a.state === 'APPROVED');
   const scenario = activeApproval ? (activeApproval.selectedStrategy === 'A' ? w.scenarioA : w.scenarioB) : null;
+  const role: DemoRole = w.role ?? 'ViewerAuditor';
 
-  // Stale & expiry checks
   const isStale = Boolean(activeApproval && w.snapshot && activeApproval.snapshotFingerprint !== w.snapshot.fingerprint);
   const isExpired = Boolean(activeApproval && w.clock && isApprovalExpired(activeApproval, w.clock));
-
-  const blockReason = isStale
-    ? 'Snapshot changed since approval'
-    : isExpired
-    ? `Approval expired at ${activeApproval?.expiresAtIso?.slice(11, 16) ?? '10:45'} on demo clock`
-    : null;
+  const deadline = activeApproval?.expiresAtIso?.slice(11, 16) ?? null;
 
   const tasks = activeApproval ? selectExecutionTasks({ p5 } as any, activeApproval.id) : [];
+  const plan = w.wired && activeApproval ? planAdvanceMyTasks(p5, adapter.deps) : { eligible: [], skipped: [] };
+  const remaining = tasks.filter((t) => t.state === 'APPROVED' || t.state === 'SIMULATED_EXECUTION');
+  const roleBlockedEverywhere =
+    !isStale && !isExpired && remaining.length > 0 && remaining.every((t) => !hasCapability(role, { kind: 'EXECUTE', actionType: t.actionType }));
 
-  const handleSimulate = (reason: string): string | null => {
-    if (!activeApproval || !simulateDialog.actionId) return null;
-    const res = p5.simulateExecutionAction(simulateDialog.actionId, activeApproval.id, reason);
+  const handleSimulateOne = (actionId: string, reason: string): string | null => {
+    if (!activeApproval) return null;
+    const res = store.getState().p5.simulateExecutionAction(actionId, activeApproval.id, reason);
     if (!res.ok) {
-      if (!BENIGN_ERRORS.has(res.error)) {
-        return p5ErrorMessage(res.error, res.detail);
-      }
+      if (!BENIGN_ERRORS.has(res.error)) return p5ErrorMessage(res.error, res.detail);
     } else {
-      setLive(`Simulated action ${res.value.actionType} → ${res.value.state}.`);
+      setLive(`${ACTION_TYPE_LABELS[res.value.actionType].label}: ${EXECUTION_STATE_LABELS[res.value.state].label}.`);
     }
-    setSimulateDialog({ open: false, actionId: '' });
+    setDialog(null);
     return null;
   };
 
-  // Progress counts
-  const approvedCount = tasks.filter((t) => t.state === 'APPROVED').length;
-  const simExecCount = tasks.filter((t) => t.state === 'SIMULATED_EXECUTION').length;
-  const awaitingCount = tasks.filter((t) => t.state === 'AWAITING_EVIDENCE').length;
-  const verifiedCount = tasks.filter((t) => t.state === 'VERIFIED').length;
-  const allAwaiting = tasks.length > 0 && tasks.every((t) => t.state === 'AWAITING_EVIDENCE' || t.state === 'VERIFIED');
+  const handleAdvanceAll = (reason: string): string | null => {
+    const res = advanceMyTasks(store.getState().p5, adapter.deps, reason);
+    if (!res.ok) return p5ErrorMessage(res.error, res.detail);
+    const text = advanceSummary(res.value.advanced.length, res.value.skipped, role);
+    setSummary(text);
+    setLive(text);
+    setDialog(null);
+    return null;
+  };
+
+  const notStarted = tasks.filter((t) => t.state === 'APPROVED').length;
+  const inProgress = tasks.filter((t) => t.state === 'SIMULATED_EXECUTION').length;
+  const waitingProof = tasks.filter((t) => t.state === 'AWAITING_EVIDENCE' || t.state === 'VERIFIED').length;
+  const allAwaiting = tasks.length > 0 && waitingProof === tasks.length;
+  const batchLabel = batchLabelFrom(tasks.filter((t) => t.actionType === 'PREP_BATCH_TASK' && t.targetId).map((t) => t.targetId as string));
+
+  const blockCtx = {
+    verb: 'executed' as const,
+    role,
+    actionTypes: [...new Set(tasks.map((t) => t.actionType))],
+    clock: w.clock,
+    deadlineLocal: deadline,
+    snapshotRevision: w.snapshot?.revision ?? null,
+  };
 
   return (
     <div className="p5" data-testid="p5-execution-view">
@@ -93,9 +124,7 @@ export function ExecutionView() {
       {!activeApproval ? (
         <section className="fm-panel p5-card p5-stack" aria-label="No approval">
           <h2>No approved plan</h2>
-          <p className="p5-muted">
-            No approved plan. Approve a plan on Approvals first.
-          </p>
+          <p className="p5-muted">No approved plan. Approve a plan on Approvals first.</p>
           <div>
             <Link to="/approvals" className="fm-btn fm-btn--primary p5-btn p5-btn--primary">
               Go to Approvals →
@@ -104,130 +133,122 @@ export function ExecutionView() {
         </section>
       ) : (
         <>
-          {blockReason && (
-            <div className="p5-alert p5-alert--danger fm-banner fm-banner--danger" role="alert" data-testid="p5-execution-blocked-banner">
-              <strong>Execution blocked: {blockReason}. Re-calculation and re-approval required.</strong>
-              <div className="p5-row" style={{ marginTop: '8px' }}>
-                <Link
-                  to="/recovery/compare"
-                  className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
-                  data-testid="p5-next-step-cta"
-                >
-                  Recalculate on Comparison
-                </Link>
-                <Link to="/approvals" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
-                  Go to Approvals →
-                </Link>
-              </div>
-            </div>
+          {(isStale || isExpired) && (
+            <BlockerCard testId="p5-execution-blocked-banner" view={blockerView(isStale ? 'STALE_SCENARIO' : 'APPROVAL_EXPIRED', '', blockCtx)} />
           )}
 
-          {allAwaiting && !blockReason && (
-            <div className="p5-alert p5-alert--ok fm-banner fm-banner--info" style={{ marginBottom: '14px' }}>
+          {roleBlockedEverywhere && (
+            <BlockerCard
+              testId="p5-execution-role-refusal"
+              view={blockerView('DEMO_FORBIDDEN', '', { ...blockCtx, actionTypes: [...new Set(remaining.map((t) => t.actionType))] })}
+            />
+          )}
+
+          {allAwaiting && !isStale && !isExpired && (
+            <div className="p5-alert p5-alert--ok fm-banner fm-banner--info">
               <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                 <p style={{ margin: 0 }}>
-                  <strong>All tasks simulated and awaiting evidence.</strong> Proceed to Outcomes to record evidence and verify the simulated outcome.
+                  <strong>All tasks done in the demo — now they need proof.</strong> Evidence is checked on Outcomes.
                 </p>
-                <Link
-                  to="/outcomes"
-                  className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
-                  data-testid="p5-next-step-cta"
-                >
+                <Link to="/outcomes" className="fm-btn fm-btn--primary p5-btn p5-btn--primary" data-testid="p5-next-step-cta">
                   Record evidence & verify →
                 </Link>
               </div>
             </div>
           )}
 
-          {/* Header */}
           <header className="fm-panel p5-card p5-card--accent-sim p5-stack" aria-label="Approved plan execution header">
             <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-              <h2>
-                Execution Tracker — Plan {activeApproval.selectedStrategy} ({activeApproval.scenarioId} v{activeApproval.scenarioVersion})
-              </h2>
+              <h2>Execution — Plan {activeApproval.selectedStrategy}</h2>
               <StatusBadge tone="simulated" title="SIMULATED_ACTION">
-                SIMULATED_ACTION
+                {TRUTH_LABELS.SIMULATED_ACTION.label}
               </StatusBadge>
             </div>
+            <p className="p5-muted">Simulation only — no supplier, POS or kitchen system is contacted.</p>
             <p className="p5-muted">
-              Simulation only — no supplier, POS or kitchen system is contacted.
+              Approved by <strong>{roleLabel(activeApproval.actorRole)}</strong> at {demoTime(activeApproval.createdAtIso)}
             </p>
-            <div className="p5-row p5-muted" style={{ fontSize: '12.5px' }}>
-              <span>
-                Approval ID: <strong className="p5-mono">{activeApproval.id}</strong>
-              </span>
-              <span>·</span>
-              <span>
-                Approved by: <strong>{activeApproval.actorRole}</strong> ({activeApproval.actorId})
-              </span>
-              <span>·</span>
-              <span>
-                Approved at: <span className="p5-mono">{activeApproval.createdAtIso.slice(11, 16)}</span>
-              </span>
-              <span>·</span>
-              <span>
-                Demo clock: <strong className="p5-mono">{w.clock ?? '—'}</strong>
-              </span>
-            </div>
+            <P5Details summary="Audit details">
+              Approval {activeApproval.id} · {activeApproval.scenarioId} v{activeApproval.scenarioVersion} · {activeApproval.actorId}
+            </P5Details>
           </header>
 
-          {/* Progress */}
           <section className="fm-panel p5-card p5-stack" aria-label="Execution progress">
-            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-              <h3>Execution progress</h3>
-              <span className="p5-badge fm-badge">{tasks.length} total tasks</span>
+            <div className="p5-row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <h3>Progress</h3>
+              <Button
+                variant="secondary"
+                disabled={plan.eligible.length === 0}
+                onClick={() => setDialog({ kind: 'all' })}
+                data-testid="p5-advance-all-btn"
+              >
+                Advance all tasks I can do as {roleLabel(role)} ({plan.eligible.length})
+              </Button>
             </div>
-            <div className="p5-kpi-grid">
+            <div className="p5-kpi-grid p5-kpi-grid--3">
               <div className="p5-kpi-card p5-kpi-card--approved">
-                <span className="p5-kpi-lbl">Approved</span>
-                <span className="p5-kpi-val">{approvedCount}</span>
+                <span className="p5-kpi-lbl">Not started</span>
+                <span className="p5-kpi-val">{notStarted}</span>
               </div>
               <div className="p5-kpi-card p5-kpi-card--sim">
-                <span className="p5-kpi-lbl">Simulated execution</span>
-                <span className="p5-kpi-val">{simExecCount}</span>
+                <span className="p5-kpi-lbl">In progress (simulated)</span>
+                <span className="p5-kpi-val">{inProgress}</span>
               </div>
               <div className="p5-kpi-card p5-kpi-card--awaiting">
-                <span className="p5-kpi-lbl">Awaiting evidence</span>
-                <span className="p5-kpi-val">{awaitingCount}</span>
-              </div>
-              <div className="p5-kpi-card p5-kpi-card--verified">
-                <span className="p5-kpi-lbl">Verified</span>
-                <span className="p5-kpi-val">{verifiedCount}</span>
+                <span className="p5-kpi-lbl">Waiting for proof</span>
+                <span className="p5-kpi-val">{waitingProof}</span>
               </div>
             </div>
             <p className="p5-muted" data-testid="p5-progress-text">
-              {awaitingCount} of {tasks.length} tasks awaiting evidence{simExecCount > 0 ? ` · ${simExecCount} in progress (one more step each)` : ''}
+              {waitingProof} of {tasks.length} tasks waiting for proof{inProgress > 0 ? ` · ${inProgress} in progress (one more step each)` : ''} · proof is checked on <Link to="/outcomes">Outcomes</Link>
             </p>
+            {summary && (
+              <p className="p5-advance-summary" data-testid="p5-advance-summary">
+                {summary}
+              </p>
+            )}
           </section>
 
-          {/* Tasks List */}
           <section className="p5-stack" aria-label="Execution tasks">
             <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-              <h2>Execution tasks</h2>
-              <span className="p5-muted">{tasks.length} task{tasks.length === 1 ? '' : 's'} assigned</span>
+              <h2>Tasks</h2>
+              <span className="p5-muted">
+                {tasks.length} task{tasks.length === 1 ? '' : 's'}
+              </span>
             </div>
             {tasks.map((task) => (
               <TaskCard
                 key={task.id}
                 task={task}
-                activeApproval={activeApproval}
                 scenario={scenario}
-                blockedBanner={Boolean(blockReason)}
+                role={role}
+                deadline={deadline}
+                batchLabel={batchLabel}
+                blockedBanner={isStale || isExpired}
                 auditEntries={p5.auditLog.filter((e) => e.actionId === task.id)}
-                onOpenSimulate={(id) => setSimulateDialog({ open: true, actionId: id })}
+                onOpenSimulate={(id) => setDialog({ kind: 'one', actionId: id })}
               />
             ))}
           </section>
         </>
       )}
 
-      {simulateDialog.open && (
+      {dialog?.kind === 'one' && (
         <ReasonDialog
-          title="Simulate Next Step"
-          description="Provide a simulated operational reason to advance this task to its next state:"
+          title="Simulate next step"
+          description="Give a short operational reason. This advances one task by one step, in the demo only."
           confirmLabel="Advance step"
-          onConfirm={handleSimulate}
-          onCancel={() => setSimulateDialog({ open: false, actionId: '' })}
+          onConfirm={(r) => handleSimulateOne(dialog.actionId, r)}
+          onCancel={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'all' && (
+        <ReasonDialog
+          title={`Advance all tasks you can do as ${roleLabel(role)}`}
+          description={`Moves ${plan.eligible.length} task${plan.eligible.length === 1 ? '' : 's'} forward by exactly one step each, with one audit entry per task. Tasks your role can't do are skipped.`}
+          confirmLabel="Advance tasks"
+          onConfirm={handleAdvanceAll}
+          onCancel={() => setDialog(null)}
         />
       )}
     </div>
@@ -237,24 +258,34 @@ export function ExecutionView() {
 function TaskCard({
   task,
   scenario,
+  role,
+  deadline,
+  batchLabel,
   blockedBanner,
   auditEntries,
   onOpenSimulate,
 }: {
   task: ExecutionAction;
-  activeApproval?: ApprovalRecord;
   scenario: RecoveryScenarioWithActions | null;
+  role: DemoRole;
+  deadline: string | null;
+  batchLabel: (id: string) => string;
   blockedBanner: boolean;
-  auditEntries: any[];
+  auditEntries: ExecutionAuditEntry[];
   onOpenSimulate: (id: string) => void;
 }) {
   const p5 = useP5Store((s) => s.p5);
   const { adapter } = useP5Runtime();
   const allowed = allowedRolesFor(task.actionType);
-
-  // Preflight check
   const blocker = preflightExecution(p5, adapter.deps, task.id);
+  const done = task.state === 'AWAITING_EVIDENCE' || task.state === 'VERIFIED';
   const isSimulationDisabled = blockedBanner || blocker !== null;
+  const blockerText =
+    !done && blocker && !blockedBanner
+      ? blocker.error === 'DEMO_FORBIDDEN'
+        ? executionRefusal(role, task.actionType).headline
+        : p5ErrorMessage(blocker.error, blocker.detail)
+      : null;
 
   const stateClass =
     task.state === 'VERIFIED'
@@ -268,12 +299,7 @@ function TaskCard({
   return (
     <article className={`fm-panel p5-card p5-task-card ${stateClass} p5-stack`} data-testid={`p5-task-card-${task.id}`}>
       <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div className="p5-stack" style={{ gap: '4px' }}>
-          <h3>{taskTitle(task)}</h3>
-          <span className="p5-muted p5-mono">
-            Key: <abbr title={task.idempotencyKey}>{shortFingerprint(task.idempotencyKey)}</abbr>
-          </span>
-        </div>
+        <h3>{taskTitle(task, adapter.deps, batchLabel)}</h3>
         <div className="p5-row">
           <span
             className={`p5-badge fm-badge ${
@@ -285,153 +311,139 @@ function TaskCard({
                 ? 'p5-badge--warn'
                 : ''
             }`}
+            title={task.state}
             data-testid={`p5-task-state-${task.id}`}
           >
-            {task.state}
+            {EXECUTION_STATE_LABELS[task.state].label}
           </span>
           {task.actionType === 'MENU_LIMIT_TASK' && (
             <span
               className={`p5-badge fm-badge ${
-                task.externalSyncStatus === 'MANUALLY_CONFIRMED_DEMO'
-                  ? 'fm-badge--success p5-badge--brand'
-                  : 'fm-badge--warning p5-badge--warn'
+                task.externalSyncStatus === 'MANUALLY_CONFIRMED_DEMO' ? 'fm-badge--success p5-badge--brand' : 'fm-badge--warning p5-badge--warn'
               }`}
+              title={task.externalSyncStatus}
               data-testid={`p5-task-sync-${task.id}`}
             >
-              {task.externalSyncStatus === 'MANUALLY_CONFIRMED_DEMO'
-                ? 'Manually confirmed (demo evidence)'
-                : 'Awaiting manual update — not synced to any POS'}
+              {SYNC_STATUS_LABELS[task.externalSyncStatus].label}
             </span>
           )}
         </div>
       </div>
 
-      {/* Strategy-specific content */}
       {task.actionType === 'PO_DRAFT' && (
-        <div
-          className="p5-stack p5-muted"
-          style={{ background: 'var(--surface-secondary)', padding: '12px 14px', borderRadius: 'var(--radius-md)' }}
-          data-testid="p5-po-draft-content"
-        >
+        <div className="p5-stack p5-muted p5-task-detail" data-testid="p5-po-draft-content">
           <p>
-            <strong style={{ color: 'var(--text-primary)' }}>Local PO draft — NOT SENT</strong>
+            <strong style={{ color: 'var(--text-primary)' }}>Local purchase order draft — NOT SENT</strong>
           </p>
           <div className="p5-row">
-            <span>Supplier: <strong>{(scenario as any)?.supplierId ?? 'Not provided by Plan A scenario'}</strong></span>
-            <span>Qty: <strong>{scenario ? formatKgMilli(scenario.newPurchaseKgMilli) : 'Not provided by Plan A scenario'}</strong></span>
-            <span>Unit cost: <strong>{(scenario as any)?.unitCostSen ? `${formatSenAsRM((scenario as any).unitCostSen)}/kg` : 'Not provided by Plan A scenario'}</strong></span>
-            <span>Freight: <strong>{(scenario as any)?.freightSen ? formatSenAsRM((scenario as any).freightSen) : 'Not provided by Plan A scenario'}</strong></span>
-            <span>Landed total: <strong>{scenario ? formatSenAsRM(scenario.additionalCostSen) : 'Not provided by Plan A scenario'}</strong></span>
+            <span>
+              Quantity: <strong>{scenario ? formatKgMilli(scenario.newPurchaseKgMilli) : 'Not provided by Plan A'}</strong>
+            </span>
+            <span>
+              Landed total: <strong>{scenario ? formatSenAsRM(scenario.additionalCostSen) : 'Not provided by Plan A'}</strong>
+            </span>
           </div>
         </div>
       )}
 
       {task.actionType === 'RECEIPT_CHECK' && (
-        <div
-          className="p5-muted"
-          style={{ background: 'var(--surface-secondary)', padding: '12px 14px', borderRadius: 'var(--radius-md)' }}
-          data-testid="p5-receipt-check-content"
-        >
-          <p>Awaiting simulated receipt + quality check before 10:45.</p>
+        <div className="p5-muted p5-task-detail" data-testid="p5-receipt-check-content">
+          <p>Waiting for the simulated delivery and quality check{deadline ? ` before ${deadline}` : ''}.</p>
         </div>
       )}
 
       {task.actionType === 'PREP_BATCH_TASK' && (
         <div className="p5-row p5-muted">
-          <span>Batch ID: <strong className="p5-mono">{task.targetId ?? '—'}</strong></span>
-          <span>·</span>
-          <span>Planned portions: <strong>{plannedPortionsFor(task, scenario)}</strong></span>
+          <span>
+            Planned portions: <strong>{plannedPortionsFor(task, scenario)}</strong>
+          </span>
         </div>
       )}
 
       {task.actionType === 'MENU_LIMIT_TASK' && (
         <div className="p5-row p5-muted">
-          <span>Item: <strong>{adapter.deps.resolveMenuDisplayName?.(task.targetId ?? '') ?? MENU_NAMES[task.targetId ?? ''] ?? task.targetId}</strong></span>
-          <span>·</span>
-          <span>Menu ID: <strong className="p5-mono">{task.targetId ?? '—'}</strong></span>
+          <span>
+            Item: <strong>{menuDisplayName(adapter.deps, task.targetId)}</strong>
+          </span>
         </div>
       )}
 
       <div className="p5-row p5-muted" style={{ fontSize: '12.5px' }}>
-        <span>Allowed roles: <strong>{allowed.join(', ')}</strong></span>
+        <span>
+          Who can do this: <strong>{roleList(allowed)}</strong>
+        </span>
       </div>
 
-      {/* Actions */}
       <div className="p5-row" style={{ alignItems: 'center' }}>
-        {task.state !== 'AWAITING_EVIDENCE' && task.state !== 'VERIFIED' && (
-          <Button
-            variant="primary"
-            disabled={isSimulationDisabled}
-            onClick={() => onOpenSimulate(task.id)}
-            data-testid={`p5-simulate-btn-${task.id}`}
-          >
+        {!done && (
+          <Button variant="primary" disabled={isSimulationDisabled} onClick={() => onOpenSimulate(task.id)} data-testid={`p5-simulate-btn-${task.id}`}>
             Simulate next step
           </Button>
         )}
-
-        {blocker && (
+        {blockerText && (
           <span className="p5-reason" data-testid={`p5-task-blocker-${task.id}`}>
-            {blocker.detail}
+            {blockerText}
           </span>
         )}
-
         {task.state === 'AWAITING_EVIDENCE' && (
           <Link
             to={`/outcomes?actionId=${task.id}`}
             className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
             data-testid={`p5-record-evidence-link-${task.id}`}
           >
-            Record evidence →
+            Next: record proof →
           </Link>
         )}
       </div>
 
-      {/* Audit timeline */}
-      <details className="p5-card" style={{ marginTop: '6px', background: 'var(--surface-secondary)' }} data-testid={`p5-task-audit-${task.id}`}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-primary)' }}>
+      <details className="p5-card p5-task-audit" data-testid={`p5-task-audit-${task.id}`}>
+        <summary>
           Audit timeline ({auditEntries.length} event{auditEntries.length === 1 ? '' : 's'})
         </summary>
         {auditEntries.length === 0 ? (
           <p className="p5-muted" style={{ marginTop: '8px' }}>
-            No simulated state changes recorded yet.
+            No simulated changes recorded yet.
           </p>
         ) : (
           <ul className="p5-list" style={{ marginTop: '8px' }}>
             {auditEntries.map((entry, idx) => (
-              <li key={idx} className="p5-muted">
-                <strong>{entry.from} → {entry.to}</strong> by <strong>{entry.actorRole}</strong> ({entry.actorId}) at{' '}
-                <span className="p5-mono">{entry.atIso.slice(11, 16)}</span>: "{entry.reason}"{' '}
-                <span className="p5-badge fm-badge p5-badge--sim" style={{ fontSize: '10.5px' }}>simulated</span>
+              <li key={idx} className="p5-muted" title={`${entry.from} → ${entry.to} · ${entry.actorId}`}>
+                <strong>
+                  {EXECUTION_STATE_LABELS[entry.from].label} → {EXECUTION_STATE_LABELS[entry.to].label}
+                </strong>{' '}
+                by <strong>{roleLabel(entry.actorRole)}</strong> at {demoTime(entry.atIso)}: “{entry.reason}”{' '}
+                <span className="p5-badge fm-badge p5-badge--sim" style={{ fontSize: '10.5px' }}>
+                  simulated
+                </span>
               </li>
             ))}
           </ul>
         )}
       </details>
+      <P5Details summary="Audit details">
+        {task.actionType}
+        {task.targetId ? ` ${task.targetId}` : ''} · key <abbr title={task.idempotencyKey}>{shortFingerprint(task.idempotencyKey)}</abbr>
+      </P5Details>
     </article>
   );
 }
 
-function taskTitle(task: ExecutionAction): string {
+function taskTitle(task: ExecutionAction, deps: Pick<P5Deps, 'resolveMenuDisplayName'>, batchLabel: (id: string) => string): string {
   switch (task.actionType) {
     case 'PO_DRAFT':
-      return 'PO Draft Task';
+      return 'Purchase order draft';
     case 'RECEIPT_CHECK':
-      return 'Receipt & Quality Check Task';
+      return 'Delivery & quality check';
     case 'MENU_LIMIT_TASK':
-      return `Menu Limit Task — ${MENU_NAMES[task.targetId ?? ''] ?? task.targetId ?? 'Menu'}`;
+      return `Menu limit — ${menuDisplayName(deps, task.targetId)}`;
     case 'PREP_BATCH_TASK':
-      return `Prep Batch Task — ${task.targetId ?? 'Batch'}`;
+      return task.targetId ? batchLabel(task.targetId) : 'Prep batch';
   }
 }
 
-function plannedPortionsFor(task: ExecutionAction, scenario: RecoveryScenarioWithActions | null): number {
+/** Planned portions from the task or the published scenario only — never a local default. */
+function plannedPortionsFor(task: ExecutionAction, scenario: RecoveryScenarioWithActions | null): string {
+  if (task.plannedPortions !== undefined) return String(task.plannedPortions);
   const p = scenario?.proposedActions?.find((a) => a.actionType === 'PREP_BATCH_TASK' && a.targetId === task.targetId);
-  if (p?.plannedPortions !== undefined) return p.plannedPortions;
-  const BATCH_DEFAULT: Record<string, number> = {
-    'HP-BATCH-B-01': 25,
-    'HP-BATCH-B-02': 20,
-    'HP-BATCH-B-03': 15,
-    'HP-BATCH-B-04': 12,
-  };
-  return BATCH_DEFAULT[task.targetId ?? ''] ?? 10;
+  return p?.plannedPortions !== undefined ? String(p.plannedPortions) : 'Not provided by Plan B';
 }
