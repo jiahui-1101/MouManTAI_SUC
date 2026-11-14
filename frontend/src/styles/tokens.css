@@ -1,0 +1,28 @@
+/* Design tokens from the approved SUC blueprint (section 17). Light theme first. */
+:root {
+  --ink: #14211d;
+  --ink-2: #4a5b55;
+  --paper: #f6f4ef;
+  --surface: #ffffff;
+  --line: #e2ddd3;
+  --brand: #1e6b52;
+  --brand-soft: #e3f0ea;
+
+  --font-heading: "Manrope", system-ui, sans-serif;
+  --font-ui: "Inter", system-ui, sans-serif;
+
+  --sidebar-width: 264px;
+  --sidebar-rail: 64px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e9efec;
+    --ink-2: #a7b6b0;
+    --paper: #0f1714;
+    --surface: #16211d;
+    --line: #26332e;
+    --brand: #4fb38e;
+    --brand-soft: #183128;
+  }
+}
