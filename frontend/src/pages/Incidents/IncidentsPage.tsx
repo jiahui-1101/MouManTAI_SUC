@@ -21,7 +21,7 @@ import {
 import { DemoControls } from "../../features/incidents/components/DemoControls";
 import { IncidentDetail } from "../../features/incidents/components/IncidentDetail";
 import { P2ErrorBoundary } from "../../features/incidents/components/P2ErrorBoundary";
-import { Badge, EmptyState, Qty, SeverityBadge, StatusBadge, SyntheticTag } from "../../features/incidents/components/ui";
+import { Badge, EmptyState, Qty, SeverityBadge, StatusBadge } from "../../features/incidents/components/ui";
 import "../../features/incidents/p2.css";
 
 const CHANNEL_LABEL: Record<Channel, string> = { WHATSAPP: "WhatsApp", OUTLOOK: "Outlook", TELEGRAM: "Telegram" };
@@ -96,12 +96,6 @@ function IncidentsContent() {
 
   return (
     <div className="p2">
-      <div className="p2-meta">
-        <div className="p2-meta__item"><span className="p2-meta__label">Snapshot</span><span className="p2-mono">{store.restaurant.snapshot.id} · r{store.restaurant.snapshot.revision}</span></div>
-        <div className="p2-meta__item"><span className="p2-meta__label">Data</span><SyntheticTag /></div>
-        <div className="p2-meta__item"><span className="p2-meta__label">Incidents</span><span>{rows.length}</span></div>
-      </div>
-
       <div className={`p2-workspace ${selected ? "p2-workspace--with-detail" : ""}`}>
         <section className="p2-card p2-list" aria-label="Incident list">
           <div className="p2-filters" role="search">
