@@ -17,12 +17,15 @@ export function adaptPlanAInputs(read: PlanAInputRead): IntegrationResult<Adapte
   const source = partial;
   const need = deriveRecoverySourcingNeed(source);
   if (!need.ok) return { ok: false, code: need.error.code, message: need.error.message };
-  if (!source.incident.messageIds.length || source.incident.messageIds.some(id => !id.trim())) {
+  const nonempty = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
+  if (!source.incident.messageIds.length || !source.incident.messageIds.every(nonempty)) {
     return { ok: false, code: "SOURCE_EVIDENCE_MISSING", message: "Verified incident source evidence references are required." };
   }
   const metadata = read.scenarioMetadata;
-  if (!metadata.scenarioId?.trim() || !Number.isSafeInteger(metadata.version) || metadata.version < 1 ||
-      !Array.isArray(metadata.evidenceRefs) || !Array.isArray(metadata.actionIds)) {
+  if (!nonempty(metadata.scenarioId) || !Number.isSafeInteger(metadata.version) || metadata.version < 1 ||
+      !Array.isArray(metadata.evidenceRefs) || !metadata.evidenceRefs.every(nonempty) ||
+      !Array.isArray(metadata.actionIds) || !metadata.actionIds.every(nonempty) ||
+      (metadata.capacityStatus !== "UNKNOWN" && metadata.capacityStatus !== "INSUFFICIENT")) {
     return { ok: false, code: "VERSION_AUTHORITY_MISSING", message: "The shared owner must supply a scenario identity, positive version and evidence/action references." };
   }
   const uniqueIds = (values: string[]) => values.every(id => typeof id === "string" && id.trim().length > 0) && new Set(values).size === values.length;

@@ -337,6 +337,7 @@ export interface PlanAScenarioCandidate {
   incidentId: string;
   strategy: "A";
   snapshotFingerprint: string;
+  snapshotRevision: number;
   version: number;
   feasibility: "CONDITIONAL";
   newPurchaseKgMilli: number;

@@ -6,6 +6,8 @@ import type { DomainResult, PlanAScenarioCandidate, PlanAScenarioMetadata, Recov
 import { SupplyNeedSummary } from "./SupplyNeedSummary";
 import { SupplierOfferComparison } from "./SupplierOfferComparison";
 import { SupplierOfferDetails } from "./SupplierOfferDetails";
+import type { PlanAPublisher } from "../integration";
+import { PlanAProposeAction } from "./PlanAProposeAction";
 import { PlanADraftActions } from "./PlanADraftActions";
 import { RecoveryProjection } from "./RecoveryProjection";
 import "../plan-a.css";
@@ -20,6 +22,7 @@ export interface PlanAWorkspaceProps {
   impactAvailable?: boolean;
   comparisonAvailable?: boolean;
   evidenceAvailable?: boolean;
+  publisher?: PlanAPublisher;
   onPreview?: (scenario: PlanAScenarioCandidate) => void;
 }
 function complete(source: Partial<RecoverySourcingNeedInput> | undefined): source is RecoverySourcingNeedInput {
@@ -66,6 +69,7 @@ export function PlanAWorkspace(props: PlanAWorkspaceProps) {
     <section className="pa-panel" aria-labelledby="proposal-heading"><span className="pa-kicker">Plan A · Local proposal</span><h2 id="proposal-heading">Review before proposing</h2><p>{selected ? `Selected offer: ${selected.candidate.offer.id}` : "Select a conditionally eligible offer to calculate a proposal preview."}</p>{!props.scenarioMetadata && <p role="status">Scenario identity and version are needed before a preview can be generated.</p>}<div className="pa-actions"><button type="button" className="pa-primary" disabled={!selected || !props.scenarioMetadata} onClick={generate}>Generate Plan A preview</button></div><p className="pa-muted">Preview only. Purchasing, approval and shared comparison publishing are separate steps.</p></section>
     {stale && <p role="status" className="pa-notice">STALE — Inputs changed. Previous projection is unavailable; review eligibility and regenerate the preview.</p>}
     {!stale && preview && (preview.result.ok ? <RecoveryProjection scenario={preview.result.value}/> : <section role="alert" className="pa-panel"><h2>Proposal unavailable</h2><p>{preview.result.error.message}</p><p>{preview.result.error.code}</p></section>)}
+    <PlanAProposeAction publisher={props.publisher} candidate={!stale && preview?.result.ok ? preview.result.value : undefined} contextKey={key} localSensitivityActive={etaPreview?.basis === basis} comparisonAvailable={props.comparisonAvailable}/>
     <PlanADraftActions source={source} candidate={selected?.candidate} supplierName={selected ? props.supplierNames?.[selected.candidate.supplier.id] : undefined} proposal={!stale && preview?.result.ok ? preview.result.value : undefined} scenarioMetadata={props.scenarioMetadata} contextKey={key}/>
     <section className="pa-panel"><h2>Affected chicken menus</h2><p>{need.affectedMenuIds.map(id => source.snapshot.menuItems.find(menu => menu.id === id)?.name ?? id).join(" · ")}</p><p className="pa-muted">Fries-only demand is excluded from the chicken projection.</p><div className="pa-actions">{props.impactAvailable && <Link to={`/impact${context}`}>View impact</Link>}{props.comparisonAvailable && <Link to={`/recovery/compare${context}`}>Open comparison workspace</Link>}</div>{!props.comparisonAvailable && <p>Shared comparison handoff is pending.</p>}</section>
   </div>;

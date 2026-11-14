@@ -45,5 +45,11 @@ after `writeText` resolves; failed or unavailable copy leaves selectable text.
 Local `demo:rfq:` and `demo:po:` references are deterministic identifiers, not
 provider messages, supplier-issued POs or cryptographic snapshot fingerprints.
 
-Phase 5 supplies shared selectors and
-`SCENARIO_A_READY` publishing; these remain integration-lead dependencies.
+Phase 5 supplies `adaptPlanAInputs`, `validateScenarioFreshness`,
+`publishScenarioAReady` and `toPlanAHandoff` through `integration/index.ts`.
+`PlanAWorkspace.publisher` is optional; without it the workspace displays publication
+pending and offers no Propose action. With it, explicit proposal publication must
+receive a matching authoritative storage acknowledgement. Local sensitivity previews
+cannot publish. Root selectors/storage and the actual P5 consumer remain pending.
+See [integration/README.md](./integration/README.md) for exact owner contracts,
+read-only remote findings, version policy, idempotency and acknowledgement requirements.

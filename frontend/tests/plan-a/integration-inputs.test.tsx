@@ -37,3 +37,7 @@ it("blocks late global ETA and a demo clock past cutoff without using wall-clock
   const eta=makeIntegrationRead();eta.offers![0]!.etaLocal="13:30";expect(validateScenarioFreshness(eta,candidate()).ok).toBe(false);
   const clock=makeIntegrationRead();clock.source!.businessClock!.nowLocal="11:00";clock.source!.businessClock!.nowIso="2026-11-21T11:00:00+08:00";expect(validateScenarioFreshness(clock,candidate()).ok).toBe(false);
 });
+it("blocks a changed snapshot revision even if the fingerprint and scenario version were incorrectly reused",()=>{
+  const read=makeIntegrationRead();read.source!.snapshot!.revision=2;
+  expect(validateScenarioFreshness(read,candidate())).toMatchObject({ok:false,code:"SNAPSHOT_MISMATCH"});
+});

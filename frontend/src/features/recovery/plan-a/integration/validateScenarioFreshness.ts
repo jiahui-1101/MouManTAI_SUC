@@ -1,6 +1,7 @@
 import { buildPlanAScenario, deriveRecoverySourcingNeed } from "../domain";
 import type { PlanAScenarioCandidate } from "../domain";
 import { adaptPlanAInputs } from "./adaptPlanAInputs";
+import { sameValue } from "./sameValue";
 import type { IntegrationResult, PlanAInputRead } from "./types";
 
 export function validateScenarioFreshness(read: PlanAInputRead, candidate: PlanAScenarioCandidate, invalidated = false): IntegrationResult<PlanAScenarioCandidate> {
@@ -9,7 +10,7 @@ export function validateScenarioFreshness(read: PlanAInputRead, candidate: PlanA
   if (!adapted.ok) return adapted;
   const { source, candidates, scenarioMetadata } = adapted.value;
   if (!candidate || candidate.strategy !== "A") return { ok: false, code: "INVALID_STRATEGY", message: "Only a Plan A scenario can be published by P3." };
-  if (candidate.snapshotFingerprint !== source.snapshot.fingerprint || candidate.incidentId !== source.incident.id) {
+  if (candidate.snapshotFingerprint !== source.snapshot.fingerprint || candidate.snapshotRevision !== source.snapshot.revision || candidate.incidentId !== source.incident.id) {
     return { ok: false, code: "SNAPSHOT_MISMATCH", message: "The proposal belongs to a different incident or snapshot." };
   }
   if (candidate.id !== scenarioMetadata.scenarioId || candidate.version !== scenarioMetadata.version) {
@@ -22,6 +23,6 @@ export function validateScenarioFreshness(read: PlanAInputRead, candidate: PlanA
     currentSnapshotFingerprint: source.snapshot.fingerprint, currentSnapshotRevision: source.snapshot.revision, businessClock: source.businessClock, scenarioMetadata });
   if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message };
   // Compare the complete derived detail, including evidence, assumptions and time results.
-  if (JSON.stringify(candidate) !== JSON.stringify(result.value)) return { ok: false, code: "SCENARIO_CHANGED", message: "Current stock, demand, quote or conditions differ from this proposal. Regenerate it." };
+  if (!sameValue(candidate, result.value)) return { ok: false, code: "SCENARIO_CHANGED", message: "Current stock, demand, quote or conditions differ from this proposal. Regenerate it." };
   return result;
 }

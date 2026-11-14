@@ -159,6 +159,7 @@ export function buildPlanAScenario(input: BuildPlanAScenarioInput): DomainResult
       incidentId: need.incidentId,
       strategy: "A",
       snapshotFingerprint: input.currentSnapshotFingerprint,
+      snapshotRevision: need.snapshotRevision,
       version: metadata.version,
       feasibility: "CONDITIONAL",
       newPurchaseKgMilli: incoming,
