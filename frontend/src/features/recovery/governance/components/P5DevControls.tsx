@@ -1,4 +1,5 @@
 import { useP5Runtime } from '../p5Store';
+import { seedEvidence } from '../../../../__dev__/p5MockWorld';
 
 /**
  * TEMPORARY dev panel standing in for the Integrator's debug panel.
@@ -27,6 +28,28 @@ export function P5DevControls() {
         <button type="button" className="p5-btn" onClick={() => world.removePlan('B')}>
           Remove Plan B
         </button>
+      </div>
+      <div className="p5-row">
+        <span className="p5-muted">Evidence seeds:</span>
+        {(
+          [
+            ['B_COMPLETE', 'Seed: B Complete'],
+            ['B_PARTIAL', 'Seed: B Partial (3/4)'],
+            ['A_COMPLETE', 'Seed: A Complete'],
+            ['A_LATE', 'Seed: A Late (11:00)'],
+            ['A_REJECTED', 'Seed: A Rejected'],
+            ['FULFILMENT_SHORT', 'Seed: Shortfall (55/60)'],
+          ] as const
+        ).map(([seed, label]) => (
+          <button
+            key={seed}
+            type="button"
+            className="p5-btn"
+            onClick={() => seedEvidence(store, world, seed)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
       <div className="p5-row">
         <span className="p5-muted">Demo clock:</span>

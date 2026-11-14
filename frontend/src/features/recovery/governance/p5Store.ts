@@ -56,6 +56,7 @@ export function rootStoreDeps(): P5DepsAdapter {
       getSnapshot: boom,
       getScenario: boom,
       getActiveIncidentId: boom,
+      getActiveIncident: boom,
       getImpact: boom,
       getDemoClockLocal: boom,
       getCurrentRole: boom,

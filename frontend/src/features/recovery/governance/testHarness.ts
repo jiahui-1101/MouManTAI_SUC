@@ -38,6 +38,10 @@ export function makeHarness(opts: { A?: boolean; B?: boolean } = {}): Harness {
     getSnapshot: () => env.snapshot,
     getScenario: (s) => env.scenarios[s],
     getActiveIncidentId: () => env.incidentId,
+    getActiveIncident: () =>
+      env.incidentId
+        ? { id: env.incidentId, type: 'UNAVAILABLE', ingredientId: 'HP-ING-CHICKEN', poId: 'HP-PO-1042' }
+        : null,
     getImpact: () => null,
     getDemoClockLocal: () => env.clock,
     getCurrentRole: () => ({ role: env.role, actorId: env.actorId }),

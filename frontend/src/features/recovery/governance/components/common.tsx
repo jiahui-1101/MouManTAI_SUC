@@ -1,10 +1,31 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { shortFingerprint } from '../format';
+import type { DemoRole } from '../p5Contracts';
 import { p5ErrorMessage } from '../p5Errors';
 import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
 import { ReasonDialog } from './Dialog';
 import './p5.css';
+
+const ROLES: DemoRole[] = ['Owner', 'OperationsManager', 'ProcurementOfficer', 'KitchenLead', 'ViewerAuditor'];
+
+export function RoleSwitcher() {
+  const w = useP5World();
+  const { adapter } = useP5Runtime();
+  const id = useId();
+  return (
+    <div className="p5-card" data-testid="p5-role-switcher">
+      <label htmlFor={id}>Demo role — not real access control</label>
+      <select id={id} value={w.role ?? ''} onChange={(e) => adapter.setRole(e.target.value as DemoRole)}>
+        {ROLES.map((r) => (
+          <option key={r} value={r}>
+            {r}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 export function NotWiredNotice() {
   return (

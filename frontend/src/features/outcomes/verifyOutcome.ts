@@ -3,6 +3,7 @@ import {
   type ApprovalRecord,
   type ExecutionAction,
   type OutcomeActual,
+  type OutcomeReason,
   type OutcomeStatus,
   type RecoveryOutcome,
   type VerificationEvidence,
@@ -22,6 +23,7 @@ export function evaluateOutcome(
   approval: ApprovalRecord,
   actions: readonly ExecutionAction[],
   log: readonly VerificationEvidence[],
+  verifiedAtIso?: string,
 ): RecoveryOutcome {
   const actionIds = new Set(actions.filter((a) => a.approvalId === approval.id).map((a) => a.id));
   const ownActions = actions.filter((a) => actionIds.has(a.id));
@@ -32,15 +34,47 @@ export function evaluateOutcome(
   const menus = ofKind(latest, 'MENU_UPDATE');
   const fulfil = ofKind(latest, 'ORDER_FULFILMENT');
 
+  const reasons: OutcomeReason[] = [];
+
   // Hard failures
   const failures: string[] = [];
   for (const r of receipts) {
-    if (!r.payload.accepted) failures.push('RECEIPT_REJECTED');
-    if (isLocalTimeAfter(r.payload.arrivalLocal, PLAN_A_DEADLINE_LOCAL)) failures.push(`RECEIPT_LATE:${r.payload.arrivalLocal}`);
+    if (!r.payload.accepted) {
+      failures.push('RECEIPT_REJECTED');
+      reasons.push({ code: 'RECEIPT_REJECTED', text: 'RECEIPT_REJECTED: simulated receipt was rejected', kind: 'HARD_FAILURE' });
+    }
+    if (isLocalTimeAfter(r.payload.arrivalLocal, PLAN_A_DEADLINE_LOCAL)) {
+      failures.push(`RECEIPT_LATE:${r.payload.arrivalLocal}`);
+      reasons.push({
+        code: `RECEIPT_LATE:${r.payload.arrivalLocal}`,
+        text: `RECEIPT_LATE: arrival ${r.payload.arrivalLocal} after 10:45 cutoff`,
+        kind: 'HARD_FAILURE',
+      });
+    }
+    if (r.payload.accepted && !isLocalTimeAfter(r.payload.arrivalLocal, PLAN_A_DEADLINE_LOCAL)) {
+      reasons.push({
+        code: 'PASS_RECEIPT',
+        text: `PASS_RECEIPT: received ${r.payload.receivedKgMilli / 1000}kg accepted at ${r.payload.arrivalLocal}`,
+        kind: 'PASS',
+      });
+    }
   }
+
   for (const f of fulfil) {
     if (f.payload.confirmedFulfilled < f.payload.confirmedRequired) {
-      failures.push(`CONFIRMED_ORDERS_UNMET:${f.payload.confirmedFulfilled}/${f.payload.confirmedRequired}`);
+      const code = `CONFIRMED_ORDERS_UNMET:${f.payload.confirmedFulfilled}/${f.payload.confirmedRequired}`;
+      failures.push(code);
+      reasons.push({
+        code,
+        text: `CONFIRMED_ORDERS_UNMET: confirmed fulfilment ${f.payload.confirmedFulfilled} of ${f.payload.confirmedRequired}`,
+        kind: 'HARD_FAILURE',
+      });
+    } else {
+      reasons.push({
+        code: 'PASS_FULFILMENT',
+        text: `PASS_FULFILMENT: ${f.payload.confirmedFulfilled} of ${f.payload.confirmedRequired} confirmed portions fulfilled`,
+        kind: 'PASS',
+      });
     }
   }
 
@@ -48,26 +82,78 @@ export function evaluateOutcome(
   const missing: string[] = [];
   let allPass = true;
   if (approval.selectedStrategy === 'A') {
-    if (receipts.length === 0) missing.push('RECEIPT');
+    if (receipts.length === 0) {
+      missing.push('RECEIPT');
+      reasons.push({ code: 'MISSING_RECEIPT', text: 'MISSING_RECEIPT: no simulated receipt recorded', kind: 'MISSING' });
+    }
   } else {
     for (const a of ownActions.filter((x) => x.actionType === 'PREP_BATCH_TASK')) {
+      const targetId = a.targetId ?? a.id;
       const p = preps.find((e) => e.actionId === a.id);
-      if (!p) missing.push(`PREP:${a.targetId ?? a.id}`);
-      else if (p.payload.producedPortions < p.payload.plannedPortions) allPass = false;
+      if (!p) {
+        missing.push(`PREP:${targetId}`);
+        reasons.push({ code: `MISSING_PREP:${targetId}`, text: `MISSING_PREP: ${targetId}`, kind: 'MISSING' });
+      } else if (p.payload.producedPortions < p.payload.plannedPortions) {
+        allPass = false;
+        reasons.push({
+          code: `SHORTFALL_PREP:${targetId}`,
+          text: `SHORTFALL_PREP: ${targetId} produced ${p.payload.producedPortions} of ${p.payload.plannedPortions}`,
+          kind: 'SHORTFALL',
+        });
+      } else {
+        reasons.push({
+          code: `PASS_PREP:${targetId}`,
+          text: `PASS_PREP: ${targetId} produced ${p.payload.producedPortions} of ${p.payload.plannedPortions}`,
+          kind: 'PASS',
+        });
+      }
     }
     for (const a of ownActions.filter((x) => x.actionType === 'MENU_LIMIT_TASK')) {
+      const targetId = a.targetId ?? a.id;
       const m = menus.find((e) => e.actionId === a.id);
-      if (!m) missing.push(`MENU_UPDATE:${a.targetId ?? a.id}`);
-      else if (!m.payload.applied) allPass = false;
+      if (!m) {
+        missing.push(`MENU_UPDATE:${targetId}`);
+        reasons.push({ code: `MISSING_MENU_UPDATE:${targetId}`, text: `MISSING_MENU_UPDATE: ${targetId}`, kind: 'MISSING' });
+      } else if (!m.payload.applied) {
+        allPass = false;
+        reasons.push({
+          code: `MENU_NOT_APPLIED:${targetId}`,
+          text: `MENU_NOT_APPLIED: ${targetId} not applied`,
+          kind: 'SHORTFALL',
+        });
+      } else {
+        reasons.push({
+          code: `PASS_MENU_UPDATE:${targetId}`,
+          text: `PASS_MENU_UPDATE: ${targetId} applied`,
+          kind: 'PASS',
+        });
+      }
     }
   }
-  if (fulfil.length === 0) missing.push('ORDER_FULFILMENT');
+  if (fulfil.length === 0) {
+    missing.push('ORDER_FULFILMENT');
+    reasons.push({
+      code: 'MISSING_ORDER_FULFILMENT',
+      text: 'MISSING_ORDER_FULFILMENT: confirmed order fulfilment not recorded',
+      kind: 'MISSING',
+    });
+  }
 
   let status: OutcomeStatus;
-  if (latest.length === 0) status = 'UNVERIFIED';
-  else if (failures.length > 0) status = 'FAILED';
-  else if (missing.length === 0 && allPass) status = 'SUCCESS';
-  else status = 'PARTIAL';
+  if (latest.length === 0) {
+    status = 'UNVERIFIED';
+    reasons.unshift({
+      code: 'NO_EVIDENCE',
+      text: 'Outcome stayed UNVERIFIED because no evidence was recorded',
+      kind: 'MISSING',
+    });
+  } else if (failures.length > 0) {
+    status = 'FAILED';
+  } else if (missing.length === 0 && allPass) {
+    status = 'SUCCESS';
+  } else {
+    status = 'PARTIAL';
+  }
 
   return {
     incidentId: approval.incidentId,
@@ -79,7 +165,9 @@ export function evaluateOutcome(
     evidenceIds: latest.map((e) => e.id),
     missingEvidence: missing,
     failures,
+    reasons,
     simulated: true,
+    verifiedAtIso,
   };
 }
 

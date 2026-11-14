@@ -240,6 +240,14 @@ export interface OutcomeActual {
   menuUpdatesApplied?: number;
 }
 
+export type OutcomeReasonKind = 'HARD_FAILURE' | 'MISSING' | 'SHORTFALL' | 'PASS';
+
+export interface OutcomeReason {
+  code: string;
+  text: string;
+  kind: OutcomeReasonKind;
+}
+
 export interface RecoveryOutcome {
   incidentId: string;
   scenarioId: string;
@@ -250,7 +258,9 @@ export interface RecoveryOutcome {
   evidenceIds: string[];
   missingEvidence: string[];
   failures: string[];
+  reasons: OutcomeReason[];
   simulated: true;
+  verifiedAtIso?: string;
 }
 
 /** TODO(G0): propose to shared contract — ESCALATED state for Reject Both. */
@@ -275,6 +285,8 @@ export interface RecalculationRequest {
 }
 
 export type EvidenceQuality = 'NONE' | 'PARTIAL' | 'COMPLETE';
+export type VerificationLevel = 'SIMULATED_VERIFIED' | 'PARTIAL_EVIDENCE' | 'NO_EVIDENCE' | 'ESCALATED';
+
 export interface Lesson {
   text: string;
   kind: 'DETERMINISTIC_FACT' | 'DEMO_INTERPRETATION';
@@ -282,14 +294,20 @@ export interface Lesson {
 export interface DecisionMemoryEntry {
   id: string;
   incidentId: string;
+  incidentType: string;
+  ingredientId: string;
   strategy: ScenarioStrategy | 'ESCALATED';
   scenarioId: string;
   version: number;
   fingerprint: string;
   outcomeStatus: OutcomeStatus;
+  verificationLevel: VerificationLevel;
   evidenceQuality: EvidenceQuality;
   lessons: Lesson[];
   savedAtIso: string;
+  predicted?: ScenarioPrediction;
+  actual?: OutcomeActual | null;
+  evidenceIds?: string[];
 }
 
 /** TODO(G0): propose to shared event registry. */

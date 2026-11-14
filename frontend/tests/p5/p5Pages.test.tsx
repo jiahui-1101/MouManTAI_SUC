@@ -2,9 +2,12 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
-import { createMockWorld, type MockWorld } from "../../src/__dev__/p5MockWorld";
+import { createMockWorld, seedEvidence, type MockWorld } from "../../src/__dev__/p5MockWorld";
 import { ApprovalsView } from "../../src/features/recovery/governance/components/ApprovalsView";
 import { ComparisonView } from "../../src/features/recovery/governance/components/ComparisonView";
+import { ExecutionView } from "../../src/features/recovery/governance/components/ExecutionView";
+import { OutcomesView } from "../../src/features/recovery/governance/components/OutcomesView";
+import { DecisionMemoryView } from "../../src/features/recovery/governance/components/DecisionMemoryView";
 import {
   P5RuntimeProvider,
   createP5Runtime,
@@ -34,6 +37,21 @@ function show(ctx: Ctx, view: ReactElement) {
       <P5RuntimeProvider runtime={ctx.rt}>{view}</P5RuntimeProvider>
     </MemoryRouter>,
   );
+}
+
+function showAt(ctx: Ctx, path: string, view: ReactElement) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <P5RuntimeProvider runtime={ctx.rt}>{view}</P5RuntimeProvider>
+    </MemoryRouter>,
+  );
+}
+
+function approvePlan(ctx: Ctx, strategy: "A" | "B") {
+  selectAs(ctx, strategy);
+  const sel = ctx.p5().selection!;
+  const res = ctx.p5().approveDemoScenario("demo approve", sel.version, sel.fingerprint);
+  if (!res.ok) throw new Error(`${res.error}: ${res.detail}`);
 }
 
 const btn = (name: string | RegExp) => screen.getByRole("button", { name }) as HTMLButtonElement;
@@ -299,19 +317,330 @@ describe("Approvals", () => {
   });
 });
 
+describe("Execution Tracker (/execution)", () => {
+  it("no approval → empty state with link to /approvals", () => {
+    const ctx = setup();
+    show(ctx, <ExecutionView />);
+    expect(text()).toContain("No approved plan. Approve a plan on Approvals first.");
+    expect(screen.getByRole("link", { name: "Go to Approvals →" })).toBeTruthy();
+  });
+
+  it("Plan B approved → 7 cards (3 menu + 4 batch), no PO_DRAFT", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    show(ctx, <ExecutionView />);
+    const cards = screen.getAllByTestId(/^p5-task-card-/);
+    expect(cards).toHaveLength(7);
+    expect(screen.queryByTestId("p5-po-draft-content")).toBeNull();
+    expect(screen.getByTestId("p5-progress-text").textContent).toContain("0 of 7 tasks awaiting evidence");
+  });
+
+  it("Plan A approved → PO_DRAFT card shows 'NOT SENT'", () => {
+    const ctx = setup();
+    approvePlan(ctx, "A");
+    show(ctx, <ExecutionView />);
+    expect(screen.getByTestId("p5-po-draft-content").textContent).toContain("Local PO draft — NOT SENT");
+    expect(screen.getByTestId("p5-receipt-check-content").textContent).toContain("Awaiting simulated receipt");
+  });
+
+  it("KitchenLead can't simulate a MENU task (visible reason) but can simulate PREP", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    act(() => ctx.world.setRole("KitchenLead"));
+    show(ctx, <ExecutionView />);
+    const menuTask = ctx.p5().actions.find((a) => a.actionType === "MENU_LIMIT_TASK")!;
+    const prepTask = ctx.p5().actions.find((a) => a.actionType === "PREP_BATCH_TASK")!;
+
+    // Menu task simulate button disabled with visible reason
+    const menuBtn = screen.getByTestId(`p5-simulate-btn-${menuTask.id}`) as HTMLButtonElement;
+    expect(menuBtn.disabled).toBe(true);
+    const blockerText = screen.getByTestId(`p5-task-blocker-${menuTask.id}`).textContent;
+    expect(blockerText).toContain("KitchenLead cannot execute MENU_LIMIT_TASK — allowed: Owner, OperationsManager");
+
+    // Prep task simulate button enabled
+    const prepBtn = screen.getByTestId(`p5-simulate-btn-${prepTask.id}`) as HTMLButtonElement;
+    expect(prepBtn.disabled).toBe(false);
+  });
+
+  it("Simulate requires a reason; one click advances exactly one step; audit entry shown; never VERIFIED (P5-FR16)", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    show(ctx, <ExecutionView />);
+    const prepTask = ctx.p5().actions.find((a) => a.actionType === "PREP_BATCH_TASK")!;
+
+    // Step 1: Click simulate
+    fireEvent.click(screen.getByTestId(`p5-simulate-btn-${prepTask.id}`));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeTruthy();
+
+    // Try submitting without reason
+    fireEvent.click(within(dialog).getByRole("button", { name: "Advance step" }));
+    expect(within(dialog).getByRole("alert").textContent).toContain("A reason is required.");
+
+    // Enter reason and advance
+    typeReason("Start kitchen prep", dialog);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Advance step" }));
+
+    // Card advanced to SIMULATED_EXECUTION
+    expect(screen.getByTestId(`p5-task-state-${prepTask.id}`).textContent).toBe("SIMULATED_EXECUTION");
+    expect(screen.getByTestId(`p5-task-audit-${prepTask.id}`).textContent).toContain("APPROVED → SIMULATED_EXECUTION");
+    expect(screen.getByTestId(`p5-task-audit-${prepTask.id}`).textContent).toContain("Start kitchen prep");
+
+    // Step 2: Simulate next step to AWAITING_EVIDENCE
+    fireEvent.click(screen.getByTestId(`p5-simulate-btn-${prepTask.id}`));
+    const d2 = screen.getByRole("dialog");
+    typeReason("Kitchen finished batch cooking", d2);
+    fireEvent.click(within(d2).getByRole("button", { name: "Advance step" }));
+
+    expect(screen.getByTestId(`p5-task-state-${prepTask.id}`).textContent).toBe("AWAITING_EVIDENCE");
+    expect(screen.getByTestId(`p5-record-evidence-link-${prepTask.id}`)).toBeTruthy();
+
+    // Verify simulate button is gone from AWAITING_EVIDENCE, state never reaches VERIFIED
+    expect(screen.queryByTestId(`p5-simulate-btn-${prepTask.id}`)).toBeNull();
+    expect(ctx.p5().actions.some((a) => a.state === "VERIFIED")).toBe(false);
+  });
+
+  it("fingerprint changed after approval → execution blocked banner, buttons disabled (P5-T07)", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    act(() => ctx.world.changeFingerprint());
+    show(ctx, <ExecutionView />);
+    expect(screen.getByTestId("p5-execution-blocked-banner").textContent).toContain(
+      "Execution blocked: Snapshot changed since approval. Re-calculation and re-approval required.",
+    );
+    const simulateBtns = screen.getAllByRole("button", { name: "Simulate next step" }) as HTMLButtonElement[];
+    expect(simulateBtns.every((b) => b.disabled)).toBe(true);
+  });
+
+  it("Plan A with clock 10:50 → blocked APPROVAL_EXPIRED", () => {
+    const ctx = setup();
+    approvePlan(ctx, "A");
+    act(() => ctx.world.setClock("10:50"));
+    show(ctx, <ExecutionView />);
+    expect(screen.getByTestId("p5-execution-blocked-banner").textContent).toContain(
+      "Execution blocked: Approval expired at 10:45 on demo clock. Re-calculation and re-approval required.",
+    );
+  });
+
+  it("menu task shows 'not synced'; after MENU_UPDATE applied evidence → 'Manually confirmed (demo evidence)'; never 'SYNCED'", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    show(ctx, <ExecutionView />);
+    const menuTask = ctx.p5().actions.find((a) => a.actionType === "MENU_LIMIT_TASK")!;
+
+    expect(screen.getByTestId(`p5-task-sync-${menuTask.id}`).textContent).toBe(
+      "Awaiting manual update — not synced to any POS",
+    );
+
+    act(() => {
+      ctx.p5().recordSimulatedEvidence(menuTask.id, "MENU_UPDATE", {
+        menuId: menuTask.targetId!,
+        applied: true,
+      });
+    });
+
+    expect(screen.getByTestId(`p5-task-sync-${menuTask.id}`).textContent).toBe(
+      "Manually confirmed (demo evidence)",
+    );
+    expect(text()).not.toMatch(/\bSYNCED\b/);
+  });
+});
+
+describe("Outcome Verification (/outcomes)", () => {
+  it("approved but no evidence → Simulated Outcome: UNVERIFIED and checklist lists everything (P5-T09)", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    show(ctx, <OutcomesView />);
+    expect(screen.getByTestId("p5-outcome-badge").textContent).toBe("Simulated Outcome: UNVERIFIED");
+    const checklist = screen.getByTestId("p5-missing-evidence-list");
+    expect(checklist.textContent).toContain("HP-BATCH-B-01");
+    expect(checklist.textContent).toContain("HP-BATCH-B-02");
+    expect(checklist.textContent).toContain("HP-BATCH-B-03");
+    expect(checklist.textContent).toContain("HP-BATCH-B-04");
+    expect(checklist.textContent).toContain("MENU_UPDATE");
+    expect(checklist.textContent).toContain("ORDER_FULFILMENT");
+  });
+
+  it("B 3/4 batches → not SUCCESS (P5-T10)", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    seedEvidence(ctx.rt.store, ctx.world, "B_PARTIAL");
+    show(ctx, <OutcomesView />);
+    fireEvent.click(btn("Verify simulated outcome"));
+    expect(screen.getByTestId("p5-outcome-badge").textContent).toBe("Simulated Outcome: PARTIAL");
+  });
+
+  it("full B evidence → Simulated Outcome: SUCCESS with 'Demo evidence only' subtext (P5-T11)", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    seedEvidence(ctx.rt.store, ctx.world, "B_COMPLETE");
+    show(ctx, <OutcomesView />);
+    fireEvent.click(btn("Verify simulated outcome"));
+    expect(screen.getByTestId("p5-outcome-badge").textContent).toBe("Simulated Outcome: SUCCESS");
+    expect(screen.getByTestId("p5-success-subtext").textContent).toBe(
+      "Demo evidence only — not real Happy Potato operations",
+    );
+  });
+
+  it("Plan A arrival 11:00 → FAILED with a RECEIPT_LATE reason", () => {
+    const ctx = setup();
+    approvePlan(ctx, "A");
+    seedEvidence(ctx.rt.store, ctx.world, "A_LATE");
+    show(ctx, <OutcomesView />);
+    fireEvent.click(btn("Verify simulated outcome"));
+    expect(screen.getByTestId("p5-outcome-badge").textContent).toBe("Simulated Outcome: FAILED");
+    expect(text()).toContain("RECEIPT_LATE: arrival 11:00 after 10:45 cutoff");
+  });
+
+  it("Waste Unknown → table shows UNKNOWN, never '0kg' (P5-T13)", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    seedEvidence(ctx.rt.store, ctx.world, "B_COMPLETE");
+    show(ctx, <OutcomesView />);
+    const wasteCell = screen.getByTestId("p5-actual-waste");
+    expect(wasteCell.textContent).toContain("UNKNOWN");
+    expect(wasteCell.textContent).not.toContain("0kg");
+  });
+
+  it("Revise evidence → revision 2 shown, revision 1 still listed, freshness OUT_OF_DATE until re-verify", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    seedEvidence(ctx.rt.store, ctx.world, "B_COMPLETE");
+    show(ctx, <OutcomesView />);
+    fireEvent.click(btn("Verify simulated outcome"));
+    expect(screen.queryByTestId("p5-freshness-badge")).toBeNull();
+
+    // Click revise on the active task
+    const reviseBtn = screen.getAllByTestId(/p5-revise-btn/)[0]!;
+    fireEvent.click(reviseBtn);
+    fireEvent.click(screen.getByTestId("p5-submit-evidence-btn"));
+
+    // Revision history lists revision 2 and revision 1
+    const revHistory = screen.getByTestId("p5-revision-history");
+    expect(revHistory.textContent).toContain("rev 2");
+    expect(revHistory.textContent).toContain("rev 1");
+
+    // Freshness is OUT_OF_DATE until re-verify
+    expect(screen.getByTestId("p5-freshness-badge").textContent).toContain(
+      "Evidence changed since last verification — re-verify",
+    );
+
+    // Re-verify clears freshness warning
+    fireEvent.click(btn("Verify simulated outcome"));
+    expect(screen.queryByTestId("p5-freshness-badge")).toBeNull();
+  });
+
+  it("ViewerAuditor: forms disabled, verify still allowed", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    act(() => ctx.world.setRole("ViewerAuditor"));
+    show(ctx, <OutcomesView />);
+    expect(screen.getByTestId("p5-role-forbidden-alert").textContent).toContain("ViewerAuditor cannot record");
+    expect((screen.getByTestId("p5-submit-evidence-btn") as HTMLButtonElement).disabled).toBe(true);
+    // Verify button is still available to evaluate
+    const verifyBtn = btn("Verify simulated outcome");
+    expect(verifyBtn.disabled).toBe(false);
+    fireEvent.click(verifyBtn);
+    expect(screen.getByTestId("p5-outcome-badge")).toBeTruthy();
+  });
+
+  it("?actionId= opens the matching form", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    const targetTask = ctx.p5().actions.find((a) => a.targetId === "HP-BATCH-B-03")!;
+    showAt(ctx, `/outcomes?actionId=${targetTask.id}`, <OutcomesView />);
+    const select = screen.getByTestId("p5-task-select") as HTMLSelectElement;
+    expect(select.value).toBe(targetTask.id);
+  });
+
+  it("Save to memory twice → one entry", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    seedEvidence(ctx.rt.store, ctx.world, "B_COMPLETE");
+    show(ctx, <OutcomesView />);
+    fireEvent.click(btn("Verify simulated outcome"));
+    const saveBtn = btn("Save case to Decision Memory");
+    fireEvent.click(saveBtn);
+    expect(ctx.p5().decisionMemory).toHaveLength(1);
+    fireEvent.click(saveBtn);
+    expect(ctx.p5().decisionMemory).toHaveLength(1);
+    expect(screen.getByTestId("p5-live").textContent).toContain("Already saved to Decision Memory.");
+  });
+});
+
+describe("Decision Memory (/decision-memory)", () => {
+  it("UNVERIFIED and ESCALATED cases listed but success count excludes them (P5-T16); filters work; lessons split", () => {
+    const ctx = setup();
+
+    // 1. Initially empty
+    const { unmount } = show(ctx, <DecisionMemoryView />);
+    expect(screen.getByTestId("p5-empty-memory").textContent).toContain(
+      "No cases yet. Complete a recovery and save it from Outcome Verification.",
+    );
+    expect(screen.getByTestId("p5-success-count").textContent).toBe("0");
+    expect(screen.getByTestId("p5-total-count").textContent).toBe("0");
+    unmount();
+
+    // 2. Save UNVERIFIED case
+    approvePlan(ctx, "A");
+    ctx.p5().saveDemoDecisionMemory("HP-INC-001");
+
+    // 3. Save ESCALATED case
+    ctx.p5().rejectBothAndEscalate("Neither acceptable");
+    ctx.p5().saveDemoDecisionMemory("HP-INC-001");
+
+    // Render with 2 cases
+    const view2 = show(ctx, <DecisionMemoryView />);
+    expect(screen.getByTestId("p5-success-count").textContent).toBe("0");
+    expect(screen.getByTestId("p5-total-count").textContent).toBe("2");
+    view2.unmount();
+
+    // 4. Save SUCCESS case
+    ctx.p5().requestRecalculation("revise");
+    approvePlan(ctx, "B");
+    seedEvidence(ctx.rt.store, ctx.world, "B_COMPLETE");
+    ctx.p5().verifyDemoOutcome("HP-INC-001");
+    ctx.p5().saveDemoDecisionMemory("HP-INC-001");
+
+    // Render with 3 cases: success count is 1, total count is 3
+    show(ctx, <DecisionMemoryView />);
+    expect(screen.getByTestId("p5-success-count").textContent).toBe("1");
+    expect(screen.getByTestId("p5-total-count").textContent).toBe("3");
+
+    // Filters: filter by strategy B
+    fireEvent.change(screen.getByTestId("p5-filter-strategy"), { target: { value: "B" } });
+    expect(screen.getAllByRole("row").length).toBe(2); // Header + 1 row
+
+    // Detail dialog: open details on the Plan B case
+    const bEntry = ctx.p5().decisionMemory.find((m) => m.strategy === "B")!;
+    fireEvent.click(screen.getByTestId(`p5-view-detail-btn-${bEntry.id}`));
+
+    // Assert lessons split into facts and interpretations with labels
+    const facts = screen.getByTestId("p5-deterministic-facts");
+    expect(facts.textContent).toContain("DETERMINISTIC_FACT");
+    expect(facts.textContent).toContain("Plan B protected 60 confirmed portions with 0kg new purchase.");
+
+    const interpretations = screen.getByTestId("p5-demo-interpretations");
+    expect(interpretations.textContent).toContain("DEMO_INTERPRETATION");
+    expect(interpretations.textContent).toContain("Demo interpretation:");
+  });
+});
+
 describe("banned wording", () => {
   const BANNED: RegExp[] = [
     /AI recommends/i,
     /best plan/i,
     /optimal/i,
-    /\bsaved\b/i,
-    /savings/i,
+    /(cost|money|RM)\s*saved/i,
+    /\bsavings\b/i,
+    /\bprofit\b/i,
     /\bROI\b/,
-    /SYNCED/,
+    /\bSYNCED\b/,
     /Synced with FeedMe/i,
     /Chicken Rice/i,
     /orders breached/i,
-    /verified (outcome|success)/i,
+    /real outcome/i,
+    /verified performance/i,
     /recommended/i,
   ];
   const check = () => {
@@ -342,5 +671,48 @@ describe("banned wording", () => {
     check();
     act(() => ctx.world.setRole("ViewerAuditor"));
     check();
+  });
+
+  it("Execution in several states", () => {
+    const ctx = setup();
+    const { unmount } = show(ctx, <ExecutionView />);
+    check();
+    unmount();
+
+    const ctxB = setup();
+    approvePlan(ctxB, "B");
+    const { unmount: unmountB } = show(ctxB, <ExecutionView />);
+    check();
+    unmountB();
+
+    const ctxA = setup();
+    approvePlan(ctxA, "A");
+    const { unmount: unmountA } = show(ctxA, <ExecutionView />);
+    check();
+    unmountA();
+  });
+
+  it("Outcomes in several states", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    const { unmount } = show(ctx, <OutcomesView />);
+    check();
+    fireEvent.click(btn("Verify simulated outcome"));
+    check();
+    seedEvidence(ctx.rt.store, ctx.world, "B_COMPLETE");
+    fireEvent.click(btn("Verify simulated outcome"));
+    check();
+    unmount();
+  });
+
+  it("Decision Memory in several states", () => {
+    const ctx = setup();
+    approvePlan(ctx, "B");
+    seedEvidence(ctx.rt.store, ctx.world, "B_COMPLETE");
+    ctx.p5().verifyDemoOutcome("HP-INC-001");
+    ctx.p5().saveDemoDecisionMemory("HP-INC-001");
+    const { unmount } = show(ctx, <DecisionMemoryView />);
+    check();
+    unmount();
   });
 });

@@ -3,14 +3,12 @@ import { Link } from 'react-router-dom';
 import { isApprovalExpired, preflightApproval } from '../../../approvals/approvalLogic';
 import { approvalKey } from '../../../approvals/idempotency';
 import { formatKgMilli, formatSenAsRM, shortFingerprint } from '../format';
-import type { ApprovalRecord, DemoRole, ProposedAction, RecoveryScenarioWithActions } from '../p5Contracts';
+import type { ApprovalRecord, ProposedAction, RecoveryScenarioWithActions } from '../p5Contracts';
 import { BENIGN_ERRORS, p5ErrorMessage } from '../p5Errors';
 import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
 import { Dialog, ReasonDialog } from './Dialog';
-import { EscalateDialog, EscalationPanel, LiveRegion, NotWiredNotice, P5ContextHeader } from './common';
+import { EscalateDialog, EscalationPanel, LiveRegion, NotWiredNotice, P5ContextHeader, RoleSwitcher } from './common';
 import { P5DevControls } from './P5DevControls';
-
-const ROLES: DemoRole[] = ['Owner', 'OperationsManager', 'ProcurementOfficer', 'KitchenLead', 'ViewerAuditor'];
 
 function scopeLine(a: ProposedAction, s: RecoveryScenarioWithActions): string {
   switch (a.actionType) {
@@ -23,24 +21,6 @@ function scopeLine(a: ProposedAction, s: RecoveryScenarioWithActions): string {
     case 'PREP_BATCH_TASK':
       return `Prep batch ${a.targetId ?? ''} task`.replace('  ', ' ');
   }
-}
-
-function RoleSwitcher() {
-  const w = useP5World();
-  const { adapter } = useP5Runtime();
-  const id = useId();
-  return (
-    <div className="p5-card">
-      <label htmlFor={id}>Demo role — not real access control</label>
-      <select id={id} value={w.role ?? ''} onChange={(e) => adapter.setRole(e.target.value as DemoRole)}>
-        {ROLES.map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
 }
 
 function History({ approvals, fingerprint, clock }: { approvals: ApprovalRecord[]; fingerprint: string; clock: string }) {

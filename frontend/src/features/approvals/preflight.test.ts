@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { makeHarness, type Harness } from '../recovery/governance/testHarness';
+import { approve, makeHarness, type Harness } from '../recovery/governance/testHarness';
 import type { P5Deps } from '../recovery/governance/p5Deps';
 import { preflightApproval } from './approvalLogic';
+import { preflightExecution } from './executionLogic';
 
 function depsOf(h: Harness): Parameters<typeof preflightApproval>[1] {
   const d: Pick<P5Deps, 'getScenario' | 'getSnapshot' | 'getCurrentRole' | 'getDemoClockLocal' | 'nowIso'> = {
@@ -23,6 +24,19 @@ function agree(h: Harness) {
   const res = h.p5().approveDemoScenario('reason', sel?.version ?? -1, sel?.fingerprint ?? '');
   if (pre === null) expect(res.ok).toBe(true);
   else expect(res).toMatchObject({ ok: false, error: pre.error });
+  return pre;
+}
+
+function execAgree(h: Harness, actionId: string, expectedApprovalId: string) {
+  const beforeAudit = h.p5().auditLog.length;
+  const pre = preflightExecution(h.p5(), depsOf(h), actionId);
+  expect(h.p5().auditLog.length).toBe(beforeAudit);
+  const res = h.p5().simulateExecutionAction(actionId, expectedApprovalId, 'test reason');
+  if (pre === null) {
+    expect(res.ok).toBe(true);
+  } else {
+    expect(res).toMatchObject({ ok: false, error: pre.error });
+  }
   return pre;
 }
 
@@ -100,5 +114,63 @@ describe('rejectSelectedScenario', () => {
     expect(h.p5().recalculationRequestedSinceEscalation).toBe(false);
     h.p5().requestRecalculation('revise');
     expect(h.p5().recalculationRequestedSinceEscalation).toBe(true);
+  });
+});
+
+describe('preflightExecution agrees with simulateExecutionAction', () => {
+  it('NOT_FOUND for unknown action', () => {
+    const h = makeHarness();
+    const app = approve(h, 'B');
+    const pre = execAgree(h, 'unknown-action-id', app);
+    expect(pre?.error).toBe('NOT_FOUND');
+  });
+
+  it('DEMO_FORBIDDEN names blocked role and lists allowed roles', () => {
+    const h = makeHarness();
+    const app = approve(h, 'B');
+    const menuAction = h.p5().actions.find((a) => a.actionType === 'MENU_LIMIT_TASK')!;
+    h.env.role = 'KitchenLead';
+    const pre = execAgree(h, menuAction.id, app);
+    expect(pre?.error).toBe('DEMO_FORBIDDEN');
+    expect(pre?.detail).toContain('KitchenLead cannot execute MENU_LIMIT_TASK');
+    expect(pre?.allowedRoles).toEqual(['Owner', 'OperationsManager']);
+  });
+
+  it('STALE_SCENARIO when snapshot fingerprint changes', () => {
+    const h = makeHarness();
+    const app = approve(h, 'B');
+    const prepAction = h.p5().actions.find((a) => a.actionType === 'PREP_BATCH_TASK')!;
+    h.changeSnapshot('fp-changed-123');
+    const pre = execAgree(h, prepAction.id, app);
+    expect(pre?.error).toBe('STALE_SCENARIO');
+  });
+
+  it('APPROVAL_EXPIRED when demo clock passes Plan A deadline (10:45)', () => {
+    const h = makeHarness();
+    const app = approve(h, 'A');
+    const poAction = h.p5().actions.find((a) => a.actionType === 'PO_DRAFT')!;
+    h.env.clock = '10:50';
+    const pre = execAgree(h, poAction.id, app);
+    expect(pre?.error).toBe('APPROVAL_EXPIRED');
+  });
+
+  it('INVALID_TRANSITION when action already reaches AWAITING_EVIDENCE', () => {
+    const h = makeHarness();
+    const app = approve(h, 'B');
+    const prepAction = h.p5().actions.find((a) => a.actionType === 'PREP_BATCH_TASK')!;
+    // Advance APPROVED -> SIMULATED_EXECUTION
+    h.p5().simulateExecutionAction(prepAction.id, app, 'step 1');
+    // Advance SIMULATED_EXECUTION -> AWAITING_EVIDENCE
+    h.p5().simulateExecutionAction(prepAction.id, app, 'step 2');
+    const pre = execAgree(h, prepAction.id, app);
+    expect(pre?.error).toBe('INVALID_TRANSITION');
+  });
+
+  it('returns null and real call succeeds when valid', () => {
+    const h = makeHarness();
+    const app = approve(h, 'B');
+    const prepAction = h.p5().actions.find((a) => a.actionType === 'PREP_BATCH_TASK')!;
+    const pre = execAgree(h, prepAction.id, app);
+    expect(pre).toBeNull();
   });
 });

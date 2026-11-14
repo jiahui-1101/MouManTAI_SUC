@@ -74,6 +74,148 @@ export interface MockWorld {
   publishNextVersion(strategy: ScenarioStrategy): void;
   removePlan(strategy: ScenarioStrategy): void;
   reset(): void;
+  seedEvidence(store: { getState(): import('../features/recovery/governance/p5Slice').P5State }, seed: EvidenceSeedType): void;
+}
+
+export type EvidenceSeedType =
+  | 'B_COMPLETE'
+  | 'B_PARTIAL'
+  | 'A_COMPLETE'
+  | 'A_LATE'
+  | 'A_REJECTED'
+  | 'FULFILMENT_SHORT';
+
+const BATCH_PLANNED: Record<string, number> = {
+  'HP-BATCH-B-01': 25,
+  'HP-BATCH-B-02': 20,
+  'HP-BATCH-B-03': 15,
+  'HP-BATCH-B-04': 12,
+};
+
+const BATCH_TIME: Record<string, string> = {
+  'HP-BATCH-B-01': '11:20',
+  'HP-BATCH-B-02': '11:40',
+  'HP-BATCH-B-03': '12:00',
+  'HP-BATCH-B-04': '12:15',
+};
+
+export function seedEvidence(
+  store: { getState(): import('../features/recovery/governance/p5Slice').P5State },
+  world: { setRole?(role: DemoRole): void; role?: DemoRole; readonly state?: MockWorldState },
+  seed: EvidenceSeedType,
+): void {
+  const prevRole = world.state?.role ?? world.role;
+  if (typeof world.setRole === 'function') {
+    world.setRole('Owner');
+  } else if ('role' in world) {
+    world.role = 'Owner';
+  }
+
+  const p5 = store.getState().p5;
+  const actions = p5.actions;
+
+  if (seed === 'B_COMPLETE' || seed === 'B_PARTIAL') {
+    const menus = actions.filter((a) => a.actionType === 'MENU_LIMIT_TASK');
+    for (const m of menus) {
+      if (m.targetId) {
+        store.getState().p5.recordSimulatedEvidence(m.id, 'MENU_UPDATE', { menuId: m.targetId, applied: true });
+      }
+    }
+    const preps = actions.filter((a) => a.actionType === 'PREP_BATCH_TASK');
+    for (const p of preps) {
+      if (!p.targetId) continue;
+      if (seed === 'B_PARTIAL' && p.targetId === 'HP-BATCH-B-04') continue;
+      const planned = BATCH_PLANNED[p.targetId] ?? 10;
+      const time = BATCH_TIME[p.targetId] ?? '11:30';
+      store.getState().p5.recordSimulatedEvidence(p.id, 'PREP', {
+        batchId: p.targetId,
+        producedPortions: planned,
+        plannedPortions: planned,
+        waste: { status: 'UNKNOWN' },
+        completedLocal: time,
+      });
+    }
+    const anyB = actions.find((a) => a.actionType === 'PREP_BATCH_TASK' || a.actionType === 'MENU_LIMIT_TASK');
+    if (anyB) {
+      store.getState().p5.recordSimulatedEvidence(anyB.id, 'ORDER_FULFILMENT', {
+        confirmedFulfilled: 60,
+        confirmedRequired: 60,
+      });
+    }
+  } else if (seed === 'A_COMPLETE' || seed === 'A_LATE' || seed === 'A_REJECTED') {
+    const rTask =
+      actions.find((a) => a.actionType === 'RECEIPT_CHECK') ??
+      actions.find((a) => a.actionType === 'PO_DRAFT') ??
+      actions[0];
+    if (rTask) {
+      const accepted = seed !== 'A_REJECTED';
+      const arrivalLocal = seed === 'A_LATE' ? '11:00' : '10:30';
+      store.getState().p5.recordSimulatedEvidence(rTask.id, 'RECEIPT', {
+        receivedKgMilli: 15000,
+        accepted,
+        arrivalLocal,
+        landedCostSen: 25500,
+      });
+    }
+    const anyA = actions.find((a) => a.actionType === 'RECEIPT_CHECK' || a.actionType === 'PO_DRAFT');
+    if (anyA) {
+      store.getState().p5.recordSimulatedEvidence(anyA.id, 'ORDER_FULFILMENT', {
+        confirmedFulfilled: 60,
+        confirmedRequired: 60,
+      });
+    }
+  } else if (seed === 'FULFILMENT_SHORT') {
+    const bPreps = actions.filter((a) => a.actionType === 'PREP_BATCH_TASK');
+    let targetAction = actions[0];
+    if (bPreps.length > 0) {
+      targetAction = bPreps[0];
+      const menus = actions.filter((a) => a.actionType === 'MENU_LIMIT_TASK');
+      for (const m of menus) {
+        if (m.targetId) {
+          store.getState().p5.recordSimulatedEvidence(m.id, 'MENU_UPDATE', { menuId: m.targetId, applied: true });
+        }
+      }
+      for (const p of bPreps) {
+        if (!p.targetId) continue;
+        const planned = BATCH_PLANNED[p.targetId] ?? 10;
+        const time = BATCH_TIME[p.targetId] ?? '11:30';
+        store.getState().p5.recordSimulatedEvidence(p.id, 'PREP', {
+          batchId: p.targetId,
+          producedPortions: planned,
+          plannedPortions: planned,
+          waste: { status: 'UNKNOWN' },
+          completedLocal: time,
+        });
+      }
+    } else {
+      const rTask =
+        actions.find((a) => a.actionType === 'RECEIPT_CHECK') ??
+        actions.find((a) => a.actionType === 'PO_DRAFT');
+      if (rTask) {
+        targetAction = rTask;
+        store.getState().p5.recordSimulatedEvidence(rTask.id, 'RECEIPT', {
+          receivedKgMilli: 15000,
+          accepted: true,
+          arrivalLocal: '10:30',
+          landedCostSen: 25500,
+        });
+      }
+    }
+    if (targetAction) {
+      store.getState().p5.recordSimulatedEvidence(targetAction.id, 'ORDER_FULFILMENT', {
+        confirmedFulfilled: 55,
+        confirmedRequired: 60,
+      });
+    }
+  }
+
+  if (prevRole && prevRole !== 'Owner') {
+    if (typeof world.setRole === 'function') {
+      world.setRole(prevRole);
+    } else if ('role' in world) {
+      world.role = prevRole;
+    }
+  }
 }
 
 export function createMockWorld(): MockWorld {
@@ -100,6 +242,10 @@ export function createMockWorld(): MockWorld {
       getSnapshot: () => state.snapshot,
       getScenario: (s) => state.scenarios[s],
       getActiveIncidentId: () => state.incidentId,
+      getActiveIncident: () =>
+        state.incidentId
+          ? { id: state.incidentId, type: 'UNAVAILABLE', ingredientId: 'HP-ING-CHICKEN', poId: 'HP-PO-1042' }
+          : null,
       getImpact: () => state.impact,
       getDemoClockLocal: () => state.clock,
       getCurrentRole: () => ({ role: state.role, actorId: state.actorId }),
@@ -150,6 +296,9 @@ export function createMockWorld(): MockWorld {
     reset() {
       state = initial();
       notify();
+    },
+    seedEvidence(store, seed) {
+      seedEvidence(store, world, seed);
     },
   };
   return world;

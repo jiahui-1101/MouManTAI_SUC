@@ -15,6 +15,7 @@ import {
   type ApprovalRecord,
   type ApprovalRequest,
   type DecisionMemoryEntry,
+  type DemoRole,
   type EscalationRecord,
   type EscalationState,
   type EvidenceKind,
@@ -281,14 +282,17 @@ export function createP5Slice<T extends P5State = P5State>(deps: P5Deps): StateC
       simulateExecutionAction(actionId, expectedApprovalId, reason) {
         const action = data().actions.find((a) => a.id === actionId);
         if (!action) return fail('NOT_FOUND', `Action ${actionId} not found.`);
+        const approval = data().approvals.find((a) => a.id === action.approvalId);
+        if (!approval || approval.id !== expectedApprovalId) return fail('NOT_FOUND', 'Approval does not match this action.');
         const r = reason.trim();
         if (!r) return fail('MISSING_REASON', 'An execution reason is required.');
         const { role, actorId } = deps.getCurrentRole();
         if (!hasCapability(role, { kind: 'EXECUTE', actionType: action.actionType })) {
-          return fail('DEMO_FORBIDDEN', `${role} cannot execute ${action.actionType}.`);
+          const allowed = (['Owner', 'OperationsManager', 'ProcurementOfficer', 'KitchenLead', 'ViewerAuditor'] as DemoRole[]).filter(
+            (rn) => hasCapability(rn, { kind: 'EXECUTE', actionType: action.actionType }),
+          );
+          return fail('DEMO_FORBIDDEN', `${role} cannot execute ${action.actionType} — allowed: ${allowed.join(', ')}.`);
         }
-        const approval = data().approvals.find((a) => a.id === action.approvalId);
-        if (!approval || approval.id !== expectedApprovalId) return fail('NOT_FOUND', 'Approval does not match this action.');
         const snapshot = deps.getSnapshot();
         const scenario = deps.getScenario(approval.selectedStrategy);
         if (approval.snapshotFingerprint !== snapshot.fingerprint || !scenario || scenario.id !== approval.scenarioId || isScenarioStale(scenario, snapshot)) {
@@ -331,21 +335,24 @@ export function createP5Slice<T extends P5State = P5State>(deps: P5Deps): StateC
       verifyDemoOutcome(incidentId) {
         const approval = findApprovalForIncident(incidentId);
         if (!approval) return fail('NOT_FOUND', `No approved plan for ${incidentId}.`);
-        const outcome = evaluateOutcome(approval, data().actions, data().evidence);
+        const outcome = evaluateOutcome(approval, data().actions, data().evidence, deps.nowIso());
         patch({ outcomes: { ...data().outcomes, [incidentId]: outcome } });
         deps.emit({ type: 'OUTCOME_VERIFIED', payload: outcome });
         return ok(outcome);
       },
 
       saveDemoDecisionMemory(incidentId) {
-        const approval = findApprovalForIncident(incidentId);
+        const isEscalated = data().escalationState === 'ESCALATED';
+        const approval = isEscalated ? undefined : findApprovalForIncident(incidentId);
+        const incident = deps.getActiveIncident();
         let entry: DecisionMemoryEntry;
         if (approval) {
-          entry = buildApprovedMemory(approval, data().outcomes[incidentId] ?? null, deps.nowIso());
+          const scenario = deps.getScenario(approval.selectedStrategy);
+          entry = buildApprovedMemory(approval, data().outcomes[incidentId] ?? null, scenario, incident, deps.nowIso());
         } else {
           const esc = [...data().escalations].reverse().find((e) => e.incidentId === incidentId);
           if (!esc) return fail('NOT_FOUND', `Nothing to save for ${incidentId}.`);
-          entry = buildEscalatedMemory(esc, deps.nowIso());
+          entry = buildEscalatedMemory(esc, incident, deps.nowIso());
         }
         if (data().decisionMemory.some((m) => m.id === entry.id)) {
           return fail('DUPLICATE_REQUEST', `Decision memory already saved for ${entry.scenarioId} v${entry.version}.`);
