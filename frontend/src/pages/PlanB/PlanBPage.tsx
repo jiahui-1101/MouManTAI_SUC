@@ -3,23 +3,33 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, Check, Package, RotateCcw, ShieldCheck, Soup, TrendingDown } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { calculatePlanB } from "../../features/recovery/plan-b/planB";
-import { preview } from "../../features/recovery/plan-b/preview";
+import { useDemoState } from "../../store/demoStore";
+import { selectPlanBInput } from "../../integration/planBShared";
+import type { PlanInput } from "../../features/recovery/plan-b/planB";
 import { kg, Pending, Table } from "../../features/recovery/plan-b/RecoveryView";
 import "../../features/recovery/plan-b/recovery.css";
 
 type Tab = "stock" | "orders" | "menu";
 
 export function PlanBPage() {
-  const [chickenGrams, setChickenGrams] = useState(10000);
+  const shared = selectPlanBInput(useDemoState());
+  if (shared.status !== "READY") return <PageContainer title="Plan B — Internal Recovery"><Pending status={shared.status === "STALE" ? "STALE" : "PENDING"} /><p className="p4-alert" data-testid="plan-b-reason">{shared.reason} <Link to="/incidents">Open incidents</Link></p></PageContainer>;
+  // Key the local what-if by snapshot fingerprint so a shared snapshot change discards stale local edits.
+  return <PlanBWorkspace key={shared.input.fingerprint} preview={shared.input} sharedChickenGrams={shared.sharedChickenGrams} />;
+}
+
+/** Local what-if state never writes back to shared inventory. */
+function PlanBWorkspace({ preview, sharedChickenGrams }: { preview: PlanInput; sharedChickenGrams: number }) {
+  const [chickenGrams, setChickenGrams] = useState(sharedChickenGrams);
   const [tab, setTab] = useState<Tab>("stock");
   const [query, setQuery] = useState("");
   const [selectedMenu, setSelectedMenu] = useState<string | null>(null);
   const [actionsOpen, setActionsOpen] = useState(false);
   const input = useMemo(() => ({
     ...preview,
-    fingerprint: chickenGrams === 10000 ? preview.fingerprint : `${preview.fingerprint}-chicken-${chickenGrams}`,
+    fingerprint: chickenGrams === sharedChickenGrams ? preview.fingerprint : `${preview.fingerprint}-chicken-${chickenGrams}`,
     lots: preview.lots.map(lot => lot.ingredient === "chicken" ? { ...lot, grams: chickenGrams } : lot),
-  }), [chickenGrams]);
+  }), [chickenGrams, preview, sharedChickenGrams]);
   const result = useMemo(() => calculatePlanB(input), [input]);
   if (result.status !== "READY") return <PageContainer title="Plan B — Internal Recovery"><Pending status={result.status} /></PageContainer>;
 
@@ -66,11 +76,11 @@ export function PlanBPage() {
       </div>
       <div className="p4-allocation-legend"><span><i className="is-confirmed"/>Confirmed orders <b>{kg(confirmedAllocated)}</b></span><span><i className="is-new"/>Additional combos <b>{kg(additionalAllocated)}</b></span><span><i className="is-left"/>Remaining <b>{kg(Math.max(0, result.residual))}</b></span></div>
       <p className="p4-note">Confirmed demand {kg(result.confirmedChicken)} · Allocated {kg(result.assigned)} · {scenario.forecastChickenPortionsServed} portions planned</p></div>
-      <aside className="p4-simulation"><h3>What-if simulation</h3><p>Change accepted chicken stock to compare with the 10 kg baseline.</p>
+      <aside className="p4-simulation"><h3>What-if simulation</h3><p>Simulated only: change accepted chicken stock locally to compare with the {kg(sharedChickenGrams)} shared baseline. Shared inventory is never modified.</p>
         <label htmlFor="demo-chicken-stock">Accepted chicken stock <strong>{kg(chickenGrams)}</strong></label>
         <input id="demo-chicken-stock" type="range" min="0" max="15000" step="250" value={chickenGrams} onChange={event => setChickenGrams(Number(event.target.value))} aria-valuetext={kg(chickenGrams)}/>
         <div className="p4-range-labels"><span>0 kg</span><span>15 kg</span></div>
-        <div className="p4-presets">{[8000, 10000, 12000].map(value => <button key={value} type="button" aria-pressed={chickenGrams === value} onClick={() => setPreset(value)}>{kg(value)}</button>)}<button type="button" className="p4-reset" onClick={() => setChickenGrams(10000)} disabled={chickenGrams === 10000}><RotateCcw size={15}/>Reset Demo</button></div>
+        <div className="p4-presets">{[8000, 10000, 12000].map(value => <button key={value} type="button" aria-pressed={chickenGrams === value} onClick={() => setPreset(value)}>{kg(value)}</button>)}<button type="button" className="p4-reset" onClick={() => setChickenGrams(sharedChickenGrams)} disabled={chickenGrams === sharedChickenGrams}><RotateCcw size={15}/>Reset Demo</button></div>
       <dl className="p4-impact" aria-live="polite"><div><dt>Extra combos</dt><dd>{combo?.quota ?? 0} <small>baseline {baseline.status === "READY" ? baseline.rows.find(row => row.id === "HP-MENU-HC")?.quota : "—"}</small></dd></div><div><dt>Confirmed shortfall</dt><dd>{kg(result.deficit)}</dd></div><div><dt>Unmet forecast</dt><dd>{scenario.forecastChickenPortionsUnmet} portions</dd></div></dl></aside></div>
       <Table caption="Chicken portions and shared lot allocation" headers={["Menu item", "Portions planned", "Chicken allocated"]}>
         {protectedOrders.map(row => <tr key={row.id}><th scope="row">{row.name}</th><td>{row.protected + row.quota} <small>({row.protected} confirmed{row.quota ? ` + ${row.quota} new` : ""})</small></td><td>{kg((row.protected + row.quota) * row.chicken)}</td></tr>)}
