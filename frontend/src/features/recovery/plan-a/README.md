@@ -61,3 +61,25 @@ a delayed publication notice from reviving after an input-change/restore cycle.
 The supplied-Outlook-evidence contract is covered; real provider ingestion remains
 another owner's integration dependency. See the integration README for the newly
 available remote P2 interfaces and the production wiring checklist.
+
+## FeedMe alignment branch
+
+`feature/p3-feedme-alignment` combines main at
+`f81a1a0dfee90f3cebe0533bdbda81ef18995381` with completed P3 at
+`6730113daeb27674a572b009a9173da323e2d445`.
+The Portal shell/tokens and P2/P4 features are retained. P3 uses shared Buttons,
+StatusBadges, DataPanels and SectionHeaders, with feature-scoped layout CSS.
+The coverage graphic derives physical/incoming proportions, forecast marker and
+residual labels from the scenario; it never changes stock or eligibility.
+
+The production PageContainer uses the canonical navigation title; the workspace
+retains External Supply Recovery as its heading. Impact links use P2's `incident`
+query parameter. The test-only review page now reuses the actual app routes and
+Portal shell, overriding only its in-memory Plan A element with supplied test inputs.
+It is still excluded from the production entry and preserves the explicit test-publisher label.
+
+P2 input wiring remains an Integrator task: restaurant selectors and fixtures are
+now in this branch, but the canonical supplier/evidence/clock/version adapter and
+acknowledged root/P5 publisher are not connected. Do not substitute the test fixture
+in the production route. Domain, draft, freshness and publication contracts are
+unchanged by this presentation refinement.

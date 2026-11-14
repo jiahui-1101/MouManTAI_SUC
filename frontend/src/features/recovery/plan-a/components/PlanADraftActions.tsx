@@ -1,3 +1,4 @@
+import { Button, StatusBadge } from "../../../../components/ui";
 import { useEffect, useState } from "react";
 import { createInternalPoDraft, createRfqDraft } from "../drafts";
 import type { DraftInput, PlanADraft } from "../drafts";
@@ -61,9 +62,9 @@ export function PlanADraftActions(props: Props) {
       setFeedback({ basis, type: draft.value.type, text: "Copy failed or is unavailable. Select the readable draft text below and copy it manually." });
     }
   };
-  return <section className="pa-panel" aria-labelledby="drafts-heading">
+  return <section className="pa-panel fm-panel" aria-labelledby="drafts-heading">
     <span className="pa-kicker">Demo only · Unsent local documents</span>
-    <h2 id="drafts-heading">RFQ and internal purchase drafts</h2>
+    <h2 className="pa-heading" id="drafts-heading">RFQ and internal purchase drafts</h2>
     <p>Drafts are separate from the proposal preview. They do not send messages, place orders, approve recovery or change accepted stock.</p>
     {!props.candidate && <p>Select a conditionally qualified supplier to create drafts.</p>}
     {!props.proposal && <p>A current Plan A preview is required for the internal PO draft.</p>}
@@ -75,18 +76,18 @@ export function PlanADraftActions(props: Props) {
         const stale = draft ? isStale(draft) : false;
         const name = type === "RFQ_DRAFT" ? "RFQ Draft" : "Internal PO Draft";
         return <article className="pa-offer" key={type} aria-label={name}>
-          <h3>{name}</h3>
-          <p className="pa-badge">{draft ? stale ? "STALE" : draft.value.status : "NOT_CREATED"}</p>
+          <h3 className="pa-subheading">{name}</h3>
+          <StatusBadge tone={draft ? "warning" : "neutral"}>{draft ? stale ? "STALE" : draft.value.status : "NOT_CREATED"}</StatusBadge>
           {stale && <p>Inputs changed. Explicit review and regeneration are required; this document cannot support approval.</p>}
           <div className="pa-actions">
-            <button type="button" disabled={!props.candidate || (type === "INTERNAL_PO_DRAFT" && !props.proposal)} onClick={() => create(type)}>{stale ? "Regenerate" : "Create"} {name}</button>
-            {draft && <button type="button" aria-expanded={open === type} onClick={() => { setOpen(type); setFeedback(null); }}>Review {name}</button>}
+            <Button type="button" disabled={!props.candidate || (type === "INTERNAL_PO_DRAFT" && !props.proposal)} onClick={() => create(type)}>{stale ? "Regenerate" : "Create"} {name}</Button>
+            {draft && <Button type="button" aria-expanded={open === type} onClick={() => { setOpen(type); setFeedback(null); }}>Review {name}</Button>}
           </div>
           {draft && open === type && <div className="pa-draft-panel">
             <p>Local reference: {draft.value.id}</p>
             <p>NOT_APPROVED · NOT_SENT · Synthetic business data</p>
             <label>{name} content<textarea readOnly rows={16} value={`${stale ? "STALE — DO NOT USE. Regenerate against current inputs.\n\n" : ""}${draft.value.text}`}/></label>
-            <div className="pa-actions"><button type="button" disabled={stale} onClick={() => void copy(draft)}>Copy {name}</button><button type="button" onClick={() => { setOpen(null); setFeedback(null); }}>Close {name}</button></div>
+            <div className="pa-actions"><Button type="button" disabled={stale} onClick={() => void copy(draft)}>Copy {name}</Button><Button type="button" onClick={() => { setOpen(null); setFeedback(null); }}>Close {name}</Button></div>
             {feedback?.basis === basis && feedback.type === type && !stale && <p role="status">{feedback.text}</p>}
           </div>}
         </article>;

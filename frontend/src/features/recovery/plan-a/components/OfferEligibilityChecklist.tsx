@@ -1,3 +1,4 @@
+import { StatusBadge } from "../../../../components/ui";
 import type { OfferAssessment, OfferConditionCode, OfferReasonCode } from "../domain";
 import { reasonText } from "./presentation";
 const groups: { label: string; codes: OfferReasonCode[]; conditional?: boolean; conditions?: OfferConditionCode[] }[] = [
@@ -15,6 +16,6 @@ export function OfferEligibilityChecklist({ assessment }: { assessment: OfferAss
     const reasons = assessment.reasonCodes.filter(code => group.codes.includes(code));
     const conditional = group.conditional || assessment.conditions.some(condition => group.conditions?.includes(condition.code));
     const status = reasons.some(code => !unknown.has(code)) ? "FAIL" : reasons.length ? "UNKNOWN" : conditional ? "CONDITIONAL" : "PASS";
-    return <li key={group.label}><strong>{status}</strong> · {group.label}{reasons.map(code => <p key={code}>{reasonText(code)}</p>)}</li>;
+    return <li key={group.label}><div className="pa-check-heading"><span>{group.label}</span><StatusBadge tone={status === "FAIL" ? "danger" : status === "PASS" ? "success" : status === "CONDITIONAL" ? "warning" : "neutral"}>{status}</StatusBadge></div>{reasons.map(code => <p key={code}>{reasonText(code)}</p>)}</li>;
   })}</ul>;
 }

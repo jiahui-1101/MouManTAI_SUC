@@ -3,7 +3,10 @@ import { useState } from "react";
 import type { PlanAPublisher } from "../../src/features/recovery/plan-a/integration";
 import { makeIntegrationRead } from "./integrationFactory";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router-dom";
+import { routes } from "../../src/app/router";
+import { titleFor } from "../../src/constants/navigation";
+import { AlertBanner } from "../../src/components/ui";
 import { PageContainer } from "../../src/components/layout/PageContainer";
 import { PlanAWorkspace } from "../../src/features/recovery/plan-a/components/PlanAWorkspace";
 import { makeCanonicalSourcingInput, makeOfferB, makeOfferC, makePlanAScenarioInput } from "./domain/happyPotatoFactory";
@@ -17,11 +20,11 @@ const testPublisher: PlanAPublisher = {
 };
 function Review() {
   const [injected, setInjected] = useState(false);
-  return <MemoryRouter><main style={{padding:24,maxWidth:1200,margin:"auto"}}>
-    <p>TEST ONLY — supplied fixture inputs; no root DemoState or P5 consumer is connected.</p>
-    <label><input type="checkbox" checked={injected} onChange={event => setInjected(event.target.checked)}/> Inject test publisher acknowledgement</label>
-    <PageContainer title="External Supply Recovery"><PlanAWorkspace source={makeCanonicalSourcingInput()} candidates={[makeOfferB(),makeOfferC()]} supplierNames={{"HP-SUP-002":"Demo Poultry Supply B","HP-SUP-003":"Demo Budget Frozen Foods"}} scenarioMetadata={makePlanAScenarioInput().scenarioMetadata} publisher={injected ? testPublisher : undefined}/></PageContainer>
-  </main></MemoryRouter>;
+  return <PageContainer title={titleFor("/recovery/plan-a")}>
+    <AlertBanner title="Test-only Plan A review" tone="info"><p>Supplied fixture inputs; no root DemoState or P5 consumer is connected.</p><label><input type="checkbox" checked={injected} onChange={event => setInjected(event.target.checked)}/> Inject test publisher acknowledgement</label></AlertBanner>
+    <div style={{marginTop:16}}><PlanAWorkspace source={makeCanonicalSourcingInput()} candidates={[makeOfferB(),makeOfferC()]} supplierNames={{"HP-SUP-002":"Demo Poultry Supply B","HP-SUP-003":"Demo Budget Frozen Foods"}} scenarioMetadata={makePlanAScenarioInput().scenarioMetadata} publisher={injected ? testPublisher : undefined}/></div>
+  </PageContainer>;
 }
 const root = document.getElementById("root");
-if (root) createRoot(root).render(<Review/>);
+const reviewRoutes: RouteObject[] = routes.map(route => route.index === true ? route : ({ ...route, children: route.children?.map(child => child.index === true ? child : child.path === "/recovery/plan-a" ? { ...child, element: <Review/> } : child) }));
+if (root) createRoot(root).render(<RouterProvider router={createMemoryRouter(reviewRoutes, {initialEntries:["/recovery/plan-a"]})}/>);

@@ -1,6 +1,13 @@
 # P3 shared integration seam — final handoff
 
 Status: **P3 implementation complete / shared integration pending**.
+
+Alignment update: this branch now includes the P2 modules listed below through the
+explicitly authorized branch-only merge of main (`f81a1a0`) and P3 (`6730113`).
+The Phase 6 repository observations below describe the original P3 branch at that
+checkpoint. They are not a claim that the P2 files are absent from this alignment
+branch. Use the existing production wiring checklist; no root DemoState, version
+authority or P5 publication consumer has been created by this UI task.
 This directory supplies adapters and an injectable acknowledged publication API.
 It contains no fixture, root store, event bus or scenario version allocator.
 
