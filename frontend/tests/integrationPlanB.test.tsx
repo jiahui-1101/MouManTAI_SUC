@@ -33,7 +33,7 @@ describe("Plan B shared inputs", () => {
   it("what-if is local only and never mutates shared inventory", () => {
     verifyAndAssess();
     const before = getP2State().restaurant;
-    app("/recovery/plan-b");
+    app("/recovery/plan-b?view=recovery");
     fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "8000" } });
     expect(screen.getByText("Chicken shortfall · 0.75 kg")).toBeTruthy();
     expect(getP2State().restaurant).toBe(before);
@@ -42,7 +42,7 @@ describe("Plan B shared inputs", () => {
 
   it("I: a real recount makes Plan B stale until P2 reassesses, then uses the new baseline", () => {
     verifyAndAssess();
-    app("/recovery/plan-b");
+    app("/recovery/plan-b?view=recovery");
     act(() => simulateChickenRecount(8000));
     expect(screen.getByText("LOCAL DEMO")).toBeTruthy();
     expect(screen.getByTestId("plan-b-reason")).toBeTruthy();

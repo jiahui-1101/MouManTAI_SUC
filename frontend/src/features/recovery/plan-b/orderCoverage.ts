@@ -17,7 +17,7 @@ export function allocateDemoOrders(menus: Menu[], chicken: number, fries: number
   return ticketPortions.map((ticket, index) => {
     const items = ticket.flatMap((portions, menuIndex) => {
       const menu = recipes[menuIndex];
-      return portions && menu ? [{ name: menu.name, portions, chicken: portions * menu.chicken, fries: portions * menu.fries }] : [];
+      return portions && menu ? [{ menuId: menu.id, name: menu.name, portions, chicken: portions * menu.chicken, fries: portions * menu.fries }] : [];
     });
     const requiredChicken = items.reduce((sum, item) => sum + item.chicken, 0);
     const requiredFries = items.reduce((sum, item) => sum + item.fries, 0);

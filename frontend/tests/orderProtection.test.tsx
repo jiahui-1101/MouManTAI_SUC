@@ -25,8 +25,8 @@ it("supports searching, paging and projected demand", () => {
   fireEvent.click(screen.getByRole("button", { name: "Next" }));
   expect(screen.getByText("Showing 7–12 of 12")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("Search orders"), { target: { value: "ORD-012" } });
-  fireEvent.click(screen.getByRole("button", { name: "HP-DEMO-ORD-012" }));
-  expect(screen.getByRole("heading", { name: "HP-DEMO-ORD-012" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "View order #012" }));
+  expect(screen.getByRole("heading", { name: "#012" })).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Forecast Demand" }));
   expect(screen.getByText("240", { exact: true })).toBeTruthy();
   expect(screen.getByText("145", { exact: true })).toBeTruthy();

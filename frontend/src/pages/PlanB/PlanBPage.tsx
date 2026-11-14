@@ -1,6 +1,7 @@
+import { MenuRecoveryPanel } from "../../features/recovery/plan-b/MenuRecoveryPanel";
 import { OrderProtection } from "../../features/recovery/plan-b/OrderProtectionPanel";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AlertTriangle, Check, Drumstick, Utensils, Package, ShieldCheck, Soup, Layers } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { calculatePlanB } from "../../features/recovery/plan-b/planB";
@@ -8,7 +9,7 @@ import { preview as demoPreview } from "../../features/recovery/plan-b/preview";
 import { useDemoState } from "../../store/demoStore";
 import { selectPlanBInput } from "../../integration/planBShared";
 import type { PlanInput } from "../../features/recovery/plan-b/planB";
-import { kg, Pending, Table } from "../../features/recovery/plan-b/RecoveryView";
+import { kg, Pending } from "../../features/recovery/plan-b/RecoveryView";
 import "../../features/recovery/plan-b/recovery.css";
 
 type Tab = "stock" | "orders" | "menu";
@@ -42,6 +43,15 @@ function MenuUsageChart({ items, available, shortageStock }: { available: number
 
 export function PlanBPage() {
   const shared = selectPlanBInput(useDemoState());
+  const [params] = useSearchParams();
+  if (params.get("view") !== "recovery") return <PageContainer title="Plan B — Internal Recovery">
+    <section className="p4-panel p4-landing">
+      <span className="p4-landing-icon"><ShieldCheck size={24} aria-hidden="true" /></span>
+      <h2>No incident · Working well</h2>
+      <p>In this demo view, operations are running normally and no recovery plan is needed.</p>
+      <Link className="fm-btn fm-btn--primary" to="?view=recovery">Open Plan B recovery <span aria-hidden="true">→</span></Link>
+    </section>
+  </PageContainer>;
   if (shared.status !== "READY") {
     const chicken = demoPreview.lots.find(lot => lot.ingredient === "chicken")?.grams ?? 0;
     return <PlanBWorkspace key="local-demo" preview={demoPreview} baselineChicken={chicken} demoReason={shared.reason} />;
@@ -54,9 +64,6 @@ function PlanBWorkspace({ preview, baselineChicken, demoReason }: { preview: Pla
   const [chickenGrams, setChickenGrams] = useState(baselineChicken);
   const [friesGrams, setFriesGrams] = useState(defaultFries);
   const [tab, setTab] = useState<Tab>("stock");
-  const [query, setQuery] = useState("");
-  const [selectedMenu, setSelectedMenu] = useState<string | null>(null);
-  const [actionsOpen, setActionsOpen] = useState(false);
   const input = useMemo(() => ({
     ...preview,
     fingerprint: chickenGrams === baselineChicken && friesGrams === defaultFries ? preview.fingerprint : `${preview.fingerprint}-chicken-${chickenGrams}-fries-${friesGrams}`,
@@ -71,8 +78,6 @@ function PlanBWorkspace({ preview, baselineChicken, demoReason }: { preview: Pla
   const confirmedAllocated = breach ? 0 : result.confirmedChicken;
   const additionalAllocated = breach ? 0 : result.assigned - confirmedAllocated;
   const combo = rows.find(row => row.id === "HP-MENU-HC");
-  const actions = scenario.proposals.filter(proposal => proposal.newOrderQuota > 0);
-  const filteredRows = rows.filter(row => row.name.toLowerCase().includes(query.toLowerCase()));
   const friesDeficit = Math.max(0, result.confirmedFries - result.fries);
   const regularFries = rows.find(row => row.id === "HP-MENU-FR");
   const friesRows = rows.filter(row => row.fries > 0);
@@ -155,19 +160,10 @@ function PlanBWorkspace({ preview, baselineChicken, demoReason }: { preview: Pla
 
     {tab === "orders" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-orders" aria-labelledby="p4-tab-orders"><OrderProtection plan={result} /></section>}
 
-    {tab === "menu" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-menu" aria-labelledby="p4-tab-menu">
-      <div className="p4-section-heading"><div><p className="p4-kicker">MANAGER REVIEW · PROPOSAL ONLY</p><h2>Menu recovery</h2><p>Suggested limits apply to new orders only. Existing customer commitments remain visible.</p></div><button className="p4-action-button" type="button" onClick={() => setActionsOpen(true)}>Preview proposed actions</button></div>
-      <label className="p4-search-label" htmlFor="menu-search">Find a menu item</label><input className="p4-search" id="menu-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search menus"/>
-      <Table caption="Menu availability and proposed new order limits" headers={["Menu item", "Confirmed", "New order limit", "Availability", "Suggested action"]}>
-        {filteredRows.map(row => <tr key={row.id}><th scope="row"><button className="p4-row-detail" type="button" onClick={() => setSelectedMenu(row.id)}>{row.name}</button></th><td>{row.confirmed}{row.protected < row.confirmed ? " · at risk" : ""}</td><td>{row.quota}</td><td><span className={`p4-pill ${row.protected < row.confirmed ? "p4-risk-pill" : "p4-ready-pill"}`}>{row.protected < row.confirmed ? "At risk" : !row.chicken ? "Available · capacity conditional" : row.quota ? "Limited" : "Pause new orders"}</span></td><td>{row.protected < row.confirmed ? "Review commitments" : row.chicken && !row.quota ? "Pause NEW orders" : row.quota ? `Allow up to ${row.quota} new` : "Capacity check"}</td></tr>)}
-      </Table>
-      <p className="p4-note">Flavoured Fries uses no chicken. Its availability depends on other ingredients and kitchen capacity.</p>
-    </section>}
+    {tab === "menu" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-menu" aria-labelledby="p4-tab-menu"><MenuRecoveryPanel plan={result} /></section>}
 
-    <footer className="p4-footer"><span>* Synthetic demo feasibility · New external purchase: <strong>0 kg · RM0</strong></span><Link to="/prep-planning">View Prep Planning <span aria-hidden="true">→</span></Link></footer>
+    <footer className="p4-footer"><span>* Synthetic demo feasibility · New external purchase: <strong>0 kg · RM0</strong></span></footer>
 
-    {selectedMenu && <div className="p4-dialog-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget) setSelectedMenu(null); }}><section className="p4-dialog" role="dialog" aria-modal="true" aria-labelledby="menu-dialog-title"><button type="button" className="p4-dialog-close" onClick={() => setSelectedMenu(null)} aria-label="Close menu details">×</button><p className="p4-kicker">MENU DETAIL</p><h2 id="menu-dialog-title">{rows.find(row => row.id === selectedMenu)?.name}</h2><p>Confirmed portions: {rows.find(row => row.id === selectedMenu)?.confirmed}. Proposed new order limit: {rows.find(row => row.id === selectedMenu)?.quota}.</p><p>Recipe unchanged. Manager review required before any manual menu update.</p></section></div>}
-    {actionsOpen && <div className="p4-dialog-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget) setActionsOpen(false); }}><section className="p4-dialog" role="dialog" aria-modal="true" aria-labelledby="actions-dialog-title"><button type="button" className="p4-dialog-close" onClick={() => setActionsOpen(false)} aria-label="Close proposed actions">×</button><p className="p4-kicker">DRAFT · NO MENU CHANGES MADE</p><h2 id="actions-dialog-title">Proposed recovery actions</h2>{breach ? <p>Current stock is insufficient. Pause new chicken orders and review confirmed commitments with a manager.</p> : actions.length ? <ul>{actions.map(action => <li key={action.id}>{rows.find(row => row.id === action.menuId)?.name}: allow up to {action.newOrderQuota} additional new portions.</li>)}</ul> : <p>No additional chicken menu portions are available at this stock level.</p>}<p>These suggestions require manager review and a manual update. This preview cannot approve, publish, or execute them.</p></section></div>}
   </main></PageContainer>;
 }
 
