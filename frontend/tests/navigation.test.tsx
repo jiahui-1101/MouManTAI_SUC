@@ -81,11 +81,11 @@ describe("pages", () => {
 
   it("shows the product name", () => {
     renderAt("/overview");
-    const header = within(screen.getByRole("banner", { name: "Recovery+ portal" }));
-    for (const label of ["FeedMe Portal", "Recovery+", "Powered by MouManTAI", "Concept integration", "Synthetic data"]) {
-      expect(header.getByText(label, { exact: true })).toBeTruthy();
-    }
-    expect(header.getByText(/Happy Potato — Demo Outlet/)).toBeTruthy();
+    const header = within(screen.getByRole("banner", { name: "MouManTAI portal" }));
+    expect(header.getByRole("img", { name: "MouManTAI" })).toBeTruthy();
+    expect(header.queryByText(/FeedMe Portal|Recovery\+|Powered by/)).toBeNull();
+    expect(header.getByText("Outlet: Happy Potato")).toBeTruthy();
+    expect(header.queryByText(/Concept integration|Synthetic data|Demo Outlet/)).toBeNull();
   });
 
   it("redirects / to /overview", () => {

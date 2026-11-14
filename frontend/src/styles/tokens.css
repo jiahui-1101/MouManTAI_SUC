@@ -80,7 +80,3 @@
 @media (max-width: 560px) {
   :root { --header-height: 72px; }
 }
-
-@media (max-width: 400px) {
-  :root { --header-height: 88px; }
-}

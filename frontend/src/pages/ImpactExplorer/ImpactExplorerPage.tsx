@@ -25,7 +25,7 @@ import "../../features/incidents/p2.css";
 
 export function ImpactExplorerPage() {
   return (
-    <PageContainer title={titleFor("/impact")}>
+    <PageContainer title={titleFor("/impact")} actions={<DemoControls />}>
       <P2ErrorBoundary label="Impact Explorer">
         <ImpactContent />
       </P2ErrorBoundary>
@@ -75,7 +75,6 @@ function ImpactContent() {
           ))}
         </select>
       </label>
-      <DemoControls />
     </div>
   );
 
