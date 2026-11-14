@@ -2,11 +2,11 @@
 
 ## Status
 
-**Milestone:** Deterministic mock-message rule extraction complete
+**Milestone:** Shared mock supplier inbox complete
 
 **Branch:** `feature/p1-mock-messaging` (created from `main`)
 
-**Implementation:** Parser increment complete; UI/store work not started
+**Implementation:** Parser and `/inbox` increments complete; remaining P1 pages are not part of this increment
 
 ## Authoritative inputs
 
@@ -76,16 +76,25 @@ The user's scope override takes precedence where the documents discuss real or r
 - [x] Extract the locked message with exact raw-text evidence spans and immutable raw text.
 - [x] Fail closed for unsupported/ambiguous text and block unknown-sender auto-verification.
 - [x] Add focused tests for canonical values, ETA handling, evidence spans, stock separation, and review gates.
-- [ ] Implement canonical P1 mock contracts/fixtures only after shared ownership is confirmed.
-- [ ] Implement and test offline inbox behavior.
+- [x] Implement the canonical P1 inbox contract/fixture from the shared mock-data document.
+- [x] Implement and test offline inbox behavior: channel filters/counts, search, selection/read state, empty state, immutable detail, provenance, processing timeline, and incident correlation.
 - [ ] Implement and test rule extraction and review behavior.
 - [ ] Implement and test display-only channel/settings behavior.
 - [x] Run full tests, typecheck, and production build for the parser milestone.
 
+## Inbox implementation notes
+
+- `/inbox` renders the three canonical shared messages: `HP-MSG-WA-001`, `HP-MSG-OL-001`, and `HP-MSG-TG-001`.
+- All messages are explicitly labelled `SIMULATED_CHANNEL`; the UI states that no channels are connected.
+- The shared module store owns selection and read state so message state survives component-local interactions.
+- Search covers the demo-safe sender, Outlook subject, `HP-PO-1042`, and immutable message text.
+- Detail shows masked provider ID, exact fixture timestamp, canonical rule result, unknown ETA, and the single `HP-INC-001` correlation rule.
+- No provider SDK, network integration, OAuth, API, credential, or backend work was added.
+
 ## Latest verification
 
-- `npm test`: 28 tests passed across 2 test files.
+- `npm test`: 33 tests passed across 3 test files.
 - `npm run typecheck`: passed.
 - `npm run build`: passed with Vite 8.3.8.
 - No dependencies or external services were added.
-- Parser scope is deterministic and offline; no AI model or API call exists.
+- Parser and inbox scope is deterministic and offline; no AI model or API call exists.
