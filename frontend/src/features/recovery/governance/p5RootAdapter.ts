@@ -15,6 +15,10 @@ import type {
 import { isApprovalExpired } from '../../approvals/approvalLogic';
 import type { P5DepsAdapter, P5WorldView } from './p5Store';
 import type { P5State } from './p5Slice';
+import { getP2State, subscribeP2 } from '../../../services/mock/restaurantStore';
+import { buildP5Handoff } from '../../impact/handoff';
+import { HP_BUSINESS, HP_IDS } from '../../../data/fixtures/happyPotato';
+import { devScenarioA, devScenarioB } from '../../../__dev__/mockScenarios';
 
 /**
  * Minimal structural interfaces mirroring docs/00_SHARED §3–4.
@@ -310,5 +314,164 @@ export function createRootP5Selectors<TRoot extends RootStoreContract = RootStor
     selectExecutionTasks: selectExecutionTasksForRoot,
     selectPendingApprovalCount: selectPendingApprovalCountForRoot,
     selectAwaitingEvidenceCount: selectAwaitingEvidenceCountForRoot,
+  };
+}
+
+/**
+ * Adapts origin/main's mock restaurant store (src/services/mock/restaurantStore.ts)
+ * and P2 impact engine (src/features/impact/handoff.ts) into P5DepsAdapter.
+ *
+ * Hybrid fallback: Since P3 and P4 have not yet merged into origin/main,
+ * canonical scenarios HP-SC-A-001 and HP-SC-B-001 bound to the current snapshot
+ * fingerprint are automatically injected if the store lacks scenarios.
+ */
+export function createRestaurantStoreAdapter(
+  dispatchRootEvent?: RootEventDispatcher,
+): P5DepsAdapter {
+  let currentRole: DemoRole = 'Owner';
+  const roleListeners = new Set<() => void>();
+
+  function notifyRoleChange() {
+    roleListeners.forEach((l) => l());
+  }
+
+  function getSnapshotRef(): SnapshotRef {
+    const p2 = getP2State();
+    const snap = p2.restaurant.snapshot;
+    return {
+      id: snap.id,
+      revision: snap.revision,
+      fingerprint: snap.fingerprint,
+      demoBusinessDate: snap.demoBusinessDate ?? HP_BUSINESS.fixtureBusinessDate,
+    };
+  }
+
+  function getActiveIncidentData(): ActiveIncidentRef | null {
+    const p2 = getP2State();
+    const inc = p2.restaurant.incidents[0];
+    if (inc) {
+      return {
+        id: inc.id,
+        type: inc.type,
+        ingredientId: inc.ingredientId,
+        poId: inc.poId,
+      };
+    }
+    return {
+      id: HP_IDS.incident,
+      type: 'UNAVAILABLE',
+      ingredientId: HP_IDS.chicken,
+      poId: HP_IDS.po,
+    };
+  }
+
+  function getImpactData(): ImpactSummaryLike | null {
+    const p2 = getP2State();
+    const inc = p2.restaurant.incidents[0];
+    const snap = p2.restaurant.snapshot;
+    const po = snap.purchaseOrders.find((p) => p.id === (inc?.poId ?? HP_IDS.po));
+    const claim = snap.supplierClaims.find((c) => c.poId === (inc?.poId ?? HP_IDS.po));
+
+    if (inc) {
+      const handoff = buildP5Handoff(p2.restaurant, inc.id);
+      if (handoff.ready) {
+        return {
+          ...handoff.payload.summary,
+          incidentId: inc.id,
+          poId: inc.poId,
+          poExpectedKgMilli: po?.expectedKgMilli ?? 20000,
+          poClaimedKgMilli: claim?.claimedDeliveryTodayKgMilli ?? 0,
+          poShortfallKgMilli: handoff.payload.summary.demandGapKgMilli,
+          forecastGapKgMilli: handoff.payload.summary.demandGapKgMilli,
+        };
+      }
+      const rawImpact = p2.restaurant.impacts[inc.id];
+      if (rawImpact?.summary) {
+        return {
+          ...rawImpact.summary,
+          incidentId: inc.id,
+          poId: inc.poId,
+          poExpectedKgMilli: po?.expectedKgMilli ?? 20000,
+          poClaimedKgMilli: claim?.claimedDeliveryTodayKgMilli ?? 0,
+          poShortfallKgMilli: rawImpact.poShortfallKgMilli ?? 20000,
+          forecastGapKgMilli: rawImpact.summary.demandGapKgMilli,
+        };
+      }
+    }
+    return null;
+  }
+
+  function getScenarioData(strategy: ScenarioStrategy): RecoveryScenarioWithActions {
+    const snapRef = getSnapshotRef();
+    const incidentData = getActiveIncidentData();
+    const scenario = strategy === 'A' ? devScenarioA(snapRef.fingerprint) : devScenarioB(snapRef.fingerprint);
+    if (incidentData) {
+      scenario.incidentId = incidentData.id;
+    }
+    return scenario;
+  }
+
+  const deps: P5Deps & { resolveMenuDisplayName(menuId: string): string } = {
+    getSnapshot: getSnapshotRef,
+    getScenario: (strategy) => getScenarioData(strategy),
+    getActiveIncidentId: () => getActiveIncidentData()?.id ?? null,
+    getActiveIncident: getActiveIncidentData,
+    getImpact: getImpactData,
+    getDemoClockLocal: () => HP_BUSINESS.simulationClockLocal,
+    getCurrentRole: () => ({ role: currentRole, actorId: `HP-ACTOR-${currentRole.toUpperCase()}` }),
+    nowIso: () => `${getSnapshotRef().demoBusinessDate}T${HP_BUSINESS.simulationClockLocal}:00+08:00`,
+    emit: (event: P5Event) => {
+      if (dispatchRootEvent) dispatchRootEvent(event);
+    },
+    resolveMenuDisplayName(menuId: string): string {
+      const p2 = getP2State();
+      return p2.restaurant.snapshot.menuItems.find((m) => m.id === menuId)?.name ?? menuId;
+    },
+  };
+
+  let cachedP2State: unknown = null;
+  let cachedRole: DemoRole = currentRole;
+  let cachedView: P5WorldView | null = null;
+
+  function computeView(): P5WorldView {
+    const p2 = getP2State();
+    if (cachedView && cachedP2State === p2 && cachedRole === currentRole) {
+      return cachedView;
+    }
+    cachedP2State = p2;
+    cachedRole = currentRole;
+
+    const snapRef = getSnapshotRef();
+    const inc = getActiveIncidentData();
+    cachedView = {
+      wired: true,
+      snapshot: snapRef,
+      scenarioA: getScenarioData('A'),
+      scenarioB: getScenarioData('B'),
+      impact: getImpactData(),
+      clock: HP_BUSINESS.simulationClockLocal,
+      role: currentRole,
+      incidentId: inc?.id ?? null,
+    };
+    return cachedView;
+  }
+
+  return {
+    wired: true,
+    deps,
+    subscribe(cb: () => void) {
+      const unsubP2 = subscribeP2(cb);
+      roleListeners.add(cb);
+      return () => {
+        unsubP2();
+        roleListeners.delete(cb);
+      };
+    },
+    getView: computeView,
+    setRole(role: DemoRole) {
+      currentRole = role;
+      notifyRoleChange();
+    },
+    mockWorld: null,
   };
 }

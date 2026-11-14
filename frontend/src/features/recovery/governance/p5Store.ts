@@ -4,7 +4,7 @@ import { createMockWorld, type MockWorld } from '../../../__dev__/p5MockWorld';
 import { isP5DevMocksEnabled } from '../../../__dev__/mockScenarios';
 import type { DemoRole, ImpactSummaryLike, RecoveryScenarioWithActions, SnapshotRef } from './p5Contracts';
 import type { P5Deps } from './p5Deps';
-import { createRootStoreAdapter, type RootStoreContract } from './p5RootAdapter';
+import { createRestaurantStoreAdapter, createRootStoreAdapter, type RootStoreContract } from './p5RootAdapter';
 import { createP5Slice, type P5State } from './p5Slice';
 
 /**
@@ -110,9 +110,9 @@ export function createP5Runtime(adapter: P5DepsAdapter): P5Runtime {
 }
 
 let defaultRuntime: P5Runtime | null = null;
-/** Adapter chosen at startup: dev mocks behind the flag, otherwise the (not yet wired) root store. */
+/** Adapter chosen at startup: dev mocks behind the flag, otherwise the live restaurant store adapter. */
 export function getDefaultP5Runtime(): P5Runtime {
-  defaultRuntime ??= createP5Runtime(isP5DevMocksEnabled() ? devMockDeps() : rootStoreDeps());
+  defaultRuntime ??= createP5Runtime(isP5DevMocksEnabled() ? devMockDeps() : createRestaurantStoreAdapter());
   return defaultRuntime;
 }
 

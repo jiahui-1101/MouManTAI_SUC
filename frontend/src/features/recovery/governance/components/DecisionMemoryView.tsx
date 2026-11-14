@@ -1,4 +1,5 @@
 import { useId, useState } from 'react';
+import { Button, DataPanel } from '../../../../components/ui';
 import { formatKgMilli, formatSenAsRM, shortFingerprint } from '../format';
 import type { DecisionMemoryEntry, OutcomeStatus, ScenarioStrategy, VerificationLevel } from '../p5Contracts';
 import { useP5Store, useP5World } from '../p5Store';
@@ -48,7 +49,7 @@ export function DecisionMemoryView() {
       <P5ContextHeader />
 
       {/* Header counts */}
-      <header className="p5-card p5-stack" aria-label="Decision memory summary">
+      <DataPanel className="p5-card p5-stack" aria-label="Decision memory summary">
         <h2>Decision Memory</h2>
         <div className="p5-row">
           <span>
@@ -68,10 +69,10 @@ export function DecisionMemoryView() {
         <p className="p5-muted" style={{ fontSize: '12px' }}>
           Reference library of simulated recoveries. Success count strictly includes verified SUCCESS cases.
         </p>
-      </header>
+      </DataPanel>
 
       {/* Filter Toolbar */}
-      <section className="p5-card p5-stack" aria-label="Filters and search">
+      <DataPanel className="p5-card p5-stack" aria-label="Filters and search">
         <h3>Filter and search cases</h3>
         <div className="p5-row">
           <label htmlFor={idSearch} style={{ flex: '1 1 200px' }}>
@@ -159,10 +160,10 @@ export function DecisionMemoryView() {
             </select>
           </label>
         </div>
-      </section>
+      </DataPanel>
 
       {/* Case List */}
-      <section className="p5-card p5-stack" aria-label="Decision memory entries">
+      <DataPanel className="p5-card p5-stack" aria-label="Decision memory entries">
         <h3>Saved Recovery Cases ({entries.length})</h3>
 
         {entries.length === 0 ? (
@@ -170,8 +171,9 @@ export function DecisionMemoryView() {
             No cases yet. Complete a recovery and save it from Outcome Verification.
           </p>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="p5-table" data-testid="p5-memory-table">
+          <div className="fm-table-wrap p5-table-wrap" role="region" aria-label="Decision memory cases table" tabIndex={0}>
+            <table className="fm-table p5-table" data-testid="p5-memory-table">
+              <caption className="p2-sr sr-only">Decision memory cases table</caption>
               <thead>
                 <tr>
                   <th scope="col">Incident ID</th>
@@ -190,7 +192,7 @@ export function DecisionMemoryView() {
                       <strong className="p5-mono">{entry.incidentId}</strong>
                     </th>
                     <td>
-                      <span className="p5-badge">
+                      <span className="p5-badge fm-badge">
                         {entry.strategy === 'ESCALATED' ? 'ESCALATED' : `Plan ${entry.strategy}`}
                       </span>
                     </td>
@@ -201,12 +203,12 @@ export function DecisionMemoryView() {
                     </td>
                     <td>
                       <span
-                        className={`p5-badge ${
+                        className={`p5-badge fm-badge ${
                           entry.outcomeStatus === 'SUCCESS'
-                            ? 'p5-badge--brand'
+                            ? 'fm-badge--success p5-badge--brand'
                             : entry.outcomeStatus === 'FAILED'
-                            ? 'p5-badge--danger'
-                            : 'p5-badge--warn'
+                            ? 'fm-badge--danger p5-badge--danger'
+                            : 'fm-badge--warning p5-badge--warn'
                         }`}
                         data-testid={`p5-memory-status-${entry.id}`}
                       >
@@ -222,14 +224,14 @@ export function DecisionMemoryView() {
                       <span className="p5-mono">{(entry.savedAtIso ?? '').slice(11, 16) || '—'}</span>
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        className="p5-btn"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => setSelectedEntry(entry)}
                         data-testid={`p5-view-detail-btn-${entry.id}`}
                       >
                         View details
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -237,7 +239,7 @@ export function DecisionMemoryView() {
             </table>
           </div>
         )}
-      </section>
+      </DataPanel>
 
       {/* Detail Dialog */}
       {selectedEntry && (
@@ -357,13 +359,12 @@ export function DecisionMemoryView() {
             </div>
 
             <div style={{ textAlign: 'right' }}>
-              <button
-                type="button"
-                className="p5-btn p5-btn--primary"
+              <Button
+                variant="primary"
                 onClick={() => setSelectedEntry(null)}
               >
                 Close
-              </button>
+              </Button>
             </div>
           </div>
         </Dialog>

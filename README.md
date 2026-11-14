@@ -5,9 +5,14 @@ message (WhatsApp, Outlook email or Telegram) into an assessed impact, two recov
 (Plan A: external supplier recovery, Plan B: internal stock/menu/prep recovery), a versioned approval and a
 verified outcome.
 
-> **Current status — Phase 1 (project foundation only).**
-> The app is a navigation shell with empty pages. There are **no** real messaging integrations, no message
-> understanding, no restaurant data, no recovery logic, no approvals and no backend yet.
+**Current status:** The FeedMe-inspired Recovery+ prototype includes a shared Portal shell and three
+populated Happy Potato demo pages: Overview, Incidents and Impact Explorer. Use **Demo test mode**
+on Overview to simulate a supplier report, verify it, assess impact, recount stock and reset the scenario.
+The other routes are placeholders in this integration. Live messaging, FeedMe connectivity and the
+recovery-to-outcome workflow are pending.
+
+See the [Portal design guide](docs/design/FEEDME_PORTAL_ALIGNMENT.md) and
+[P2 integration notes](docs/development/P2_impact_foundation.md).
 
 ## Technology stack
 
@@ -23,11 +28,11 @@ No database, AI model, solver, payment or messaging SDK is installed.
 
 ## Getting started
 
-Requires Node.js 20+ (tested with Node 24).
+Requires Node.js 20.19+ on the Node 20 release line, or Node.js 22.12+ (tested with Node 24).
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev        # http://localhost:5173
 ```
 
@@ -52,26 +57,25 @@ MouManTAI_SUC/
 │   │   ├── layouts/               MainLayout (header + navigation + <Outlet/>)
 │   │   ├── components/
 │   │   │   ├── layout/            AppHeader, Navigation, PageContainer
-│   │   │   ├── ui/                (future) reusable primitives: buttons, tables, badges
+│   │   │   ├── ui/                shared Portal presentation primitives and styles
 │   │   │   └── shared/            (future) cross-feature composites
-│   │   ├── pages/                 one route-level component per page (titles only for now)
-│   │   ├── features/              (future) feature business modules: messaging, incidents, recovery, …
+│   │   ├── pages/                 route components, including the three operational demo pages
+│   │   ├── features/              incident and impact presentation and domain logic
 │   │   ├── services/
 │   │   │   ├── api/               (future) Live Message Bridge client
-│   │   │   ├── mock/              (future) simulated business services
+│   │   │   ├── mock/              synthetic restaurant state, selectors and demo actions
 │   │   │   └── adapters/          (future) live vs mock integration boundary
-│   │   ├── data/fixtures/         (future) synthetic restaurant datasets, clearly labelled
+│   │   ├── data/fixtures/         synthetic Happy Potato dataset
 │   │   ├── store/                 (future) shared application state
-│   │   ├── types/                 (future) TypeScript domain contracts
+│   │   ├── types/                 TypeScript domain contracts
 │   │   ├── hooks/ utils/ assets/
 │   │   ├── constants/             navigation.ts — single source of nav items and page titles
 │   │   └── styles/                tokens.css (design tokens), global.css (shell styles)
-│   └── tests/                     routing and navigation tests
+│   └── tests/                     shell, shared UI and P2 regression tests
 ├── backend/                       reserved for the Live Message Bridge (README only)
 ├── docs/
-│   ├── architecture/              approved architecture and UI/UX blueprint
-│   ├── requirements/              Recovery+ requirements specification v1.0
-│   └── development/               (future) developer guides
+│   ├── design/                    FeedMe Portal alignment
+│   └── development/               P2 interface notes
 └── scripts/                       (future) dev and demo scripts
 ```
 
@@ -106,18 +110,14 @@ To add a page: add an entry to `frontend/src/constants/navigation.ts` and map it
 
 | Phase | Scope |
 |---|---|
-| **1 — Foundation (current)** | Repository structure, app shell, routing, empty pages |
+| **1 — Foundation (available)** | Repository structure, Portal shell and routing |
 | 2 — Inbox & message understanding | Unified inbox UI, event schema, rule-based extraction, supplier/PO verification, incidents |
 | 3 — Live message connections | Minimal bridge: Telegram, Outlook, WhatsApp inbound |
-| 4 — Restaurant recovery | Impact explorer, Plan A, Plan B (allocation, menu, prep) on synthetic data |
+| 4 — Restaurant recovery (partial) | Synthetic incident and impact views available. Plan A and Plan B integration pending. |
 | 5 — Decisions & outcomes | Comparison, approval, simulated execution, outcome verification, decision memory |
 | 6 — QA & demo | End-to-end tests, offline fallback, rehearsal |
 
-Provider account setup (Telegram, Outlook, WhatsApp) is recommended in parallel with Phase 1–2 because
-it carries the largest unknowns. See `docs/architecture/` for details.
-
 ## Honesty notes
 
-- No real integrations or recovery functionality exist yet.
-- When added, simulated or rule-based behaviour will be labelled as such in the UI; no FeedMe API access is assumed.
-- No code from the earlier MouManTAI repository is used.
+- Recovery+ is an independent hackathon concept inspired by FeedMe Portal.
+- Operational data and channel events are synthetic. The demo runs locally in the browser.

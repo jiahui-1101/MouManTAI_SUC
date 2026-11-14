@@ -1,5 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { Button, StatusBadge, DataPanel, AlertBanner } from '../../../../components/ui';
 import { shortFingerprint } from '../format';
 import type { DemoRole } from '../p5Contracts';
 import { p5ErrorMessage } from '../p5Errors';
@@ -14,9 +15,9 @@ export function RoleSwitcher() {
   const { adapter } = useP5Runtime();
   const id = useId();
   return (
-    <div className="p5-card" data-testid="p5-role-switcher">
+    <div className="fm-panel p5-card" data-testid="p5-role-switcher">
       <label htmlFor={id}>Demo role — not real access control</label>
-      <select id={id} value={w.role ?? ''} onChange={(e) => adapter.setRole(e.target.value as DemoRole)}>
+      <select id={id} className="fm-select" value={w.role ?? ''} onChange={(e) => adapter.setRole(e.target.value as DemoRole)}>
         {ROLES.map((r) => (
           <option key={r} value={r}>
             {r}
@@ -29,9 +30,9 @@ export function RoleSwitcher() {
 
 export function NotWiredNotice() {
   return (
-    <div className="p5-alert p5-alert--warn" role="status">
+    <AlertBanner tone="warning" title="P5 Store Connection">
       P5 is not connected to the shared demo store yet (TODO(G0)). Waiting for Plan A and Plan B.
-    </div>
+    </AlertBanner>
   );
 }
 
@@ -47,7 +48,7 @@ export function LiveRegion({ message }: { message: string }) {
 export function P5ContextHeader() {
   const w = useP5World();
   return (
-    <div className="p5-card p5-stack">
+    <DataPanel className="p5-card p5-stack">
       <div className="p5-row">
         <span>
           Incident <strong className="p5-mono">{w.incidentId ?? '—'}</strong>
@@ -72,15 +73,15 @@ export function P5ContextHeader() {
         )}
       </div>
       <div className="p5-row">
-        <span className="p5-badge p5-badge--brand" title="SIMULATED_CALCULATION">
+        <StatusBadge tone="simulated" title="SIMULATED_CALCULATION">
           SIMULATED_CALCULATION · Demo calculation
-        </span>
-        <span className="p5-badge" title="SYNTHETIC_BUSINESS">
+        </StatusBadge>
+        <StatusBadge tone="neutral" title="SYNTHETIC_BUSINESS">
           SYNTHETIC_BUSINESS · Happy Potato • Demo data
-        </span>
+        </StatusBadge>
       </div>
       <p className="p5-muted">Not a production food-safety or procurement authorization system.</p>
-    </div>
+    </DataPanel>
   );
 }
 
@@ -93,7 +94,7 @@ export function EscalationPanel({ onMessage }: { onMessage: (m: string) => void 
   const last = p5.escalations[p5.escalations.length - 1];
   const viewer = w.role === 'ViewerAuditor';
   return (
-    <div className="p5-alert p5-alert--warn p5-stack" role="region" aria-label="Escalation status">
+    <div className="p5-alert p5-alert--warn p5-stack fm-banner fm-banner--warning" role="region" aria-label="Escalation status">
       <h2>ESCALATED — both plans rejected</h2>
       <p>No plan will execute. No approval or task has been created.</p>
       {last && <p>Reason: {last.reason}</p>}
@@ -103,9 +104,9 @@ export function EscalationPanel({ onMessage }: { onMessage: (m: string) => void 
         </p>
       ) : (
         <div className="p5-row">
-          <button type="button" className="p5-btn" disabled={viewer} onClick={() => setOpen(true)}>
+          <Button variant="secondary" disabled={viewer} onClick={() => setOpen(true)}>
             Revise constraints
-          </button>
+          </Button>
           {viewer && <span className="p5-reason">ViewerAuditor is read-only.</span>}
         </div>
       )}

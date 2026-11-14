@@ -93,7 +93,7 @@ export function buildApproval(input: ApproveInput): Result<ApprovalRecord> {
   if (input.usedApprovalKeys.includes(key)) {
     return fail('DUPLICATE_REQUEST', `Approval already recorded for ${key}.`);
   }
-  const expiresAtIso = expiresAtFor(scenario.strategy, snapshot.demoBusinessDate);
+  const expiresAtIso = expiresAtFor(scenario.strategy, snapshot.demoBusinessDate ?? '2026-11-14');
   if (expiresAtIso !== null && isApprovalExpired({ expiresAtIso }, input.demoClockLocal)) {
     return fail('APPROVAL_EXPIRED', `Demo clock ${input.demoClockLocal} is past the Plan A deadline ${PLAN_A_DEADLINE_LOCAL}.`);
   }

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Button } from '../../../../components/ui';
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
@@ -15,7 +16,7 @@ export function Dialog({ title, onClose, children }: { title: string; onClose: (
     <div className="p5-dialog-backdrop">
       <div
         ref={ref}
-        className="p5-dialog"
+        className="p5-dialog fm-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -37,7 +38,7 @@ export function Dialog({ title, onClose, children }: { title: string; onClose: (
           }
         }}
       >
-        <h2 id={titleId}>{title}</h2>
+        <h2 id={titleId} className="fm-dialog__title">{title}</h2>
         {children}
       </div>
     </div>
@@ -76,10 +77,9 @@ export function ReasonDialog(props: {
           {error}
         </p>
       )}
-      <div className="p5-row">
-        <button
-          type="button"
-          className="p5-btn p5-btn--primary"
+      <div className="fm-dialog__actions p5-row">
+        <Button
+          variant="primary"
           onClick={() => {
             if (!reason.trim()) {
               setError('A reason is required.');
@@ -89,10 +89,10 @@ export function ReasonDialog(props: {
           }}
         >
           {props.confirmLabel}
-        </button>
-        <button type="button" className="p5-btn" onClick={props.onCancel}>
+        </Button>
+        <Button variant="secondary" onClick={props.onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </Dialog>
   );

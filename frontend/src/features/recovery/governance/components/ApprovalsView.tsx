@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Button, StatusBadge, AlertBanner } from '../../../../components/ui';
 import { isApprovalExpired, preflightApproval } from '../../../approvals/approvalLogic';
 import { approvalKey } from '../../../approvals/idempotency';
 import { formatKgMilli, formatSenAsRM, shortFingerprint } from '../format';
@@ -25,12 +26,12 @@ function scopeLine(a: ProposedAction, s: RecoveryScenarioWithActions): string {
 
 function History({ approvals, fingerprint, clock }: { approvals: ApprovalRecord[]; fingerprint: string; clock: string }) {
   return (
-    <section className="p5-card p5-stack" aria-label="Approval history">
+    <section className="fm-panel p5-card p5-stack" aria-label="Approval history">
       <h2>Approval history</h2>
       {approvals.length === 0 ? (
         <p className="p5-muted">No approval decisions recorded yet.</p>
       ) : (
-        <ul className="p5-stack" data-testid="approval-history">
+        <ul className="p5-stack" data-testid="approval-history" style={{ listStyle: 'none', padding: 0 }}>
           {approvals.map((a) => {
             const stale = a.snapshotFingerprint !== fingerprint;
             const expired = a.state === 'APPROVED' && isApprovalExpired(a, clock);
@@ -38,9 +39,11 @@ function History({ approvals, fingerprint, clock }: { approvals: ApprovalRecord[
             return (
               <li key={a.id} className="p5-card" data-testid="approval-history-item">
                 <div className="p5-row">
-                  <span className={`p5-badge ${a.state === 'REJECTED' ? 'p5-badge--danger' : ''}`}>{expired ? 'EXPIRED' : a.state}</span>
-                  {stale && <span className="p5-badge p5-badge--danger">STALE</span>}
-                  {active && <span className="p5-badge p5-badge--brand">Active (simulated)</span>}
+                  <StatusBadge tone={a.state === 'REJECTED' || expired ? 'danger' : 'neutral'}>
+                    {expired ? 'EXPIRED' : a.state}
+                  </StatusBadge>
+                  {stale && <StatusBadge tone="danger">STALE</StatusBadge>}
+                  {active && <StatusBadge tone="simulated">Active (simulated)</StatusBadge>}
                   {!active && a.state === 'APPROVED' && <span className="p5-muted">Not active</span>}
                 </div>
                 <p className="p5-mono">
@@ -92,9 +95,9 @@ export function ApprovalsView() {
       <RoleSwitcher />
       {body}
       {error && (
-        <div className="p5-alert p5-alert--danger" role="alert">
+        <AlertBanner tone="danger" title="Error">
           {error}
-        </div>
+        </AlertBanner>
       )}
       <LiveRegion message={message} />
       {history}
@@ -112,7 +115,7 @@ export function ApprovalsView() {
   if (!sel) {
     if (p5.escalationState === 'ESCALATED') return page(<EscalationPanel onMessage={setMessage} />);
     return page(
-      <div className="p5-card p5-stack" data-testid="no-selection">
+      <div className="fm-panel p5-card p5-stack" data-testid="no-selection">
         <p>No plan selected. Choose a plan on Recovery Comparison first.</p>
         <Link to="/recovery/compare">Go to Recovery Comparison</Link>
       </div>,
@@ -126,7 +129,7 @@ export function ApprovalsView() {
   if (existing) {
     const tasks = p5.actions.filter((t) => t.approvalId === existing.id);
     return page(
-      <div className="p5-alert p5-alert--ok p5-stack" data-testid="approval-success">
+      <div className="p5-alert p5-alert--ok p5-stack fm-banner fm-banner--info" data-testid="approval-success">
         <h2>Approved (simulated). {tasks.length} tasks created — not executed yet.</h2>
         <p className="p5-mono">Approval {existing.id}</p>
         <p>
@@ -164,48 +167,51 @@ export function ApprovalsView() {
 
   return page(
     <>
-      <section className="p5-card p5-stack" aria-label="Approval request">
+      <section className="fm-panel p5-card p5-stack" aria-label="Approval request">
         <h2>Approval request — Plan {sel.strategy}</h2>
-        <table className="p5-table">
-          <tbody>
-            <tr>
-              <th scope="row">Incident</th>
-              <td className="p5-mono">{sel.incidentId}</td>
-            </tr>
-            <tr>
-              <th scope="row">Scenario</th>
-              <td className="p5-mono">
-                {sel.scenarioId} · v{sel.version}
-              </td>
-            </tr>
-            <tr>
-              <th scope="row">Snapshot</th>
-              <td className="p5-mono">
-                {snapshot.id} rev {snapshot.revision} · <abbr title={sel.fingerprint}>{shortFingerprint(sel.fingerprint)}</abbr>
-              </td>
-            </tr>
-            {scenario && scenario.id === sel.scenarioId && (
-              <>
-                <tr>
-                  <th scope="row">New purchase</th>
-                  <td>{formatKgMilli(scenario.newPurchaseKgMilli)}</td>
-                </tr>
-                <tr>
-                  <th scope="row">Additional cost</th>
-                  <td>{formatSenAsRM(scenario.additionalCostSen)}</td>
-                </tr>
-                <tr>
-                  <th scope="row">Confirmed chicken portions protected</th>
-                  <td>{scenario.confirmedChickenPortionsProtected}</td>
-                </tr>
-                <tr>
-                  <th scope="row">Chicken forecast portions unmet</th>
-                  <td>{scenario.forecastChickenPortionsUnmet} (forecast only)</td>
-                </tr>
-              </>
-            )}
-          </tbody>
-        </table>
+        <div className="fm-table-wrap p5-table-wrap" role="region" aria-label="Approval request details" tabIndex={0}>
+          <table className="fm-table p5-table">
+            <caption className="p2-sr sr-only">Approval request details</caption>
+            <tbody>
+              <tr>
+                <th scope="row">Incident</th>
+                <td className="p5-mono">{sel.incidentId}</td>
+              </tr>
+              <tr>
+                <th scope="row">Scenario</th>
+                <td className="p5-mono">
+                  {sel.scenarioId} · v{sel.version}
+                </td>
+              </tr>
+              <tr>
+                <th scope="row">Snapshot</th>
+                <td className="p5-mono">
+                  {snapshot.id} rev {snapshot.revision} · <abbr title={sel.fingerprint}>{shortFingerprint(sel.fingerprint)}</abbr>
+                </td>
+              </tr>
+              {scenario && scenario.id === sel.scenarioId && (
+                <>
+                  <tr>
+                    <th scope="row">New purchase</th>
+                    <td>{formatKgMilli(scenario.newPurchaseKgMilli)}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Additional cost</th>
+                    <td>{formatSenAsRM(scenario.additionalCostSen)}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Confirmed chicken portions protected</th>
+                    <td>{scenario.confirmedChickenPortionsProtected}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Chicken forecast portions unmet</th>
+                    <td>{scenario.forecastChickenPortionsUnmet} (forecast only)</td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {scenario && (
           <div>
@@ -227,7 +233,7 @@ export function ApprovalsView() {
         </p>
 
         {blocker && (
-          <div className="p5-alert p5-alert--danger" role="alert" data-testid="approval-blocker">
+          <div className="p5-alert p5-alert--danger fm-banner fm-banner--danger" role="alert" data-testid="approval-blocker">
             <strong>{blocker.error}</strong>: {p5ErrorMessage(blocker.error, blocker.detail)}
           </div>
         )}
@@ -241,15 +247,15 @@ export function ApprovalsView() {
         )}
 
         <div className="p5-row">
-          <button type="button" className="p5-btn p5-btn--primary" disabled={approveDisabled} onClick={() => setDialog('confirm')}>
+          <Button variant="primary" disabled={approveDisabled} onClick={() => setDialog('confirm')}>
             Approve
-          </button>
-          <button type="button" className="p5-btn" disabled={decisionBlocked || viewer} onClick={() => setDialog('reject')}>
+          </Button>
+          <Button variant="secondary" disabled={decisionBlocked || viewer} onClick={() => setDialog('reject')}>
             Reject
-          </button>
-          <button type="button" className="p5-btn p5-btn--danger" disabled={viewer} onClick={() => setDialog('escalate')}>
+          </Button>
+          <Button variant="danger" disabled={viewer} onClick={() => setDialog('escalate')}>
             Escalate
-          </button>
+          </Button>
           {(decisionBlocked || viewer) && <span className="p5-reason">Reject unavailable: {viewer ? 'ViewerAuditor is read-only.' : 'see blocker above.'}</span>}
         </div>
       </section>
@@ -261,12 +267,12 @@ export function ApprovalsView() {
             {scenario?.proposedActions.length ?? 0} actions? Tasks are created but not executed. No external effects.
           </p>
           <div className="p5-row">
-            <button type="button" className="p5-btn p5-btn--primary" disabled={inFlight} onClick={doApprove}>
+            <Button variant="primary" disabled={inFlight} onClick={doApprove}>
               Confirm approval
-            </button>
-            <button type="button" className="p5-btn" onClick={() => setDialog(null)}>
+            </Button>
+            <Button variant="secondary" onClick={() => setDialog(null)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </Dialog>
       )}
@@ -285,6 +291,6 @@ export function ApprovalsView() {
           }}
         />
       )}
-    </>,
+    </>
   );
 }

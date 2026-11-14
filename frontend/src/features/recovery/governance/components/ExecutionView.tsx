@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Button, StatusBadge } from '../../../../components/ui';
 import { isApprovalExpired } from '../../../approvals/approvalLogic';
 import { preflightExecution } from '../../../approvals/executionLogic';
 import { hasCapability } from '../../../approvals/permissions';
@@ -89,13 +90,13 @@ export function ExecutionView() {
       {p5.escalationState === 'ESCALATED' && <EscalationPanel onMessage={setLive} />}
 
       {!activeApproval ? (
-        <section className="p5-card p5-stack" aria-label="No approval">
+        <section className="fm-panel p5-card p5-stack" aria-label="No approval">
           <h2>No approved plan</h2>
           <p className="p5-muted">
             No approved plan. Approve a plan on Approvals first.
           </p>
           <div>
-            <Link to="/approvals" className="p5-btn p5-btn--primary">
+            <Link to="/approvals" className="fm-btn fm-btn--primary p5-btn p5-btn--primary">
               Go to Approvals →
             </Link>
           </div>
@@ -103,7 +104,7 @@ export function ExecutionView() {
       ) : (
         <>
           {blockReason && (
-            <div className="p5-alert p5-alert--danger" role="alert" data-testid="p5-execution-blocked-banner">
+            <div className="p5-alert p5-alert--danger fm-banner fm-banner--danger" role="alert" data-testid="p5-execution-blocked-banner">
               <strong>Execution blocked: {blockReason}. Re-calculation and re-approval required.</strong>
               <div className="p5-row" style={{ marginTop: '8px' }}>
                 <Link to="/recovery/compare">Review Comparison →</Link>
@@ -113,14 +114,14 @@ export function ExecutionView() {
           )}
 
           {/* Header */}
-          <header className="p5-card p5-stack" aria-label="Approved plan execution header">
+          <header className="fm-panel p5-card p5-stack" aria-label="Approved plan execution header">
             <div className="p5-row">
               <h2>
                 Execution Tracker — Plan {activeApproval.selectedStrategy} ({activeApproval.scenarioId} v{activeApproval.scenarioVersion})
               </h2>
-              <span className="p5-badge p5-badge--brand" title="SIMULATED_ACTION">
+              <StatusBadge tone="simulated" title="SIMULATED_ACTION">
                 SIMULATED_ACTION
-              </span>
+              </StatusBadge>
             </div>
             <p className="p5-muted">
               Simulation only — no supplier, POS or kitchen system is contacted.
@@ -142,7 +143,7 @@ export function ExecutionView() {
           </header>
 
           {/* Progress */}
-          <section className="p5-card p5-stack" aria-label="Execution progress">
+          <section className="fm-panel p5-card p5-stack" aria-label="Execution progress">
             <h3>Execution progress</h3>
             <div className="p5-row">
               <span>Approved: <strong>{approvedCount}</strong></span>
@@ -209,7 +210,7 @@ function TaskCard({
   const isSimulationDisabled = blockedBanner || blocker !== null;
 
   return (
-    <article className="p5-card p5-stack" data-testid={`p5-task-card-${task.id}`}>
+    <article className="fm-panel p5-card p5-stack" data-testid={`p5-task-card-${task.id}`}>
       <div className="p5-row" style={{ justifyContent: 'space-between' }}>
         <div>
           <h3>{taskTitle(task)}</h3>
@@ -218,12 +219,12 @@ function TaskCard({
           </span>
         </div>
         <div className="p5-row">
-          <span className="p5-badge" data-testid={`p5-task-state-${task.id}`}>
+          <span className="p5-badge fm-badge" data-testid={`p5-task-state-${task.id}`}>
             {task.state}
           </span>
           {task.actionType === 'MENU_LIMIT_TASK' && (
             <span
-              className={`p5-badge ${task.externalSyncStatus === 'MANUALLY_CONFIRMED_DEMO' ? 'p5-badge--brand' : 'p5-badge--warn'}`}
+              className={`p5-badge fm-badge ${task.externalSyncStatus === 'MANUALLY_CONFIRMED_DEMO' ? 'fm-badge--success p5-badge--brand' : 'fm-badge--warning p5-badge--warn'}`}
               data-testid={`p5-task-sync-${task.id}`}
             >
               {task.externalSyncStatus === 'MANUALLY_CONFIRMED_DEMO'
@@ -277,15 +278,14 @@ function TaskCard({
       {/* Actions */}
       <div className="p5-row" style={{ alignItems: 'center' }}>
         {task.state !== 'AWAITING_EVIDENCE' && task.state !== 'VERIFIED' && (
-          <button
-            type="button"
-            className="p5-btn p5-btn--primary"
+          <Button
+            variant="primary"
             disabled={isSimulationDisabled}
             onClick={() => onOpenSimulate(task.id)}
             data-testid={`p5-simulate-btn-${task.id}`}
           >
             Simulate next step
-          </button>
+          </Button>
         )}
 
         {blocker && (
@@ -297,7 +297,7 @@ function TaskCard({
         {task.state === 'AWAITING_EVIDENCE' && (
           <Link
             to={`/outcomes?actionId=${task.id}`}
-            className="p5-btn p5-btn--primary"
+            className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
             data-testid={`p5-record-evidence-link-${task.id}`}
           >
             Record evidence →
@@ -320,7 +320,7 @@ function TaskCard({
               <li key={idx} className="p5-muted">
                 <strong>{entry.from} → {entry.to}</strong> by <strong>{entry.actorRole}</strong> ({entry.actorId}) at{' '}
                 <span className="p5-mono">{entry.atIso.slice(11, 16)}</span>: "{entry.reason}"{' '}
-                <span className="p5-badge" style={{ fontSize: '10px' }}>simulated</span>
+                <span className="p5-badge fm-badge" style={{ fontSize: '10px' }}>simulated</span>
               </li>
             ))}
           </ul>

@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Button } from '../../../../components/ui';
 import { hasCapability } from '../../../approvals/permissions';
 import { evaluateOutcome } from '../../../outcomes/verifyOutcome';
 import { formatKgMilli, formatSenAsRM } from '../format';
@@ -140,24 +141,22 @@ export function OutcomesView() {
             )}
 
             <div className="p5-row" style={{ marginTop: '10px' }}>
-              <button
-                type="button"
-                className="p5-btn p5-btn--primary"
+              <Button
+                variant="primary"
                 onClick={handleVerify}
                 data-testid="p5-verify-btn"
               >
                 Verify simulated outcome
-              </button>
+              </Button>
 
               {(outcome !== null || p5.escalationState === 'ESCALATED') && (
-                <button
-                  type="button"
-                  className="p5-btn"
+                <Button
+                  variant="secondary"
                   onClick={handleSaveMemory}
                   data-testid="p5-save-memory-btn"
                 >
                   Save case to Decision Memory
-                </button>
+                </Button>
               )}
 
               {savedMemory && (
@@ -187,8 +186,9 @@ export function OutcomesView() {
           {/* Predicted vs Simulated Actual Table */}
           <section className="p5-card p5-stack" aria-label="Predicted vs Simulated Actual">
             <h2>Predicted vs Simulated Actual</h2>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="p5-table" data-testid="p5-predicted-actual-table">
+            <div className="fm-table-wrap p5-table-wrap" role="region" aria-label="Predicted vs Simulated Actual Table" tabIndex={0}>
+              <table className="fm-table p5-table" data-testid="p5-predicted-actual-table">
+                <caption className="p2-sr sr-only">Predicted vs Simulated Actual Table</caption>
                 <thead>
                   <tr>
                     <th scope="col">Metric / Task</th>
@@ -231,9 +231,9 @@ export function OutcomesView() {
                         {allowed.join(', ')}
                       </span>
                       {matchingTask && (
-                        <button
-                          type="button"
-                          className="p5-btn"
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => {
                             setSelectedActionId(matchingTask.id);
                             const el = document.getElementById('p5-evidence-entry-section');
@@ -241,7 +241,7 @@ export function OutcomesView() {
                           }}
                         >
                           Record this →
-                        </button>
+                        </Button>
                       )}
                     </li>
                   );
@@ -898,7 +898,7 @@ function EvidenceForm({
           <div>
             <button
               type="submit"
-              className="p5-btn p5-btn--primary"
+              className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
               disabled={!isAllowed}
               data-testid="p5-submit-evidence-btn"
             >

@@ -7,11 +7,11 @@
  * publishes them. P5-specific extensions are marked `TODO(G0)`.
  */
 
-// ---------------------------------------------------------------------------
-// SHARED-MIRROR — replace with imports from the shared contract when it lands.
-// TODO(G0): propose to shared contract (shared types not yet present in repo)
-// ---------------------------------------------------------------------------
-export type Feasibility = 'FEASIBLE' | 'CONDITIONAL' | 'INFEASIBLE' | 'UNKNOWN';
+import type { Feasibility } from '../../../types/common';
+import type { ImpactSummary } from '../../../types/restaurant';
+import type { SnapshotRef as CanonicalSnapshotRef, P5ImpactHandoff } from '../../impact/handoff';
+
+export type { Feasibility, ImpactSummary, P5ImpactHandoff };
 export type ScenarioStrategy = 'A' | 'B';
 export type OutcomeStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'UNVERIFIED';
 
@@ -82,24 +82,21 @@ export type Result<T> = { ok: true; value: T } | { ok: false; error: P5ErrorCode
 export const ok = <T>(value: T): Result<T> => ({ ok: true, value });
 export const fail = <T = never>(error: P5ErrorCode, detail: string): Result<T> => ({ ok: false, error, detail });
 
-export interface SnapshotRef {
-  id: string;
-  revision: number;
-  fingerprint: string;
-  demoBusinessDate: string;
+export interface SnapshotRef extends CanonicalSnapshotRef {
+  demoBusinessDate?: string;
 }
 
 /**
- * TODO(G0): propose to shared contract — the subset of P2's ImpactSummary that P5 displays.
- * P5 never computes these; it only renders what P2 publishes.
+ * Shared ImpactSummary subset + fields that P5 displays.
+ * Sourced directly from P2 ImpactSummary / P5ImpactHandoff.
  */
-export interface ImpactSummaryLike {
+export interface ImpactSummaryLike extends Partial<ImpactSummary> {
   incidentId: string;
-  poId: string;
-  poExpectedKgMilli: number;
-  poClaimedKgMilli: number;
-  poShortfallKgMilli: number;
-  forecastGapKgMilli: number;
+  poId?: string;
+  poExpectedKgMilli?: number;
+  poClaimedKgMilli?: number;
+  poShortfallKgMilli?: number;
+  forecastGapKgMilli?: number;
 }
 
 export interface ScenarioSelection {
