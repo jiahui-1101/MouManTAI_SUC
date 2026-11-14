@@ -54,7 +54,6 @@ export function P5ContextBar() {
     <section className="fm-panel p5-card p5-context-bar" aria-label="Incident context" data-testid="p5-context-bar">
       <div className="p5-context-bar__row">
         <p className="p5-context-bar__headline">
-          <span aria-hidden="true">🐔 </span>
           <strong>{headline}</strong>
           <span className="p5-muted"> · Happy Potato</span>
         </p>

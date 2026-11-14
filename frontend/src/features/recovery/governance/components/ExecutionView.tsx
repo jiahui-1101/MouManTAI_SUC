@@ -200,7 +200,7 @@ export function ExecutionView() {
               </div>
             </div>
             <p className="p5-muted" data-testid="p5-progress-text">
-              {waitingProof} of {tasks.length} tasks waiting for proof · proof is checked on <Link to="/outcomes">Outcomes</Link>
+              {waitingProof} of {tasks.length} tasks waiting for proof{inProgress > 0 ? ` · ${inProgress} in progress (one more step each)` : ''} · proof is checked on <Link to="/outcomes">Outcomes</Link>
             </p>
             {summary && (
               <p className="p5-advance-summary" data-testid="p5-advance-summary">
