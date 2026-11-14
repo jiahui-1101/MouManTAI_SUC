@@ -8,8 +8,8 @@ verified outcome.
 **Current status:** The FeedMe-inspired MouManTAI prototype includes a shared Portal shell and three
 populated Happy Potato demo pages: Overview, Incidents and Impact Explorer. Use **Supplier disruption demo**
 on Overview to simulate a supplier report, verify it, assess impact, recount stock and reset the scenario.
-The other routes are placeholders in this integration. Live messaging, FeedMe connectivity and the
-recovery-to-outcome workflow are pending.
+Plan A, Plan B and Prep Planning also have demo views. Live messaging, FeedMe connectivity and the
+end-to-end recovery-to-outcome workflow are pending.
 
 See the [Portal design guide](docs/design/FEEDME_PORTAL_ALIGNMENT.md) and
 [P2 integration notes](docs/development/P2_impact_foundation.md).
@@ -113,7 +113,7 @@ To add a page: add an entry to `frontend/src/constants/navigation.ts` and map it
 | **1 — Foundation (available)** | Repository structure, Portal shell and routing |
 | 2 — Inbox & message understanding | Unified inbox UI, event schema, rule-based extraction, supplier/PO verification, incidents |
 | 3 — Live message connections | Minimal bridge: Telegram, Outlook, WhatsApp inbound |
-| 4 — Restaurant recovery (partial) | Synthetic incident and impact views available. Plan A and Plan B integration pending. |
+| 4 — Restaurant recovery (partial) | Synthetic incident, impact, Plan A, Plan B and prep planning views available. |
 | 5 — Decisions & outcomes | Comparison, approval, simulated execution, outcome verification, decision memory |
 | 6 — QA & demo | End-to-end tests, offline fallback, rehearsal |
 
