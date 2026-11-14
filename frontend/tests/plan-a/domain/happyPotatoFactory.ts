@@ -3,6 +3,7 @@
  * Production code must consume the shared runtime fixture when the integrator adds it.
  */
 import type { RecoverySourcingNeedInput, SupplierOfferCandidateInput } from "../../../src/features/recovery/plan-a/domain/types";
+import { deriveRecoverySourcingNeed } from "../../../src/features/recovery/plan-a/domain";
 
 const CANONICAL_NEED_INPUT: RecoverySourcingNeedInput = {
   outletId: "HP-OUTLET-001",
@@ -145,5 +146,40 @@ export function makeOfferC(overrides: CandidateOverrides = {}): SupplierOfferCan
     },
     specEvidenceStatus: specEvidenceStatus ?? "SYNTHETIC_DEMO_APPROVED",
     availabilityStatus: availabilityStatus ?? "UNCONFIRMED",
+  };
+}
+
+type ScenarioOverrides = {
+  sourcingInput?: ReturnType<typeof makeCanonicalSourcingInput>;
+  candidateOffers?: SupplierOfferCandidateInput[];
+  selectedOfferId?: string | null;
+  currentSnapshotFingerprint?: string;
+  currentSnapshotRevision?: number;
+  scenarioId?: string;
+  version?: number;
+  evidenceRefs?: string[];
+  actionIds?: string[];
+  capacityStatus?: "UNKNOWN" | "INSUFFICIENT";
+};
+
+export function makePlanAScenarioInput(overrides: ScenarioOverrides = {}) {
+  const sourcingInput = overrides.sourcingInput ?? makeCanonicalSourcingInput();
+  const needResult = deriveRecoverySourcingNeed(sourcingInput);
+  if (!needResult.ok) throw new Error(`${needResult.error.code}: ${needResult.error.message}`);
+
+  return {
+    sourcingNeed: needResult.value,
+    candidateOffers: overrides.candidateOffers ?? [makeOfferB(), makeOfferC()],
+    selectedOfferId: overrides.selectedOfferId === undefined ? "HP-OFFER-002" : overrides.selectedOfferId,
+    currentSnapshotFingerprint: overrides.currentSnapshotFingerprint ?? sourcingInput.snapshot.fingerprint,
+    currentSnapshotRevision: overrides.currentSnapshotRevision ?? sourcingInput.snapshot.revision,
+    businessClock: sourcingInput.businessClock,
+    scenarioMetadata: {
+      scenarioId: overrides.scenarioId ?? "HP-SC-A-001",
+      version: overrides.version ?? 1,
+      evidenceRefs: overrides.evidenceRefs ?? ["HP-MSG-WA-001"],
+      actionIds: overrides.actionIds ?? [],
+      capacityStatus: overrides.capacityStatus ?? "UNKNOWN",
+    },
   };
 }

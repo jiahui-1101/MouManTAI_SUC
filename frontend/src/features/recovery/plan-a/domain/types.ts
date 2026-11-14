@@ -17,6 +17,7 @@ export type DomainFailureCode =
   | "UNSUPPORTED_INGREDIENT"
   | "NO_SUPPLIER_OFFERS"
   | "NO_ELIGIBLE_OFFERS"
+  | "OFFER_SELECTION_REQUIRED"
   | "OFFER_NOT_ELIGIBLE"
   | "NEEDS_RECALCULATION"
   | "SCENARIO_METADATA_MISSING"
@@ -299,4 +300,63 @@ export interface AssessOfferInput {
   candidate: SupplierOfferCandidateInput;
   need: RecoverySourcingNeed;
   businessClock: BusinessClockContext;
+}
+
+export interface PlanAScenarioMetadata {
+  scenarioId: string;
+  version: number;
+  evidenceRefs: string[];
+  actionIds: string[];
+  capacityStatus: "UNKNOWN" | "INSUFFICIENT";
+}
+
+export interface BuildPlanAScenarioInput {
+  sourcingNeed: RecoverySourcingNeed;
+  candidateOffers: SupplierOfferCandidateInput[];
+  selectedOfferId: string | null;
+  currentSnapshotFingerprint: string;
+  currentSnapshotRevision: number;
+  businessClock: BusinessClockContext;
+  scenarioMetadata: PlanAScenarioMetadata;
+}
+
+export type ScenarioConditionCode =
+  | "SUPPLIER_CONFIRMATION_REQUIRED"
+  | "QUALITY_ACCEPTANCE_REQUIRED"
+  | "QUOTE_VALIDITY_NOT_PROVIDED"
+  | "CONDITIONAL_INCOMING_NOT_PHYSICAL_STOCK"
+  | "KITCHEN_CAPACITY_NOT_RECOMPUTED";
+
+export interface ScenarioCondition {
+  code: ScenarioConditionCode;
+  description: string;
+}
+
+export interface PlanAScenarioCandidate {
+  id: string;
+  incidentId: string;
+  strategy: "A";
+  snapshotFingerprint: string;
+  version: number;
+  feasibility: "CONDITIONAL";
+  newPurchaseKgMilli: number;
+  additionalCostSen: number;
+  forecastChickenPortionsServed: number;
+  forecastChickenPortionsUnmet: number;
+  confirmedChickenPortionsProtected: number;
+  assumptions: string[];
+  evidenceRefs: string[];
+  actionIds: string[];
+  simulatedCalculation: true;
+  acceptedOnHandKgMilli: number;
+  conditionalIncomingKgMilli: number;
+  projectedChickenAfterConditionalReceiptKgMilli: number;
+  forecastRequirementKgMilli: number;
+  projectedResidualKgMilli: number;
+  projectionScope: "INGREDIENT_COVERAGE_ONLY";
+  productionGuaranteed: false;
+  physicalInventoryEffect: "UNCHANGED";
+  conditions: ScenarioCondition[];
+  selectedOfferAssessment: OfferAssessment;
+  sourceLabels: Array<"LIVE_CHANNEL" | "REPLAY_CHANNEL" | "SIMULATED_CHANNEL" | "SYNTHETIC_BUSINESS" | "SIMULATED_CALCULATION">;
 }
