@@ -1,4 +1,4 @@
-import { OrderProtection } from "../../features/recovery/plan-b/OrderProtection";
+import { OrderProtection } from "../../features/recovery/plan-b/OrderProtectionPanel";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Check, Drumstick, Utensils, Package, ShieldCheck, Soup, Layers } from "lucide-react";

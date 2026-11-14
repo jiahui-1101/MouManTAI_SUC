@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { allocateDemoOrders } from "../src/features/recovery/plan-b/orderCoverage";
-import { OrderProtection } from "../src/features/recovery/plan-b/OrderProtection";
+import { OrderProtection } from "../src/features/recovery/plan-b/OrderProtectionPanel";
 import { calculatePlanB } from "../src/features/recovery/plan-b/planB";
 import { preview } from "../src/features/recovery/plan-b/preview";
 
