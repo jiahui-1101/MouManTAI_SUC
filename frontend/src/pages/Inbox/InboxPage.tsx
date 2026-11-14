@@ -34,7 +34,9 @@ export function InboxPage() {
     const haystack = `${message.senderDisplay} ${message.subject ?? ""} ${message.poId ?? ""} ${message.rawText}`.toLowerCase();
     return matchesChannel && haystack.includes(query.trim().toLowerCase());
   }).sort((a, b) => preferences.unreadFirst ? Number(a.read) - Number(b.read) : 0), [filter, messages, preferences.unreadFirst, query]);
-  const selected = messages.find((message) => message.id === selectedId) ?? messages[0]!;
+  const selected = messages.find((message) => message.id === selectedId) ?? messages[0];
+
+  if (!selected) return <PageContainer title={titleFor("/inbox")}><div className="inbox__empty"><strong>No fixture messages loaded</strong><p>SIMULATED_CHANNEL · Load a predefined scenario from Channels.</p><Link to="/channels">Choose a demo scenario</Link></div></PageContainer>;
 
   return <PageContainer title={titleFor("/inbox")}>
     <div className="inbox__intro">

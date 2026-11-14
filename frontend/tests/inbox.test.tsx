@@ -14,6 +14,12 @@ function renderInbox() {
 }
 
 describe("unified supplier inbox", () => {
+  it("opens an empty shared fixture without crashing", () => {
+    inboxStore.loadFixture("EMPTY");
+    renderInbox();
+    expect(screen.getByText("No fixture messages loaded")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Choose a demo scenario" }).getAttribute("href")).toBe("/channels");
+  });
   it("renders all three shared simulated channel messages and canonical extraction", () => {
     renderInbox();
     const list = screen.getByRole("region", { name: "Messages" });
