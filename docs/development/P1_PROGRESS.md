@@ -2,9 +2,11 @@
 
 ## Status
 
-**Milestone:** Setup and requirements preparation complete  
-**Branch:** `feature/p1-mock-messaging` (created from `main`)  
-**Implementation:** Not started, per requested stopping point
+**Milestone:** Deterministic mock-message rule extraction complete
+
+**Branch:** `feature/p1-mock-messaging` (created from `main`)
+
+**Implementation:** Parser increment complete; UI/store work not started
 
 ## Authoritative inputs
 
@@ -70,15 +72,20 @@ The user's scope override takes precedence where the documents discuss real or r
 - [x] Copy both source requirement documents into `docs/requirements/`.
 - [x] Inspect current React/Vite architecture and P1 route ownership.
 - [x] Record mock-only scope, invariants, exclusions, and integration dependencies.
+- [x] Implement the canonical supplier/PO parser registry required for P1 extraction.
+- [x] Extract the locked message with exact raw-text evidence spans and immutable raw text.
+- [x] Fail closed for unsupported/ambiguous text and block unknown-sender auto-verification.
+- [x] Add focused tests for canonical values, ETA handling, evidence spans, stock separation, and review gates.
 - [ ] Implement canonical P1 mock contracts/fixtures only after shared ownership is confirmed.
 - [ ] Implement and test offline inbox behavior.
 - [ ] Implement and test rule extraction and review behavior.
 - [ ] Implement and test display-only channel/settings behavior.
-- [ ] Run P1 tests, typecheck, and production build.
+- [x] Run full tests, typecheck, and production build for the parser milestone.
 
-## Setup verification
+## Latest verification
 
-- Required source documents are present under `docs/requirements/`.
-- No application source files were changed during setup.
-- No dependencies were added.
-- No feature implementation was performed.
+- `npm test`: 28 tests passed across 2 test files.
+- `npm run typecheck`: passed.
+- `npm run build`: passed with Vite 8.3.8.
+- No dependencies or external services were added.
+- Parser scope is deterministic and offline; no AI model or API call exists.
