@@ -11,9 +11,9 @@ import {
   EscalationPanel,
   LiveRegion,
   NotWiredNotice,
-  P5ContextHeader,
   ReviseDialog,
 } from './common';
+import { RecoveryWorkflowHeader } from './RecoveryWorkflowHeader';
 import { P5DevControls } from './P5DevControls';
 import './p5.css';
 
@@ -232,7 +232,9 @@ function PlanColumn(props: {
         </div>
         <p className="p5-muted">The plan owner has not published this plan yet.</p>
         <div style={{ marginTop: 'auto' }}>
-          <Link to={PLAN_ROUTE[strategy]}>Go to {title}</Link>
+          <Link to={PLAN_ROUTE[strategy]} className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
+            Go to {title}
+          </Link>
         </div>
       </section>
     );
@@ -323,7 +325,7 @@ export function ComparisonView() {
   if (!w.wired || !w.snapshot) {
     return (
       <div className="p5">
-        <P5ContextHeader />
+        <RecoveryWorkflowHeader currentStep="compare" />
         <NotWiredNotice />
       </div>
     );
@@ -357,7 +359,7 @@ export function ComparisonView() {
   return (
     <div className="p5">
       <P5DevControls />
-      <P5ContextHeader />
+      <RecoveryWorkflowHeader currentStep="compare" />
       <ImpactStrip />
       <EscalationPanel onMessage={setMessage} />
 
@@ -365,10 +367,14 @@ export function ComparisonView() {
         <div className="fm-panel p5-card p5-stack" data-testid="waiting-both">
           <h2>Waiting for Plan A and Plan B</h2>
           <p className="p5-muted">Comparison opens once the plan owners publish their plans.</p>
-          <p className="p5-row">
-            <Link to="/recovery/plan-a">Go to Plan A</Link>
-            <Link to="/recovery/plan-b">Go to Plan B</Link>
-          </p>
+          <div className="p5-row">
+            <Link to="/recovery/plan-a" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
+              Go to Plan A
+            </Link>
+            <Link to="/recovery/plan-b" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
+              Go to Plan B
+            </Link>
+          </div>
         </div>
       ) : (
         <>
@@ -398,10 +404,18 @@ export function ComparisonView() {
 
       {sel && (
         <div className="p5-alert p5-alert--ok fm-banner fm-banner--info" data-testid="selection-panel">
-          <p>
-            <strong>Plan {sel.strategy} selected — not approved yet.</strong> Approval is a separate step.{' '}
-            <Link to="/approvals">Go to Approvals</Link>
-          </p>
+          <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+            <p style={{ margin: 0 }}>
+              <strong>Plan {sel.strategy} selected — not approved yet.</strong> Approval is a separate step.
+            </p>
+            <Link
+              to="/approvals"
+              className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
+              data-testid="p5-next-step-cta"
+            >
+              Continue to Approval →
+            </Link>
+          </div>
         </div>
       )}
       {error && (

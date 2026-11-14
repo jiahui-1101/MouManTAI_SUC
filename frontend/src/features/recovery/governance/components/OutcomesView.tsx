@@ -17,7 +17,8 @@ import type {
 import { p5ErrorMessage } from '../p5Errors';
 import { useP5Store, useP5World } from '../p5Store';
 import { selectEvidenceForAction, selectMissingEvidence, selectOutcomeFreshness } from '../selectors';
-import { EscalationPanel, LiveRegion, NotWiredNotice, P5ContextHeader, RoleSwitcher } from './common';
+import { EscalationPanel, LiveRegion, NotWiredNotice } from './common';
+import { RecoveryWorkflowHeader } from './RecoveryWorkflowHeader';
 import { P5DevControls } from './P5DevControls';
 import './p5.css';
 
@@ -92,8 +93,7 @@ export function OutcomesView() {
     <div className="p5" data-testid="p5-outcomes-view">
       <P5DevControls />
       {!w.wired && <NotWiredNotice />}
-      <P5ContextHeader />
-      <RoleSwitcher />
+      <RecoveryWorkflowHeader currentStep="outcomes" />
       <LiveRegion message={live} />
 
       {p5.escalationState === 'ESCALATED' && <EscalationPanel onMessage={setLive} />}
@@ -105,7 +105,7 @@ export function OutcomesView() {
             No approved plan. Approve a plan on Approvals first.
           </p>
           <div>
-            <Link to="/approvals" className="p5-btn p5-btn--primary">
+            <Link to="/approvals" className="fm-btn fm-btn--primary p5-btn p5-btn--primary">
               Go to Approvals →
             </Link>
           </div>
@@ -148,7 +148,7 @@ export function OutcomesView() {
               </p>
             )}
 
-            <div className="p5-row" style={{ marginTop: '8px' }}>
+            <div className="p5-row" style={{ marginTop: '8px', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
               <Button
                 variant="primary"
                 onClick={handleVerify}
@@ -159,16 +159,21 @@ export function OutcomesView() {
 
               {(outcome !== null || p5.escalationState === 'ESCALATED') && (
                 <Button
-                  variant="secondary"
+                  variant={savedMemory ? 'secondary' : 'primary'}
                   onClick={handleSaveMemory}
+                  aria-label="Save case to Decision Memory"
                   data-testid="p5-save-memory-btn"
                 >
-                  Save case to Decision Memory
+                  Save to Decision Memory
                 </Button>
               )}
 
               {savedMemory && (
-                <Link to="/decision-memory" className="p5-muted" data-testid="p5-saved-memory-link">
+                <Link
+                  to="/decision-memory"
+                  className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
+                  data-testid="p5-next-step-cta"
+                >
                   View in Decision Memory →
                 </Link>
               )}

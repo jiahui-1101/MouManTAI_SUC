@@ -8,7 +8,8 @@ import type { ApprovalRecord, ProposedAction, RecoveryScenarioWithActions, Scena
 import { BENIGN_ERRORS, p5ErrorMessage } from '../p5Errors';
 import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
 import { Dialog, ReasonDialog } from './Dialog';
-import { EscalateDialog, EscalationPanel, LiveRegion, NotWiredNotice, P5ContextHeader, RoleSwitcher } from './common';
+import { EscalateDialog, EscalationPanel, LiveRegion, NotWiredNotice } from './common';
+import { RecoveryWorkflowHeader } from './RecoveryWorkflowHeader';
 import { P5DevControls } from './P5DevControls';
 import './p5.css';
 
@@ -279,7 +280,7 @@ export function ApprovalsView() {
   if (!w.wired || !w.snapshot || !w.clock) {
     return (
       <div className="p5">
-        <P5ContextHeader />
+        <RecoveryWorkflowHeader currentStep="approvals" />
         <NotWiredNotice />
       </div>
     );
@@ -301,8 +302,7 @@ export function ApprovalsView() {
   const page = (body: React.ReactNode) => (
     <div className="p5">
       <P5DevControls />
-      <P5ContextHeader />
-      <RoleSwitcher />
+      <RecoveryWorkflowHeader currentStep="approvals" />
       {body}
       {error && (
         <AlertBanner tone="danger" title="Error">
@@ -323,11 +323,39 @@ export function ApprovalsView() {
   );
 
   if (!sel) {
-    if (p5.escalationState === 'ESCALATED') return page(<EscalationPanel onMessage={setMessage} />);
+    const isEscalated = p5.escalationState === 'ESCALATED';
+    const lastApproval = p5.approvals[p5.approvals.length - 1];
+    const isRejected = lastApproval?.state === 'REJECTED';
+
+    if (isEscalated) {
+      return page(
+        <div className="p5-stack">
+          <EscalationPanel onMessage={setMessage} />
+          <div className="p5-row" style={{ marginTop: '8px' }}>
+            <Link
+              to="/recovery/compare"
+              className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
+              data-testid="p5-next-step-cta"
+            >
+              Back to Comparison
+            </Link>
+          </div>
+        </div>,
+      );
+    }
+
     return page(
       <div className="fm-panel p5-card p5-stack" data-testid="no-selection">
         <p>No plan selected. Choose a plan on Recovery Comparison first.</p>
-        <Link to="/recovery/compare">Go to Recovery Comparison</Link>
+        <div>
+          <Link
+            to="/recovery/compare"
+            className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
+            data-testid={isRejected ? 'p5-next-step-cta' : undefined}
+          >
+            {isRejected ? 'Back to Comparison' : 'Go to Recovery Comparison →'}
+          </Link>
+        </div>
       </div>,
     );
   }
@@ -342,9 +370,16 @@ export function ApprovalsView() {
       <div className="p5-alert p5-alert--ok p5-stack fm-banner fm-banner--info" data-testid="approval-success">
         <h2>Approved (simulated). {tasks.length} tasks created — not executed yet.</h2>
         <p className="p5-mono">Approval {existing.id}</p>
-        <p>
-          Execution is a separate step. <Link to="/execution">Go to Execution</Link>
-        </p>
+        <p>Execution is a separate step.</p>
+        <div>
+          <Link
+            to="/execution"
+            className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
+            data-testid="p5-next-step-cta"
+          >
+            Continue to Execution →
+          </Link>
+        </div>
       </div>,
     );
   }

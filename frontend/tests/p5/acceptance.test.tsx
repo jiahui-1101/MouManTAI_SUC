@@ -485,12 +485,12 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
 
     // Mount and unmount ExecutionView
     const { unmount: unmount1 } = show(ctx, <ExecutionView />);
-    expect(screen.getByText(/HP-SC-B-001/i)).toBeDefined();
+    expect(screen.getAllByText(/HP-SC-B-001/i)[0]).toBeDefined();
     unmount1();
 
     // Re-mount ExecutionView into same store
     const { unmount: unmount2 } = show(ctx, <ExecutionView />);
-    expect(screen.getByText(/HP-SC-B-001/i)).toBeDefined();
+    expect(screen.getAllByText(/HP-SC-B-001/i)[0]).toBeDefined();
     expect(screen.queryAllByTestId(/^p5-task-card-/)).toHaveLength(7);
     unmount2();
 

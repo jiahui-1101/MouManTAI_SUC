@@ -10,7 +10,8 @@ import { BENIGN_ERRORS, p5ErrorMessage } from '../p5Errors';
 import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
 import { selectExecutionTasks } from '../selectors';
 import { ReasonDialog } from './Dialog';
-import { EscalationPanel, LiveRegion, NotWiredNotice, P5ContextHeader, RoleSwitcher } from './common';
+import { EscalationPanel, LiveRegion, NotWiredNotice } from './common';
+import { RecoveryWorkflowHeader } from './RecoveryWorkflowHeader';
 import { P5DevControls } from './P5DevControls';
 import './p5.css';
 
@@ -78,13 +79,13 @@ export function ExecutionView() {
   const simExecCount = tasks.filter((t) => t.state === 'SIMULATED_EXECUTION').length;
   const awaitingCount = tasks.filter((t) => t.state === 'AWAITING_EVIDENCE').length;
   const verifiedCount = tasks.filter((t) => t.state === 'VERIFIED').length;
+  const allAwaiting = tasks.length > 0 && tasks.every((t) => t.state === 'AWAITING_EVIDENCE' || t.state === 'VERIFIED');
 
   return (
     <div className="p5" data-testid="p5-execution-view">
       <P5DevControls />
       {!w.wired && <NotWiredNotice />}
-      <P5ContextHeader />
-      <RoleSwitcher />
+      <RecoveryWorkflowHeader currentStep="execution" />
       <LiveRegion message={live} />
 
       {p5.escalationState === 'ESCALATED' && <EscalationPanel onMessage={setLive} />}
@@ -107,8 +108,33 @@ export function ExecutionView() {
             <div className="p5-alert p5-alert--danger fm-banner fm-banner--danger" role="alert" data-testid="p5-execution-blocked-banner">
               <strong>Execution blocked: {blockReason}. Re-calculation and re-approval required.</strong>
               <div className="p5-row" style={{ marginTop: '8px' }}>
-                <Link to="/recovery/compare">Review Comparison →</Link>
-                <Link to="/approvals">Go to Approvals →</Link>
+                <Link
+                  to="/recovery/compare"
+                  className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
+                  data-testid="p5-next-step-cta"
+                >
+                  Recalculate on Comparison
+                </Link>
+                <Link to="/approvals" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
+                  Go to Approvals →
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {allAwaiting && !blockReason && (
+            <div className="p5-alert p5-alert--ok fm-banner fm-banner--info" style={{ marginBottom: '14px' }}>
+              <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                <p style={{ margin: 0 }}>
+                  <strong>All tasks simulated and awaiting evidence.</strong> Proceed to Outcomes to record evidence and verify the simulated outcome.
+                </p>
+                <Link
+                  to="/outcomes"
+                  className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
+                  data-testid="p5-next-step-cta"
+                >
+                  Record evidence & verify →
+                </Link>
               </div>
             </div>
           )}
