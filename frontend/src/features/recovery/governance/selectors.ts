@@ -1,3 +1,4 @@
+import { ERROR_LABELS } from './labels';
 import { isApprovalExpired, preflightApproval } from '../../approvals/approvalLogic';
 import { approvalKey } from '../../approvals/idempotency';
 import { latestEvidence } from '../../outcomes/evidence';
@@ -327,7 +328,7 @@ export function selectWorkflowSteps(
         approveTone = 'warning';
         approveIcon = '⚠';
       } else {
-        approveStatus = `Blocked: ${blocker.error}`;
+        approveStatus = `Blocked: ${ERROR_LABELS[blocker.error].label}`;
         approveTone = 'danger';
         approveIcon = '✕';
       }

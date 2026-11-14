@@ -4,6 +4,8 @@ import { Button, StatusBadge, AlertBanner } from '../../../../components/ui';
 import { formatKgMilli, formatSenAsRM } from '../format';
 import { publishPlanAFromShared } from '../p5RootAdapter';
 import type { RecoveryScenarioWithActions, ScenarioStrategy, SnapshotRef } from '../p5Contracts';
+import { approvalKey } from '../../../approvals/idempotency';
+import { FEASIBILITY_LABELS } from '../labels';
 import { BENIGN_ERRORS, p5ErrorMessage } from '../p5Errors';
 import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
 import { selectComparisonReadiness, selectIsScenarioStale } from '../selectors';
@@ -79,30 +81,24 @@ function ImpactStrip() {
   return (
     <div className="p5-stack" role="region" aria-label="Impact context">
       <div className="p5-grid2">
-        <div className="fm-panel p5-card p5-card--accent-warn" data-testid="impact-po-shortfall">
+        <div className="fm-panel p5-card p5-card--accent-warn p5-impact-card" data-testid="impact-po-shortfall">
           <div className="p5-row" style={{ justifyContent: 'space-between', marginBottom: '4px' }}>
-            <span className="p5-badge p5-badge--warn">Supplier Shortfall</span>
-            <span className="p5-mono p5-muted">{impact.poId ?? 'HP-PO-1042'}</span>
+            <span className="p5-badge p5-badge--warn">Supplier shortfall</span>
           </div>
-          <h3>Supplier PO shortfall: {formatKgMilli(impact.poShortfallKgMilli ?? 0)}</h3>
-          <p className="p5-muted">
-            {impact.poId ?? 'HP-PO-1042'} expected {formatKgMilli(impact.poExpectedKgMilli ?? 0)}, supplier claims{' '}
+          <h3>Supplier won&apos;t deliver: {formatKgMilli(impact.poShortfallKgMilli ?? 0)}</h3>
+          <p className="p5-muted p5-impact-sub">
+            {impact.poId ?? 'The PO'} expected {formatKgMilli(impact.poExpectedKgMilli ?? 0)}, supplier says{' '}
             {formatKgMilli(impact.poClaimedKgMilli ?? 0)} today
           </p>
         </div>
-        <div className="fm-panel p5-card p5-card--accent-info" data-testid="impact-forecast-gap">
+        <div className="fm-panel p5-card p5-card--accent-info p5-impact-card" data-testid="impact-forecast-gap">
           <div className="p5-row" style={{ justifyContent: 'space-between', marginBottom: '4px' }}>
-            <span className="p5-badge p5-badge--info">Demand Coverage</span>
-            <span className="p5-mono p5-muted">Accepted Stock</span>
+            <span className="p5-badge p5-badge--info">Forecast gap</span>
           </div>
-          <h3>Forecast chicken demand gap: {formatKgMilli(impact.forecastGapKgMilli ?? impact.demandGapKgMilli ?? 0)}</h3>
-          <p className="p5-muted">Forecast need vs accepted on-hand</p>
+          <h3>Actually short for today&apos;s forecast: {formatKgMilli(impact.forecastGapKgMilli ?? impact.demandGapKgMilli ?? 0)}</h3>
+          <p className="p5-muted p5-impact-sub">After counting chicken already accepted on hand</p>
         </div>
       </div>
-      <p className="p5-muted" style={{ fontSize: '12.5px' }}>
-        Why these differ: the PO shortfall is what the supplier will not deliver; the demand gap is what remains after
-        counting chicken already accepted on hand.
-      </p>
     </div>
   );
 }
@@ -131,7 +127,7 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
               <RowHeader label="Feasibility" tooltip="Feasibility status under current synthetic operational constraints" />
             </th>
             <td>
-              <strong>{s.feasibility}</strong> — {feasibilityReason(s)}
+              <strong title={s.feasibility}>{FEASIBILITY_LABELS[s.feasibility].label}</strong> — {feasibilityReason(s)}
             </td>
           </tr>
           <tr>
@@ -198,8 +194,8 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
             <th scope="row">
               <RowHeader label="Scenario / version" tooltip="Scenario identifier, version, and referenced evidence" />
             </th>
-            <td className="p5-mono">
-              {s.id} · v{s.version}
+            <td className="p5-mono" title={`${s.id} · v${s.version}`}>
+              Version {s.version}
               {s.evidenceRefs.length > 0 && ` · refs ${s.evidenceRefs.join(', ')}`}
             </td>
           </tr>
@@ -209,82 +205,39 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
   );
 }
 
-function PlanColumn(props: {
-  strategy: ScenarioStrategy;
-  scenario: RecoveryScenarioWithActions | null;
-  snapshot: SnapshotRef;
-  blockedReason: string | null;
-  selected: boolean;
-  onChoose: () => void;
-}) {
-  const { strategy, scenario } = props;
-  const title = `Plan ${strategy}`;
+function PlanDetails({ strategy, scenario, snapshot }: { strategy: ScenarioStrategy; scenario: RecoveryScenarioWithActions | null; snapshot: SnapshotRef }) {
   const isA = strategy === 'A';
-
   if (!scenario) {
     return (
-      <section
-        className={`fm-panel p5-card p5-compare-card ${
-          isA ? 'p5-compare-card--plan-a' : 'p5-compare-card--plan-b'
-        } p5-stack`}
-        aria-label={title}
-        data-testid={`plan-${strategy}`}
-      >
-        <div className={`p5-compare-header ${isA ? 'p5-compare-header--plan-a' : 'p5-compare-header--plan-b'}`}>
-          <h2>{title} not ready</h2>
-        </div>
-        <p className="p5-muted">The plan owner has not published this plan yet.</p>
-        <div className="p5-row" style={{ marginTop: 'auto', gap: '8px', flexWrap: 'wrap' }}>
-          <Link to={PLAN_ROUTE[strategy]} className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
-            Go to {title}
-          </Link>
-          {isA && (
-            <button
-              type="button"
-              className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
-              onClick={() => publishPlanAFromShared()}
-            >
-              Propose Plan A
-            </button>
-          )}
-        </div>
+      <section className={`fm-panel p5-card p5-compare-card ${isA ? 'p5-compare-card--plan-a' : 'p5-compare-card--plan-b'}`} data-testid={`plan-${strategy}-details`}>
+        <h3>Plan {strategy} not ready</h3>
       </section>
     );
   }
-
-  const stale = selectIsScenarioStale(scenario, props.snapshot);
-  const reasonId = `choose-${strategy}-reason`;
-  const badgeInfo = STRATEGY_BADGE[strategy];
-
+  const stale = selectIsScenarioStale(scenario, snapshot);
   return (
     <section
-      className={`fm-panel p5-card p5-compare-card ${
-        isA ? 'p5-compare-card--plan-a' : 'p5-compare-card--plan-b'
-      }${props.selected ? ' p5-compare-card--selected' : ''}`}
-      aria-label={title}
-      data-testid={`plan-${strategy}`}
+      className={`fm-panel p5-card p5-compare-card ${isA ? 'p5-compare-card--plan-a' : 'p5-compare-card--plan-b'}`}
+      aria-label={`Plan ${strategy} details`}
+      data-testid={`plan-${strategy}-details`}
     >
       <div className={`p5-compare-header ${isA ? 'p5-compare-header--plan-a' : 'p5-compare-header--plan-b'}`}>
-        <div className="p5-row" style={{ justifyContent: 'space-between', marginBottom: '4px' }}>
-          <StatusBadge tone={badgeInfo.tone}>{badgeInfo.label}</StatusBadge>
-          <span className="p5-mono p5-muted">
-            {scenario.id} · v{scenario.version}
-          </span>
-        </div>
         <div className="p5-row">
-          <h2>{STRATEGY_TITLE[strategy]}</h2>
-          {stale && <StatusBadge tone="danger">STALE — recalculation required</StatusBadge>}
-          {props.selected && <StatusBadge tone="simulated">Selected (not approved)</StatusBadge>}
+          <StatusBadge tone={STRATEGY_BADGE[strategy].tone}>{STRATEGY_BADGE[strategy].label}</StatusBadge>
+          <h3>{STRATEGY_TITLE[strategy]}</h3>
+          {stale && (
+            <StatusBadge tone="danger" title="STALE_SCENARIO">
+              Numbers changed — recalculation required
+            </StatusBadge>
+          )}
         </div>
       </div>
-
       <PlanRows s={scenario} />
-
       {isHardBlocked(scenario) && (
         <div style={{ marginTop: '12px' }}>
           <AlertBanner tone="danger" title="Hard blocker">
             <p>
-              Feasibility {scenario.feasibility}: {feasibilityReason(scenario)}.
+              {FEASIBILITY_LABELS[scenario.feasibility].label}: {feasibilityReason(scenario)}.
             </p>
             {scenario.assumptions.length > 0 && (
               <ul className="p5-list">
@@ -296,17 +249,111 @@ function PlanColumn(props: {
           </AlertBanner>
         </div>
       )}
+    </section>
+  );
+}
 
-      {scenario.feasibility === 'CONDITIONAL' && (
-        <div style={{ marginTop: '12px' }}>
-          <AlertBanner tone="warning" title="Conditions">
-            <p>Figures hold only {feasibilityReason(scenario)}.</p>
-          </AlertBanner>
+/** "What you give up", built only from the scenario's own numbers and assumption text. */
+export function giveUpLine(s: RecoveryScenarioWithActions): string {
+  if (s.strategy === 'A') {
+    const deadline = s.assumptions.map((a) => a.match(/\b(\d{2}:\d{2})\b/)?.[1]).find(Boolean);
+    const chilled = s.assumptions.some((a) => /chilled/i.test(a)) ? ' chilled' : '';
+    const kg = formatKgMilli(s.newPurchaseKgMilli);
+    return `${formatSenAsRM(s.additionalCostSen)} and depends on ${kg}${chilled} chicken arriving and passing checks ${
+      deadline ? `by ${deadline}` : 'before the prep cutoff'
+    }`;
+  }
+  return s.forecastChickenPortionsUnmet > 0
+    ? `${s.forecastChickenPortionsUnmet} forecast portions can't be offered today (forecast, not customer orders)`
+    : 'No forecast portions given up';
+}
+
+function DecisionCard(props: {
+  strategy: ScenarioStrategy;
+  scenario: RecoveryScenarioWithActions | null;
+  snapshot: SnapshotRef;
+  blockedReason: string | null;
+  selected: boolean;
+  onChoose: () => void;
+}) {
+  const { strategy, scenario } = props;
+  const title = `Plan ${strategy}`;
+  const isA = strategy === 'A';
+  const cls = `fm-panel p5-card p5-decision-card ${isA ? 'p5-compare-card--plan-a' : 'p5-compare-card--plan-b'}${
+    props.selected ? ' p5-compare-card--selected' : ''
+  }`;
+
+  if (!scenario) {
+    return (
+      <section className={cls} aria-label={title} data-testid={`plan-${strategy}`}>
+        <h2>{title} not ready</h2>
+        <p className="p5-muted">The plan owner has not published this plan yet.</p>
+        <div className="p5-row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+          <Link to={PLAN_ROUTE[strategy]} className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
+            Go to {title}
+          </Link>
+          {isA && (
+            <button type="button" className="fm-btn fm-btn--primary p5-btn p5-btn--primary" onClick={() => publishPlanAFromShared()}>
+              Propose Plan A
+            </button>
+          )}
         </div>
-      )}
+      </section>
+    );
+  }
 
-      <div className="p5-compare-footer">
-        <div className="p5-row">
+  const stale = selectIsScenarioStale(scenario, props.snapshot);
+  const cond = scenario.feasibility === 'CONDITIONAL';
+  const totalForecast = scenario.forecastChickenPortionsServed + scenario.forecastChickenPortionsUnmet;
+  const reasonId = `choose-${strategy}-reason`;
+  const pillTone = cond ? 'p5-pill--warn' : isHardBlocked(scenario) ? 'p5-pill--danger' : 'p5-pill--ok';
+
+  return (
+    <section className={cls} aria-label={title} data-testid={`plan-${strategy}`}>
+      <div className="p5-decision-card__head">
+        <h2>{STRATEGY_TITLE[strategy]}</h2>
+        <span className={`p5-pill ${pillTone}`} title={scenario.feasibility}>
+          {FEASIBILITY_LABELS[scenario.feasibility].label}
+        </span>
+        {stale && (
+          <span className="p5-pill p5-pill--danger" title="STALE_SCENARIO">
+            Numbers changed — recalculation required
+          </span>
+        )}
+      </div>
+      <dl className="p5-decision-lines">
+        <div>
+          <dt>New spend</dt>
+          <dd data-testid={`strip-${strategy}-spend`}>
+            <strong>{formatSenAsRM(scenario.additionalCostSen)}</strong> {isA ? '(projected)' : 'new purchase'}
+          </dd>
+        </div>
+        <div>
+          <dt>Forecast chicken coverage</dt>
+          <dd data-testid={`strip-${strategy}-coverage`}>
+            <strong>
+              {scenario.forecastChickenPortionsServed} of {totalForecast}
+            </strong>{' '}
+            portions{cond ? ' (conditional)' : ''}
+          </dd>
+        </div>
+        <div>
+          <dt>Confirmed orders</dt>
+          <dd data-testid={`strip-${strategy}-confirmed`}>
+            <strong>{scenario.confirmedChickenPortionsProtected}</strong> protected{cond ? ' (conditional)' : ''}
+          </dd>
+        </div>
+        <div className="p5-decision-lines__giveup">
+          <dt>What you give up</dt>
+          <dd data-testid={`strip-${strategy}-giveup`}>{giveUpLine(scenario)}</dd>
+        </div>
+      </dl>
+      <div className="p5-row p5-decision-card__actions">
+        {props.selected ? (
+          <button type="button" className="fm-btn fm-btn--secondary p5-btn" disabled>
+            ✓ {title} chosen
+          </button>
+        ) : (
           <Button
             variant="primary"
             disabled={props.blockedReason !== null}
@@ -315,12 +362,12 @@ function PlanColumn(props: {
           >
             Choose {title}
           </Button>
-          {props.blockedReason && (
-            <span id={reasonId} className="p5-reason">
-              {props.blockedReason}
-            </span>
-          )}
-        </div>
+        )}
+        {props.blockedReason && !props.selected && (
+          <span id={reasonId} className="p5-reason">
+            {props.blockedReason}
+          </span>
+        )}
       </div>
     </section>
   );
@@ -340,6 +387,13 @@ export function ComparisonView() {
     }
   }, [adapter, store]);
 
+  const readiness = selectComparisonReadiness(w.scenarioA, w.scenarioB);
+  useEffect(() => {
+    if (w.wired && readiness === 'WAITING_BOTH' && (p5.selection !== null || p5.approvals.length > 0)) {
+      store.getState().p5.resetP5();
+    }
+  }, [w.wired, readiness, p5.selection, p5.approvals.length, store]);
+
   if (!w.wired || !w.snapshot) {
     return (
       <div className="p5">
@@ -349,22 +403,15 @@ export function ComparisonView() {
     );
   }
   const snapshot = w.snapshot;
-  const readiness = selectComparisonReadiness(w.scenarioA, w.scenarioB);
   const viewer = w.role === 'ViewerAuditor';
   const escalatedBlock = p5.escalationState === 'ESCALATED' && !p5.recalculationRequestedSinceEscalation;
 
-  useEffect(() => {
-    if (readiness === 'WAITING_BOTH' && (p5.selection !== null || p5.approvals.length > 0)) {
-      store.getState().p5.resetP5();
-    }
-  }, [readiness, p5.selection, p5.approvals.length, store]);
-
   const blockedReason = (s: RecoveryScenarioWithActions | null): string | null => {
     if (!s) return 'Plan not ready';
-    if (readiness === 'FINGERPRINT_MISMATCH') return 'Plans were calculated on different snapshots';
-    if (selectIsScenarioStale(s, snapshot)) return 'STALE — recalculation required';
-    if (isHardBlocked(s)) return `Hard blocker: feasibility ${s.feasibility}`;
-    if (viewer) return 'ViewerAuditor is read-only';
+    if (readiness === 'FINGERPRINT_MISMATCH') return 'Plans were calculated on different data versions';
+    if (selectIsScenarioStale(s, snapshot)) return 'Numbers changed — recalculation required';
+    if (isHardBlocked(s)) return `Hard blocker: ${FEASIBILITY_LABELS[s.feasibility].label}`;
+    if (viewer) return 'Viewer (audit only) is read-only';
     if (escalatedBlock) return 'Escalated — request revised constraints first';
     return null;
   };
@@ -373,13 +420,16 @@ export function ComparisonView() {
     const r = store.getState().p5.chooseRecoveryScenario(strategy);
     if (r.ok) {
       setError(null);
-      setMessage(`Plan ${strategy} selected — not approved yet.`);
+      setMessage(`Plan ${strategy} chosen — not approved yet.`);
     } else if (!BENIGN_ERRORS.has(r.error)) {
       setError(p5ErrorMessage(r.error, r.detail));
     }
   };
 
   const sel = p5.selection;
+  const selectionApproved = Boolean(
+    sel && p5.approvals.some((a) => a.state === 'APPROVED' && a.idempotencyKey === approvalKey(sel.scenarioId, sel.version, sel.fingerprint)),
+  );
   return (
     <div className="p5">
       <P5DevControls />
@@ -473,15 +523,15 @@ export function ComparisonView() {
             </AlertBanner>
           )}
           {readiness === 'FINGERPRINT_MISMATCH' && (
-            <AlertBanner tone="danger" title="Snapshot Mismatch">
-              Plans were calculated on different snapshots. Choosing is disabled until both are recalculated.
+            <AlertBanner tone="danger" title="Plans used different data">
+              Plans were calculated on different data versions. Choosing is disabled until both are recalculated.
             </AlertBanner>
           )}
-          <div className="p5-grid2">
+          <div className="p5-grid2 p5-decision-strip" role="region" aria-label="Decision strip" data-testid="p5-decision-strip">
             {(['A', 'B'] as const).map((st) => {
               const s = st === 'A' ? w.scenarioA : w.scenarioB;
               return (
-                <PlanColumn
+                <DecisionCard
                   key={st}
                   strategy={st}
                   scenario={s}
@@ -499,16 +549,25 @@ export function ComparisonView() {
       {sel && (
         <div className="p5-alert p5-alert--ok fm-banner fm-banner--info" data-testid="selection-panel">
           <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-            <p style={{ margin: 0 }}>
-              <strong>Plan {sel.strategy} selected — not approved yet.</strong> Approval is a separate step.
-            </p>
-            <Link
-              to="/approvals"
-              className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
-              data-testid="p5-next-step-cta"
-            >
-              Continue to Approval →
-            </Link>
+            {selectionApproved ? (
+              <>
+                <p style={{ margin: 0 }}>
+                  <strong>Plan {sel.strategy} approved (simulated) — tasks not executed yet.</strong> Execution is a separate step.
+                </p>
+                <Link to="/execution" className="fm-btn fm-btn--primary p5-btn p5-btn--primary" data-testid="p5-next-step-cta">
+                  Continue to Execution →
+                </Link>
+              </>
+            ) : (
+              <>
+                <p style={{ margin: 0 }}>
+                  <strong>Plan {sel.strategy} chosen — not approved yet.</strong> Approval is a separate step.
+                </p>
+                <Link to="/approvals" className="fm-btn fm-btn--primary p5-btn p5-btn--primary" data-testid="p5-next-step-cta">
+                  Continue to Approval →
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -529,9 +588,19 @@ export function ComparisonView() {
         <Button variant="secondary" disabled={viewer} onClick={() => setDialog('revise')}>
           Revise constraints
         </Button>
-        {viewer && <span className="p5-reason">ViewerAuditor is read-only.</span>}
+        {viewer && <span className="p5-reason">Viewer (audit only) is read-only.</span>}
         {!viewer && p5.escalationState === 'ESCALATED' && <span className="p5-muted">Already escalated.</span>}
       </div>
+
+      {readiness !== 'WAITING_BOTH' && (
+        <details className="p5-full-compare" data-testid="p5-full-comparison">
+          <summary>Full comparison details</summary>
+          <div className="p5-grid2">
+            <PlanDetails strategy="A" scenario={w.scenarioA} snapshot={snapshot} />
+            <PlanDetails strategy="B" scenario={w.scenarioB} snapshot={snapshot} />
+          </div>
+        </details>
+      )}
 
       <LiveRegion message={message} />
 

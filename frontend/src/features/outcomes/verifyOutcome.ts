@@ -47,7 +47,7 @@ export function evaluateOutcome(
       failures.push(`RECEIPT_LATE:${r.payload.arrivalLocal}`);
       reasons.push({
         code: `RECEIPT_LATE:${r.payload.arrivalLocal}`,
-        text: `RECEIPT_LATE: arrival ${r.payload.arrivalLocal} after 10:45 cutoff`,
+        text: `RECEIPT_LATE: arrival ${r.payload.arrivalLocal} after ${PLAN_A_DEADLINE_LOCAL} cutoff`,
         kind: 'HARD_FAILURE',
       });
     }

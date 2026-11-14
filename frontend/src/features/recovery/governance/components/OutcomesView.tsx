@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '../../../../components/ui';
 import { hasCapability } from '../../../approvals/permissions';
@@ -14,9 +14,22 @@ import type {
   RecoveryOutcome,
   VerificationEvidence,
 } from '../p5Contracts';
+import {
+  EVIDENCE_KIND_LABELS,
+  OUTCOME_STATUS_LABELS,
+  TRUTH_LABELS,
+  demoTime,
+  describeMissing,
+  describeReason,
+  reasonContext,
+  roleLabel,
+  roleList,
+  type ReasonContext,
+} from '../labels';
 import { p5ErrorMessage } from '../p5Errors';
-import { useP5Store, useP5World } from '../p5Store';
-import { selectEvidenceForAction, selectMissingEvidence, selectOutcomeFreshness } from '../selectors';
+import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
+import { P5Details } from './P5Details';
+import { selectEvidenceForAction, selectOutcomeFreshness } from '../selectors';
 import { EscalationPanel, LiveRegion, NotWiredNotice } from './common';
 import { RecoveryWorkflowHeader } from './RecoveryWorkflowHeader';
 import { P5DevControls } from './P5DevControls';
@@ -45,7 +58,6 @@ export function OutcomesView() {
   const outcome: RecoveryOutcome | null =
     savedOutcome ?? (activeApproval ? evaluateOutcome(activeApproval, p5.actions, p5.evidence) : null);
   const freshness = selectOutcomeFreshness({ p5 } as any, incidentId);
-  const missingList = selectMissingEvidence({ p5 } as any, incidentId);
 
   // Selected task for evidence form
   const tasks = activeApproval ? p5.actions.filter((a) => a.approvalId === activeApproval.id) : [];
@@ -55,12 +67,40 @@ export function OutcomesView() {
   // Keep selectedActionId updated if param changes or initial load
   const activeTask = tasks.find((t) => t.id === (selectedActionId || actionIdParam)) ?? defaultAction;
 
+  const { adapter } = useP5Runtime();
+  const ctx = reasonContext(adapter.deps.resolveMenuDisplayName?.bind(adapter.deps), tasks);
+  /** Live preview of the evidence (drives the checklist); the hero shows only the VERIFIED result. */
+  const preview: RecoveryOutcome | null = activeApproval ? evaluateOutcome(activeApproval, p5.actions, p5.evidence) : null;
+  const verified: RecoveryOutcome | null = savedOutcome;
+  const heroStatus = verified?.status ?? 'UNVERIFIED';
+  const previewMissing = preview?.missingEvidence ?? [];
+  const requiredCount = activeApproval
+    ? activeApproval.selectedStrategy === 'A'
+      ? 2
+      : tasks.filter((t) => t.actionType === 'PREP_BATCH_TASK' || t.actionType === 'MENU_LIMIT_TASK').length + 1
+    : 0;
+  const recordedCount = Math.max(0, requiredCount - previewMissing.length);
+  const deadline = activeApproval?.expiresAtIso?.slice(11, 16) ?? null;
+
+  // Brief highlight when the verified status changes (CSS disables it under prefers-reduced-motion).
+  const prevStatus = useRef(heroStatus);
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (prevStatus.current !== heroStatus) {
+      prevStatus.current = heroStatus;
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 1200);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [heroStatus]);
+
   const handleVerify = () => {
     const res = p5.verifyDemoOutcome(incidentId);
     if (!res.ok) {
-      setLive(`Verification failed: ${p5ErrorMessage(res.error, res.detail)}`);
+      setLive(`Check failed: ${p5ErrorMessage(res.error, res.detail)}`);
     } else {
-      setLive(`Outcome verified: ${res.value.status}.`);
+      setLive(`Simulated outcome checked: ${res.value.status}.`);
     }
   };
 
@@ -69,25 +109,35 @@ export function OutcomesView() {
     if (!res.ok) {
       if (res.error === 'DUPLICATE_REQUEST') {
         setSavedMemory(true);
-        setLive('Already saved to Decision Memory.');
+        setLive('Already in Decision Memory.');
       } else {
         setLive(`Save failed: ${p5ErrorMessage(res.error, res.detail)}`);
       }
     } else {
       setSavedMemory(true);
-      setLive('Case saved to Decision Memory.');
+      setLive('Case added to Decision Memory.');
     }
   };
 
   const currentRole = w.role ?? 'ViewerAuditor';
 
-  const outcomeTone = !outcome || outcome.status === 'UNVERIFIED'
-    ? 'p5-card--accent-warn'
-    : outcome.status === 'SUCCESS'
-    ? 'p5-card--accent-success'
-    : outcome.status === 'FAILED'
-    ? 'p5-card--accent-danger'
-    : 'p5-card--accent-warn';
+  const heroTone =
+    heroStatus === 'SUCCESS' ? 'success' : heroStatus === 'FAILED' ? 'danger' : heroStatus === 'PARTIAL' ? 'warn' : 'neutral';
+  const checks = (verified?.reasons ?? []).filter((x) => x.code !== 'NO_EVIDENCE');
+  const passed = checks.filter((x) => x.kind === 'PASS').length;
+  const firstProblem = checks.find((x) => x.kind === 'HARD_FAILURE') ?? checks.find((x) => x.kind !== 'PASS');
+  const heroWhy =
+    heroStatus === 'UNVERIFIED'
+      ? recordedCount === requiredCount && requiredCount > 0
+        ? `all ${requiredCount} evidence items recorded — press “Verify simulated outcome” to check them`
+        : `waiting for evidence (${recordedCount} of ${requiredCount} items recorded)`
+      : heroStatus === 'SUCCESS'
+      ? `all ${checks.length} checks passed on demo evidence`
+      : heroStatus === 'FAILED'
+      ? firstProblem
+        ? describeReason(firstProblem, ctx)
+        : 'a hard requirement failed'
+      : `${passed} of ${checks.length} checks passed${firstProblem ? ` — ${describeReason(firstProblem, ctx)}` : ''}`;
 
   return (
     <div className="p5" data-testid="p5-outcomes-view">
@@ -112,145 +162,75 @@ export function OutcomesView() {
         </section>
       ) : (
         <>
-          {/* Header */}
-          <header className={`p5-card p5-stack ${outcomeTone}`} aria-label="Simulated outcome status">
-            <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="p5-row" style={{ alignItems: 'center' }}>
-                <h2>Simulated Outcome:</h2>
-                <span
-                  className={`p5-badge ${
-                    !outcome || outcome.status === 'UNVERIFIED'
-                      ? 'p5-badge--warn'
-                      : outcome.status === 'SUCCESS'
-                      ? 'p5-badge--brand'
-                      : outcome.status === 'FAILED'
-                      ? 'p5-badge--danger'
-                      : 'p5-badge--warn'
-                  }`}
-                  style={{ fontSize: '14px', padding: '4px 12px', fontWeight: 700 }}
-                  data-testid="p5-outcome-badge"
-                >
-                  Simulated Outcome: {outcome ? outcome.status : 'UNVERIFIED'}
-                </span>
-              </div>
-              <div>
-                {freshness === 'OUT_OF_DATE' && (
-                  <span className="p5-badge p5-badge--warn" data-testid="p5-freshness-badge">
-                    Evidence changed since last verification — re-verify
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {outcome?.status === 'SUCCESS' && (
-              <p className="p5-muted" data-testid="p5-success-subtext">
+          {/* Outcome hero */}
+          <header
+            className={`p5-hero p5-hero--${heroTone}${flash ? ' p5-hero--flash' : ''}`}
+            aria-label="Simulated outcome status"
+            data-testid="p5-outcome-hero"
+            data-tone={heroTone}
+          >
+            <p className="p5-hero__status">
+              <span data-testid="p5-outcome-badge" title={OUTCOME_STATUS_LABELS[heroStatus].explain}>
+                Simulated Outcome: {OUTCOME_STATUS_LABELS[heroStatus].label}
+              </span>
+            </p>
+            <p className="p5-hero__why" data-testid="p5-outcome-why">
+              {heroWhy}
+            </p>
+            {heroStatus === 'SUCCESS' && (
+              <p className="p5-hero__note" data-testid="p5-success-subtext">
                 Demo evidence only — not real Happy Potato operations
               </p>
             )}
-
-            <div className="p5-row" style={{ marginTop: '8px', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-              <Button
-                variant="primary"
-                onClick={handleVerify}
-                data-testid="p5-verify-btn"
-              >
+            {freshness === 'OUT_OF_DATE' && (
+              <p className="p5-hero__note" data-testid="p5-freshness-badge">
+                Evidence changed since the last check — verify again.
+              </p>
+            )}
+            <div className="p5-row" style={{ marginTop: '10px', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+              <Button variant="primary" onClick={handleVerify} data-testid="p5-verify-btn">
                 Verify simulated outcome
               </Button>
-
               {(outcome !== null || p5.escalationState === 'ESCALATED') && (
                 <Button
-                  variant={savedMemory ? 'secondary' : 'primary'}
+                  variant={savedMemory ? 'secondary' : heroStatus === 'UNVERIFIED' ? 'secondary' : 'primary'}
                   onClick={handleSaveMemory}
                   aria-label="Save case to Decision Memory"
                   data-testid="p5-save-memory-btn"
                 >
-                  Save to Decision Memory
+                  Add case to Decision Memory
                 </Button>
               )}
-
               {savedMemory && (
-                <Link
-                  to="/decision-memory"
-                  className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
-                  data-testid="p5-next-step-cta"
-                >
+                <Link to="/decision-memory" className="fm-btn fm-btn--primary p5-btn p5-btn--primary" data-testid="p5-next-step-cta">
                   View in Decision Memory →
                 </Link>
               )}
             </div>
-            <p className="p5-muted" style={{ fontSize: '12px' }}>
-              Inbound supplier messages are not evidence of recovery execution.
+            <p className="p5-muted" style={{ fontSize: '12px', marginTop: '8px' }}>
+              A supplier message is not evidence. Only recorded demo evidence counts.
             </p>
           </header>
 
-          {/* Verification Reasons Summary */}
-          {outcome && outcome.reasons.length > 0 && (
-            <section className="p5-card p5-stack" aria-label="Verification reasons">
-              <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-                <h3>Verification evaluation reasons</h3>
-                <span className="p5-badge fm-badge">{outcome.reasons.length} total checks</span>
-              </div>
-              <div className="p5-grid2">
-                <ReasonGroup title="Hard failures" kind="HARD_FAILURE" reasons={outcome.reasons} badgeClass="p5-badge--danger" />
-                <ReasonGroup title="Missing evidence" kind="MISSING" reasons={outcome.reasons} badgeClass="p5-badge--warn" />
-                <ReasonGroup title="Shortfalls" kind="SHORTFALL" reasons={outcome.reasons} badgeClass="p5-badge--warn" />
-                <ReasonGroup title="Passed checks" kind="PASS" reasons={outcome.reasons} badgeClass="p5-badge--brand" />
-              </div>
-            </section>
-          )}
-
-          {/* Predicted vs Simulated Actual Table */}
-          <section className="p5-card p5-stack" aria-label="Predicted vs Simulated Actual">
-            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-              <h2>Predicted vs Simulated Actual</h2>
-              <span className="p5-mono p5-muted">Approval {activeApproval.id}</span>
-            </div>
-            <div className="fm-table-wrap p5-table-wrap" role="region" aria-label="Predicted vs Simulated Actual Table" tabIndex={0}>
-              <table className="fm-table p5-table" data-testid="p5-predicted-actual-table">
-                <caption className="p2-sr sr-only">Predicted vs Simulated Actual Table</caption>
-                <thead>
-                  <tr>
-                    <th scope="col" style={{ width: '28%' }}>Metric / Task</th>
-                    <th scope="col" style={{ width: '26%' }}>Predicted (from Approval)</th>
-                    <th scope="col" style={{ width: '26%' }}>Simulated Actual</th>
-                    <th scope="col" style={{ width: '20%' }}>Source & Revision</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeApproval.selectedStrategy === 'A' ? (
-                    <PlanATableRows approval={activeApproval} evidence={p5.evidence} />
-                  ) : (
-                    <PlanBTableRows approval={activeApproval} tasks={tasks} evidence={p5.evidence} />
-                  )}
-                  <tr>
-                    <th scope="row">External acknowledgment</th>
-                    <td>NOT_APPLICABLE_SIMULATION</td>
-                    <td>NOT_APPLICABLE_SIMULATION</td>
-                    <td><span className="p5-badge">SIMULATED_LOCAL_ONLY</span></td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          {/* Missing Evidence Checklist */}
-          {missingList.length > 0 && (
+          {/* Missing Evidence Checklist — directly under the hero */}
+          {previewMissing.length > 0 && (
             <section className="p5-card p5-card--accent-warn p5-stack" aria-label="Missing evidence checklist" data-testid="p5-missing-evidence-list">
               <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-                <h3>Missing Evidence Checklist</h3>
-                <span className="p5-badge p5-badge--warn">{missingList.length} missing item{missingList.length === 1 ? '' : 's'}</span>
+                <h3>Still needed</h3>
+                <span className="p5-badge p5-badge--warn">
+                  {previewMissing.length} of {requiredCount} item{requiredCount === 1 ? '' : 's'} missing
+                </span>
               </div>
-              <ul className="p5-list">
-                {missingList.map((m) => {
+              <ul className="p5-checklist">
+                {previewMissing.map((m) => {
                   const matchingTask = findMatchingTask(m, tasks);
                   const kind = evidenceKindOf(m);
                   const allowed = ROLES_BY_EVIDENCE[kind] ?? [];
                   return (
-                    <li key={m} className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
+                    <li key={m} className="p5-checklist__item" title={m}>
                       <span>
-                        Need <strong>{m}</strong> for task{' '}
-                        <strong className="p5-mono">{matchingTask ? matchingTask.id : 'incident'}</strong> — allowed roles:{' '}
-                        {allowed.join(', ')}
+                        <span aria-hidden="true">✗ </span>
+                        {describeMissing(m, ctx)} <span className="p5-muted">— {roleList(allowed)} can record it</span>
                       </span>
                       {matchingTask && (
                         <Button
@@ -272,16 +252,68 @@ export function OutcomesView() {
             </section>
           )}
 
+          {/* Verification Reasons Summary */}
+          {verified && checks.length > 0 && (
+            <section className="p5-card p5-stack" aria-label="Verification reasons">
+              <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+                <h3>Why this result</h3>
+                <span className="p5-badge fm-badge">{checks.length} checks</span>
+              </div>
+              <div className="p5-grid2">
+                <ReasonGroup title="Hard failures" kind="HARD_FAILURE" reasons={checks} icon="✗" ctx={ctx} />
+                <ReasonGroup title="Missing evidence" kind="MISSING" reasons={checks} icon="○" ctx={ctx} />
+                <ReasonGroup title="Below plan" kind="SHORTFALL" reasons={checks} icon="!" ctx={ctx} />
+                <ReasonGroup title="Passed checks" kind="PASS" reasons={checks} icon="✓" ctx={ctx} />
+              </div>
+            </section>
+          )}
+
+          {/* Predicted vs Simulated Actual Table */}
+          <section className="p5-card p5-stack" aria-label="Predicted vs Simulated Actual">
+            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+              <h2>Predicted vs Simulated Actual</h2>
+              <P5Details summary="Audit details">Approval {activeApproval.id}</P5Details>
+            </div>
+            <div className="fm-table-wrap p5-table-wrap" role="region" aria-label="Predicted vs Simulated Actual Table" tabIndex={0}>
+              <table className="fm-table p5-table" data-testid="p5-predicted-actual-table">
+                <caption className="p2-sr sr-only">Predicted vs Simulated Actual Table</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ width: '28%' }}>Metric / Task</th>
+                    <th scope="col" style={{ width: '26%' }}>Predicted (from Approval)</th>
+                    <th scope="col" style={{ width: '26%' }}>Simulated Actual</th>
+                    <th scope="col" style={{ width: '20%' }}>Source & Revision</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeApproval.selectedStrategy === 'A' ? (
+                    <PlanATableRows approval={activeApproval} evidence={p5.evidence} deadline={deadline} />
+                  ) : (
+                    <PlanBTableRows approval={activeApproval} tasks={tasks} evidence={p5.evidence} ctx={ctx} />
+                  )}
+                  <tr>
+                    <th scope="row">External acknowledgment</th>
+                    <td colSpan={3} title="NOT_APPLICABLE_SIMULATION · SIMULATED_LOCAL_ONLY">
+                      Not applicable — nothing was sent outside the demo
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
           {/* Evidence Entry Forms */}
           <section id="p5-evidence-entry-section" className="p5-card p5-stack" aria-label="Record simulated evidence">
             <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-              <h2>Record Simulated Evidence</h2>
-              <span className="p5-badge p5-badge--sim">Simulated Evidence Log</span>
+              <h2>Record demo evidence</h2>
+              <span className="p5-badge p5-badge--sim" title="SIMULATED_EVIDENCE">
+                {TRUTH_LABELS.SIMULATED_EVIDENCE.label}
+              </span>
             </div>
 
             <div className="p5-row">
               <label htmlFor="p5-task-select" style={{ minWidth: '240px' }}>
-                Select Task:
+                Task:
                 <select
                   id="p5-task-select"
                   value={activeTask?.id ?? ''}
@@ -290,7 +322,7 @@ export function OutcomesView() {
                 >
                   {tasks.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.actionType} {t.targetId ? `(${t.targetId})` : ''} — {t.id}
+                      {taskLabel(t, ctx)}
                     </option>
                   ))}
                 </select>
@@ -299,6 +331,9 @@ export function OutcomesView() {
 
             {activeTask && (
               <EvidenceForm
+                key={activeTask.id}
+                ctx={ctx}
+                clock={w.clock}
                 task={activeTask}
                 currentRole={currentRole}
                 approval={activeApproval}
@@ -316,33 +351,29 @@ function ReasonGroup({
   title,
   kind,
   reasons,
-  badgeClass,
+  icon,
+  ctx,
 }: {
   title: string;
   kind: OutcomeReason['kind'];
   reasons: OutcomeReason[];
-  badgeClass: string;
+  icon: string;
+  ctx: ReasonContext;
 }) {
   const filtered = reasons.filter((r) => r.kind === kind);
   if (filtered.length === 0) return null;
-
   const groupToneClass =
-    kind === 'HARD_FAILURE'
-      ? 'p5-reason-card--danger'
-      : kind === 'PASS'
-      ? 'p5-reason-card--success'
-      : 'p5-reason-card--warn';
-
+    kind === 'HARD_FAILURE' ? 'p5-reason-card--danger' : kind === 'PASS' ? 'p5-reason-card--success' : 'p5-reason-card--warn';
   return (
     <div className={`p5-stack p5-card p5-reason-card ${groupToneClass}`} style={{ padding: '12px 14px', background: 'var(--surface-secondary)' }}>
-      <h4>{title} ({filtered.length})</h4>
-      <ul className="p5-list">
+      <h4>
+        {title} ({filtered.length})
+      </h4>
+      <ul className="p5-checklist">
         {filtered.map((r, i) => (
-          <li key={i}>
-            <span className={`p5-badge ${badgeClass}`} style={{ marginRight: '6px' }}>
-              {r.code}
-            </span>
-            <span>{r.text}</span>
+          <li key={i} title={r.code}>
+            <span aria-hidden="true">{icon} </span>
+            {describeReason(r, ctx)}
           </li>
         ))}
       </ul>
@@ -350,7 +381,20 @@ function ReasonGroup({
   );
 }
 
-function PlanATableRows({ approval, evidence }: { approval: ApprovalRecord; evidence: VerificationEvidence[] }) {
+function taskLabel(t: ExecutionAction, ctx: ReasonContext): string {
+  switch (t.actionType) {
+    case 'PO_DRAFT':
+      return 'Purchase order draft';
+    case 'RECEIPT_CHECK':
+      return 'Delivery & quality check';
+    case 'MENU_LIMIT_TASK':
+      return `Menu limit — ${t.targetId ? ctx.menuName(t.targetId) : 'menu item'}`;
+    case 'PREP_BATCH_TASK':
+      return t.targetId ? ctx.batchLabel(t.targetId) : 'Prep batch';
+  }
+}
+
+function PlanATableRows({ approval, evidence, deadline }: { approval: ApprovalRecord; evidence: VerificationEvidence[]; deadline: string | null }) {
   const rEv = latestForKind(evidence, 'RECEIPT');
   const fEv = latestForKind(evidence, 'ORDER_FULFILMENT');
 
@@ -358,9 +402,9 @@ function PlanATableRows({ approval, evidence }: { approval: ApprovalRecord; evid
     <>
       <tr>
         <th scope="row">Received chilled chicken</th>
-        <td>{formatKgMilli(approval.predicted.newPurchaseKgMilli)} (15kg)</td>
+        <td>{formatKgMilli(approval.predicted.newPurchaseKgMilli)}</td>
         <td data-testid="p5-actual-received-kg">
-          {rEv ? formatKgMilli(rEv.payload.receivedKgMilli) : 'NOT RECORDED'}
+          {rEv ? formatKgMilli(rEv.payload.receivedKgMilli) : 'Not recorded yet'}
         </td>
         <td><EvidenceSourceBadge ev={rEv} /></td>
       </tr>
@@ -368,15 +412,15 @@ function PlanATableRows({ approval, evidence }: { approval: ApprovalRecord; evid
         <th scope="row">Acceptance</th>
         <td>Accepted (quality check)</td>
         <td data-testid="p5-actual-acceptance">
-          {rEv ? (rEv.payload.accepted ? 'Accepted' : 'REJECTED') : 'NOT RECORDED'}
+          {rEv ? (rEv.payload.accepted ? 'Accepted' : 'Rejected') : 'Not recorded yet'}
         </td>
         <td><EvidenceSourceBadge ev={rEv} /></td>
       </tr>
       <tr>
         <th scope="row">Arrival</th>
-        <td>≤ 10:45</td>
+        <td>{deadline ? `By ${deadline}` : 'Before the prep cutoff'}</td>
         <td data-testid="p5-actual-arrival">
-          {rEv ? rEv.payload.arrivalLocal : 'NOT RECORDED'}
+          {rEv ? rEv.payload.arrivalLocal : 'Not recorded yet'}
         </td>
         <td><EvidenceSourceBadge ev={rEv} /></td>
       </tr>
@@ -384,7 +428,7 @@ function PlanATableRows({ approval, evidence }: { approval: ApprovalRecord; evid
         <th scope="row">Landed cost</th>
         <td>{formatSenAsRM(approval.predicted.additionalCostSen)}</td>
         <td data-testid="p5-actual-landed-cost">
-          {rEv ? formatSenAsRM(rEv.payload.landedCostSen) : 'NOT RECORDED'}
+          {rEv ? formatSenAsRM(rEv.payload.landedCostSen) : 'Not recorded yet'}
         </td>
         <td><EvidenceSourceBadge ev={rEv} /></td>
       </tr>
@@ -392,15 +436,15 @@ function PlanATableRows({ approval, evidence }: { approval: ApprovalRecord; evid
         <th scope="row">Confirmed portions fulfilled</th>
         <td>{approval.predicted.confirmedChickenPortionsProtected}</td>
         <td data-testid="p5-actual-confirmed-portions">
-          {fEv ? fEv.payload.confirmedFulfilled : 'NOT RECORDED'}
+          {fEv ? fEv.payload.confirmedFulfilled : 'Not recorded yet'}
         </td>
         <td><EvidenceSourceBadge ev={fEv} /></td>
       </tr>
       <tr>
         <th scope="row">Chicken forecast portions served</th>
         <td>{approval.predicted.forecastChickenPortionsServed} (conditional)</td>
-        <td data-testid="p5-actual-forecast-served">NOT RECORDED</td>
-        <td><span className="p5-muted">No evidence type</span></td>
+        <td data-testid="p5-actual-forecast-served">Not measured in this demo</td>
+        <td><span className="p5-muted">—</span></td>
       </tr>
     </>
   );
@@ -410,10 +454,12 @@ function PlanBTableRows({
   approval,
   tasks,
   evidence,
+  ctx,
 }: {
   approval: ApprovalRecord;
   tasks: ExecutionAction[];
   evidence: VerificationEvidence[];
+  ctx: ReasonContext;
 }) {
   const prepTasks = tasks.filter((t) => t.actionType === 'PREP_BATCH_TASK');
   const menuTasks = tasks.filter((t) => t.actionType === 'MENU_LIMIT_TASK');
@@ -435,13 +481,15 @@ function PlanBTableRows({
     <>
       {prepTasks.map((t) => {
         const pEv = evidence.filter((e): e is Extract<VerificationEvidence, { kind: 'PREP' }> => e.actionId === t.id && e.kind === 'PREP').reverse()[0];
-        const planned = plannedForBatch(t.targetId ?? '');
+        const planned = t.plannedPortions;
         return (
           <tr key={t.id}>
-            <th scope="row">Batch {t.targetId} produced</th>
-            <td>{planned} portions</td>
+            <th scope="row" title={t.targetId}>
+              {t.targetId ? ctx.batchLabel(t.targetId) : 'Prep batch'} produced
+            </th>
+            <td>{planned !== undefined ? `${planned} portions` : 'Not provided by Plan B'}</td>
             <td data-testid={`p5-actual-batch-${t.targetId}`}>
-              {pEv ? `${pEv.payload.producedPortions} portions` : 'NOT RECORDED'}
+              {pEv ? `${pEv.payload.producedPortions} portions` : 'Not recorded yet'}
             </td>
             <td><EvidenceSourceBadge ev={pEv} /></td>
           </tr>
@@ -450,13 +498,15 @@ function PlanBTableRows({
 
       <tr>
         <th scope="row">Menu limit tasks applied</th>
-        <td>3 of 3 tasks</td>
+        <td>
+          {menuTasks.length} of {menuTasks.length} limits live
+        </td>
         <td data-testid="p5-actual-menus-applied">
-          {allMenuEvs.length > 0 ? `${menusApplied} of ${menuTasks.length} applied` : 'NOT RECORDED'}
+          {allMenuEvs.length > 0 ? `${menusApplied} of ${menuTasks.length} confirmed live` : 'Not recorded yet'}
         </td>
         <td>
           {allMenuEvs.length > 0 ? (
-            <span className="p5-badge">SIMULATED_EVIDENCE</span>
+            <span className="p5-badge p5-badge--sim" title="SIMULATED_EVIDENCE">Demo evidence</span>
           ) : (
             <span className="p5-muted">—</span>
           )}
@@ -467,7 +517,7 @@ function PlanBTableRows({
         <th scope="row">Confirmed portions fulfilled</th>
         <td>{approval.predicted.confirmedChickenPortionsProtected}</td>
         <td data-testid="p5-actual-confirmed-portions">
-          {fEv ? fEv.payload.confirmedFulfilled : 'NOT RECORDED'}
+          {fEv ? fEv.payload.confirmedFulfilled : 'Not recorded yet'}
         </td>
         <td><EvidenceSourceBadge ev={fEv} /></td>
       </tr>
@@ -476,11 +526,11 @@ function PlanBTableRows({
         <th scope="row">Waste</th>
         <td>No prediction</td>
         <td data-testid="p5-actual-waste">
-          {allPrepEvs.length > 0 ? formatWasteSummary(allPrepEvs) : 'NOT RECORDED'}
+          {allPrepEvs.length > 0 ? formatWasteSummary(allPrepEvs) : 'Not recorded yet'}
         </td>
         <td>
           {allPrepEvs.length > 0 ? (
-            <span className="p5-badge">SIMULATED_EVIDENCE</span>
+            <span className="p5-badge p5-badge--sim" title="SIMULATED_EVIDENCE">Demo evidence</span>
           ) : (
             <span className="p5-muted">—</span>
           )}
@@ -491,11 +541,11 @@ function PlanBTableRows({
         <th scope="row">Chicken forecast portions planned</th>
         <td>{approval.predicted.forecastChickenPortionsServed}</td>
         <td data-testid="p5-actual-forecast-planned">
-          {totalProduced !== null ? `${totalProduced} produced` : 'NOT RECORDED'}
+          {totalProduced !== null ? `${totalProduced} produced` : 'Not recorded yet'}
         </td>
         <td>
           {totalProduced !== null ? (
-            <span className="p5-badge">SIMULATED_EVIDENCE</span>
+            <span className="p5-badge p5-badge--sim" title="SIMULATED_EVIDENCE">Demo evidence</span>
           ) : (
             <span className="p5-muted">—</span>
           )}
@@ -508,11 +558,9 @@ function PlanBTableRows({
 function EvidenceSourceBadge({ ev }: { ev?: VerificationEvidence }) {
   if (!ev) return <span className="p5-muted">—</span>;
   return (
-    <div className="p5-row" style={{ gap: '6px' }}>
-      <span className="p5-badge p5-badge--sim" title={ev.source}>SIMULATED_EVIDENCE</span>
-      <span className="p5-mono" style={{ fontSize: '11px' }}>
-        rev {ev.revision} ({ev.id.slice(0, 16)})
-      </span>
+    <div className="p5-row" style={{ gap: '6px' }} title={`${ev.source} · ${ev.id}`}>
+      <span className="p5-badge p5-badge--sim">Demo evidence</span>
+      <span style={{ fontSize: '11.5px' }}>revision {ev.revision}</span>
     </div>
   );
 }
@@ -523,7 +571,7 @@ function formatWasteSummary(evs: VerificationEvidence[]): string {
     if (e.kind === 'PREP') {
       const w = e.payload.waste;
       if (w.status === 'UNKNOWN') {
-        parts.push(`${e.payload.batchId}: UNKNOWN`);
+        parts.push(`${e.payload.batchId}: unknown`);
       } else {
         parts.push(`${e.payload.batchId}: ${formatKgMilli(w.valueMilli)}`);
       }
@@ -537,16 +585,6 @@ type Ev<K extends EvidenceKind> = Extract<VerificationEvidence, { kind: K }>;
 function latestForKind<K extends EvidenceKind>(log: VerificationEvidence[], kind: K): Ev<K> | undefined {
   const list = log.filter((e): e is Ev<K> => e.kind === kind);
   return list.reverse()[0];
-}
-
-function plannedForBatch(targetId: string): number {
-  const MAP: Record<string, number> = {
-    'HP-BATCH-B-01': 25,
-    'HP-BATCH-B-02': 20,
-    'HP-BATCH-B-03': 15,
-    'HP-BATCH-B-04': 12,
-  };
-  return MAP[targetId] ?? 10;
 }
 
 function findMatchingTask(missingCode: string, tasks: ExecutionAction[]): ExecutionAction | undefined {
@@ -579,11 +617,15 @@ function EvidenceForm({
   currentRole,
   approval,
   onSaved,
+  ctx,
+  clock,
 }: {
   task: ExecutionAction;
   currentRole: DemoRole;
   approval: ApprovalRecord;
   onSaved: (msg: string) => void;
+  ctx: ReasonContext;
+  clock: string | null;
 }) {
   const p5 = useP5Store((s) => s.p5);
   const evidenceLogs = selectEvidenceForAction({ p5 } as any, task.id);
@@ -602,15 +644,16 @@ function EvidenceForm({
   const isAllowed = hasCapability(currentRole, { kind: 'RECORD_EVIDENCE', evidenceKind });
 
   // Receipt fields
-  const [rcvKg, setRcvKg] = useState('15');
+  // Defaults come from the approved plan and the demo clock — never literals.
+  const [rcvKg, setRcvKg] = useState(String(approval.predicted.newPurchaseKgMilli / 1000));
   const [accepted, setAccepted] = useState('yes');
-  const [arrival, setArrival] = useState('10:30');
-  const [landedCost, setLandedCost] = useState('255.00');
+  const [arrival, setArrival] = useState(clock ?? '');
+  const [landedCost, setLandedCost] = useState((approval.predicted.additionalCostSen / 100).toFixed(2));
 
   // Prep fields
-  const plannedPortions = plannedForBatch(task.targetId ?? '');
+  const plannedPortions = task.plannedPortions ?? 0;
   const [producedPortions, setProducedPortions] = useState(String(plannedPortions));
-  const [completedTime, setCompletedTime] = useState('11:20');
+  const [completedTime, setCompletedTime] = useState(clock ?? '');
   const [wasteStatus, setWasteStatus] = useState<'UNKNOWN' | 'MEASURED'>('UNKNOWN');
   const [wasteKg, setWasteKg] = useState('0');
 
@@ -671,7 +714,7 @@ function EvidenceForm({
       if (!res.ok) {
         setErr(p5ErrorMessage(res.error, res.detail));
       } else {
-        onSaved(`Recorded RECEIPT evidence rev ${res.value.revision}.`);
+        onSaved(`Recorded delivery receipt (revision ${res.value.revision}).`);
       }
     } else if (evidenceKind === 'PREP') {
       const produced = parseInt(producedPortions, 10);
@@ -702,7 +745,7 @@ function EvidenceForm({
       if (!res.ok) {
         setErr(p5ErrorMessage(res.error, res.detail));
       } else {
-        onSaved(`Recorded PREP evidence rev ${res.value.revision} for ${task.targetId}.`);
+        onSaved(`Recorded ${taskLabel(task, ctx)} result (revision ${res.value.revision}).`);
       }
     } else if (evidenceKind === 'MENU_UPDATE') {
       const res = p5.recordSimulatedEvidence(task.id, 'MENU_UPDATE', {
@@ -712,7 +755,7 @@ function EvidenceForm({
       if (!res.ok) {
         setErr(p5ErrorMessage(res.error, res.detail));
       } else {
-        onSaved(`Recorded MENU_UPDATE evidence rev ${res.value.revision} for ${task.targetId}.`);
+        onSaved(`Recorded ${taskLabel(task, ctx)} confirmation (revision ${res.value.revision}).`);
       }
     } else if (evidenceKind === 'ORDER_FULFILMENT') {
       const fulfilled = parseInt(confirmedFulfilled, 10);
@@ -727,7 +770,7 @@ function EvidenceForm({
       if (!res.ok) {
         setErr(p5ErrorMessage(res.error, res.detail));
       } else {
-        onSaved(`Recorded ORDER_FULFILMENT evidence rev ${res.value.revision}.`);
+        onSaved(`Recorded confirmed orders served (revision ${res.value.revision}).`);
       }
     }
   };
@@ -743,13 +786,13 @@ function EvidenceForm({
 
   return (
     <div className="p5-stack" data-testid={`p5-evidence-form-${task.id}`}>
-      <h3>
-        Record {evidenceKind} Evidence for Task {task.id} {task.targetId ? `(${task.targetId})` : ''}
+      <h3 title={`${evidenceKind} · ${task.id}`}>
+        {EVIDENCE_KIND_LABELS[evidenceKind].label} — {taskLabel(task, ctx)}
       </h3>
 
       {!isAllowed && (
         <div className="p5-alert p5-alert--warn" role="alert" data-testid="p5-role-forbidden-alert">
-          {currentRole} cannot record {evidenceKind} evidence — allowed: {allowedRoles.join(', ')}.
+          {roleLabel(currentRole)} can&apos;t record this. Only {roleList(allowedRoles)} can record {EVIDENCE_KIND_LABELS[evidenceKind].label.toLowerCase()}.
         </div>
       )}
 
@@ -819,7 +862,9 @@ function EvidenceForm({
           {evidenceKind === 'PREP' && (
             <>
               <div className="p5-row">
-                <span>Batch: <strong className="p5-mono">{task.targetId}</strong></span>
+                <span title={task.targetId}>
+                  Batch: <strong>{task.targetId ? ctx.batchLabel(task.targetId) : '—'}</strong>
+                </span>
                 <span>Planned portions: <strong>{plannedPortions}</strong></span>
               </div>
               <label htmlFor={idProd}>
@@ -891,18 +936,20 @@ function EvidenceForm({
           {evidenceKind === 'MENU_UPDATE' && (
             <>
               <div className="p5-row">
-                <span>Menu item: <strong>{task.targetId}</strong></span>
+                <span title={task.targetId}>
+                  Menu item: <strong>{task.targetId ? ctx.menuName(task.targetId) : '—'}</strong>
+                </span>
               </div>
               <label htmlFor={idApp}>
-                Applied to POS / Ordering:
+                Staff confirmed the menu limit is live:
                 <select
                   id={idApp}
                   value={applied}
                   onChange={(e) => setApplied(e.target.value)}
                   data-testid="p5-input-applied"
                 >
-                  <option value="yes">Yes (Applied)</option>
-                  <option value="no">No (Pending)</option>
+                  <option value="yes">Yes</option>
+                  <option value="no">Not yet</option>
                 </select>
               </label>
             </>
@@ -954,11 +1001,11 @@ function EvidenceForm({
           <ul className="p5-list" style={{ marginTop: '8px' }}>
             {[...evidenceLogs.all].reverse().map((ev) => (
               <li key={ev.id} className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <strong>rev {ev.revision}</strong> ({ev.kind}) recorded by <strong>{ev.recordedByRole}</strong> ({ev.recordedById}) at{' '}
-                  <span className="p5-mono">{ev.observedAtIso.slice(11, 16)}</span>
+                <div title={`${ev.kind} · ${ev.id} · ${ev.recordedById}`}>
+                  <strong>Revision {ev.revision}</strong> · {EVIDENCE_KIND_LABELS[ev.kind].label} recorded by{' '}
+                  <strong>{roleLabel(ev.recordedByRole)}</strong> at {demoTime(ev.observedAtIso)}
                   <div className="p5-muted" style={{ fontSize: '12px' }}>
-                    {payloadSummary(ev)}
+                    {payloadSummary(ev, ctx)}
                   </div>
                 </div>
                 {isAllowed && (
@@ -980,16 +1027,18 @@ function EvidenceForm({
   );
 }
 
-function payloadSummary(ev: VerificationEvidence): string {
+function payloadSummary(ev: VerificationEvidence, ctx: ReasonContext): string {
   switch (ev.kind) {
     case 'RECEIPT':
-      return `Received ${formatKgMilli(ev.payload.receivedKgMilli)}, accepted: ${ev.payload.accepted}, arrival: ${ev.payload.arrivalLocal}, cost: ${formatSenAsRM(ev.payload.landedCostSen)}`;
+      return `Received ${formatKgMilli(ev.payload.receivedKgMilli)}, ${ev.payload.accepted ? 'accepted' : 'rejected'}, arrived ${ev.payload.arrivalLocal}, landed cost ${formatSenAsRM(ev.payload.landedCostSen)}`;
     case 'PREP':
-      return `Batch ${ev.payload.batchId}: ${ev.payload.producedPortions}/${ev.payload.plannedPortions} portions, waste: ${ev.payload.waste.status === 'UNKNOWN' ? 'UNKNOWN' : formatKgMilli(ev.payload.waste.valueMilli)}`;
+      return `${ctx.batchLabel(ev.payload.batchId)}: ${ev.payload.producedPortions} of ${ev.payload.plannedPortions} portions, waste ${
+        ev.payload.waste.status === 'UNKNOWN' ? 'unknown' : formatKgMilli(ev.payload.waste.valueMilli)
+      }`;
     case 'MENU_UPDATE':
-      return `Menu ${ev.payload.menuId} applied: ${ev.payload.applied}`;
+      return `Menu limit for ${ctx.menuName(ev.payload.menuId)}: ${ev.payload.applied ? 'confirmed live' : 'not live yet'}`;
     case 'ORDER_FULFILMENT':
-      return `Fulfilled ${ev.payload.confirmedFulfilled}/${ev.payload.confirmedRequired} confirmed portions`;
+      return `Served ${ev.payload.confirmedFulfilled} of ${ev.payload.confirmedRequired} confirmed portions`;
   }
 }
 

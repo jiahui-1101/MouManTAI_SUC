@@ -1,11 +1,22 @@
 import { useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, StatusBadge, AlertBanner } from '../../../../components/ui';
-import { isApprovalExpired, preflightApproval } from '../../../approvals/approvalLogic';
+import { approvedActionTypesOf, expiresAtFor, isApprovalExpired, preflightApproval } from '../../../approvals/approvalLogic';
 import { approvalKey } from '../../../approvals/idempotency';
 import { formatKgMilli, formatSenAsRM, shortFingerprint } from '../format';
 import type { ApprovalRecord, ProposedAction, RecoveryScenarioWithActions, ScenarioStrategy } from '../p5Contracts';
+import {
+  ACTION_TYPE_LABELS,
+  FEASIBILITY_LABELS,
+  TRUTH_LABELS,
+  demoTime,
+  reasonContext,
+  roleLabel,
+  type ReasonContext,
+} from '../labels';
 import { BENIGN_ERRORS, p5ErrorMessage } from '../p5Errors';
+import { BlockerCard, blockerView } from './BlockerCard';
+import { P5Details } from './P5Details';
 import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
 import { Dialog, ReasonDialog } from './Dialog';
 import { EscalateDialog, EscalationPanel, LiveRegion, NotWiredNotice } from './common';
@@ -18,16 +29,18 @@ const STRATEGY_TITLE: Record<ScenarioStrategy, string> = {
   B: 'Plan B — Protect orders with existing stock',
 };
 
-function scopeLine(a: ProposedAction, s: RecoveryScenarioWithActions): string {
+function scopeLine(a: ProposedAction, s: RecoveryScenarioWithActions, ctx: ReasonContext): string {
   switch (a.actionType) {
     case 'PO_DRAFT':
-      return `Create local PO draft for ${formatKgMilli(s.newPurchaseKgMilli)} — NOT sent to any supplier`;
+      return `Purchase order draft for ${formatKgMilli(s.newPurchaseKgMilli)} — a local draft, NOT sent to any supplier`;
     case 'RECEIPT_CHECK':
-      return 'Monitor simulated receipt and quality check';
+      return 'Delivery check — confirm the replacement arrives on time and passes quality (simulated)';
     case 'MENU_LIMIT_TASK':
-      return `Menu limit task for ${a.targetId ?? 'menu item'} — awaiting manual update, not synced to any POS`;
+      return `Limit ${a.targetId ? ctx.menuName(a.targetId) : 'a menu item'} on today's menu — staff update the POS by hand; nothing is sent automatically`;
     case 'PREP_BATCH_TASK':
-      return `Prep batch ${a.targetId ?? ''} task`.replace('  ', ' ');
+      return `${a.targetId ? ctx.batchLabel(a.targetId) : 'Prep batch'}${
+        a.plannedPortions !== undefined ? ` — ${a.plannedPortions} portions` : ''
+      }`;
   }
 }
 
@@ -61,7 +74,11 @@ function HistoryItem({
           <StatusBadge tone={a.state === 'REJECTED' || expired ? 'danger' : 'neutral'}>
             {expired ? 'EXPIRED' : a.state}
           </StatusBadge>
-          {stale && <StatusBadge tone="danger">STALE</StatusBadge>}
+          {stale && (
+            <StatusBadge tone="danger" title="STALE_SCENARIO">
+              STALE — numbers changed
+            </StatusBadge>
+          )}
           {active && <StatusBadge tone="simulated">Active (simulated)</StatusBadge>}
           {!active && a.state === 'APPROVED' && <span className="p5-muted">Not active</span>}
         </div>
@@ -76,13 +93,14 @@ function HistoryItem({
         </Button>
       </div>
 
-      <p className="p5-mono">
-        {a.scenarioId} · v{a.scenarioVersion} · {a.id}
-      </p>
       <p>
-        {a.actorRole} ({a.actorId}) · {a.createdAtIso}
+        <strong>Plan {a.selectedStrategy}</strong> · {a.state === 'REJECTED' ? 'Rejected' : 'Approved'} by{' '}
+        <strong>{roleLabel(a.actorRole)}</strong> at {demoTime(a.createdAtIso)}
       </p>
-      <p>Reason: {a.reason}</p>
+      <p>Reason: “{a.reason}”</p>
+      <P5Details summary="Audit details">
+        {a.scenarioId} · v{a.scenarioVersion} · {a.id} · {a.actorId} · {a.createdAtIso}
+      </P5Details>
 
       {expanded && (
         <div className="p5-history-details">
@@ -99,7 +117,7 @@ function HistoryItem({
                   Scenario: <strong className="p5-mono">{a.scenarioId} · v{a.scenarioVersion}</strong>
                 </div>
                 <div>
-                  Feasibility: <strong>{a.predicted.feasibility}</strong>
+                  Feasibility: <strong title={a.predicted.feasibility}>{FEASIBILITY_LABELS[a.predicted.feasibility].label}</strong>
                 </div>
                 <div>
                   New purchase: <strong>{formatKgMilli(a.predicted.newPurchaseKgMilli)}</strong>
@@ -119,7 +137,7 @@ function HistoryItem({
                 <div>
                   Approved actions:{' '}
                   <strong>
-                    {a.approvedActionTypes.length > 0 ? a.approvedActionTypes.join(', ') : 'None'}
+                    {a.approvedActionTypes.length > 0 ? a.approvedActionTypes.map((t) => ACTION_TYPE_LABELS[t].label).join(', ') : 'None'}
                   </strong>
                 </div>
                 {chosenScenario && chosenScenario.assumptions.length > 0 && (
@@ -149,7 +167,7 @@ function HistoryItem({
                       Scenario: <strong className="p5-mono">{unchosenScenario.id} · v{unchosenScenario.version}</strong>
                     </div>
                     <div>
-                      Feasibility: <strong>{unchosenScenario.feasibility}</strong>
+                      Feasibility: <strong title={unchosenScenario.feasibility}>{FEASIBILITY_LABELS[unchosenScenario.feasibility].label}</strong>
                     </div>
                     <div>
                       New purchase: <strong>{formatKgMilli(unchosenScenario.newPurchaseKgMilli)}</strong>
@@ -168,8 +186,7 @@ function HistoryItem({
                       Confirmed portions protected: <strong>{unchosenScenario.confirmedChickenPortionsProtected}</strong>
                     </div>
                     <p className="p5-muted" style={{ fontSize: '12px', marginTop: '4px' }}>
-                      Decision Trade-off: Plan {chosenStrategy} was selected over Plan {unchosenStrategy} for operational
-                      suitability and inventory availability.
+                      Owner&apos;s reason for choosing Plan {chosenStrategy}: “{a.reason}”
                     </p>
                   </div>
                 </>
@@ -185,7 +202,9 @@ function HistoryItem({
           <div className="p5-history-audit p5-stack">
             <div className="p5-row" style={{ justifyContent: 'space-between' }}>
               <h4>Governance & Audit Metadata</h4>
-              <StatusBadge tone="simulated">SIMULATED_ACTION</StatusBadge>
+              <StatusBadge tone="simulated" title="SIMULATED_ACTION">
+                {TRUTH_LABELS.SIMULATED_ACTION.label}
+              </StatusBadge>
             </div>
             <div className="p5-history-meta-grid">
               <div>
@@ -204,7 +223,7 @@ function HistoryItem({
               </div>
               <div>
                 <span className="p5-muted">Actor: </span>
-                <strong>{a.actorRole}</strong> ({a.actorId})
+                <strong>{roleLabel(a.actorRole)}</strong> ({a.actorId})
               </div>
               <div>
                 <span className="p5-muted">Recorded at: </span>
@@ -369,7 +388,7 @@ export function ApprovalsView() {
     return page(
       <div className="p5-alert p5-alert--ok p5-stack fm-banner fm-banner--info" data-testid="approval-success">
         <h2>Approved (simulated). {tasks.length} tasks created — not executed yet.</h2>
-        <p className="p5-mono">Approval {existing.id}</p>
+        <P5Details summary="Audit details">Approval {existing.id}</P5Details>
         <p>Execution is a separate step.</p>
         <div>
           <Link
@@ -385,6 +404,8 @@ export function ApprovalsView() {
   }
 
   const blocker = preflightApproval(p5, adapter.deps);
+  const planADeadline = snapshot.demoBusinessDate ? expiresAtFor('A', snapshot.demoBusinessDate)?.slice(11, 16) ?? null : null;
+  const scopeCtx = reasonContext(adapter.deps.resolveMenuDisplayName?.bind(adapter.deps), scenario?.proposedActions ?? []);
   const viewer = w.role === 'ViewerAuditor';
   const reasonMissing = !reason.trim();
   const approveDisabled = blocker !== null || reasonMissing || inFlight;
@@ -412,6 +433,19 @@ export function ApprovalsView() {
 
   return page(
     <>
+      {blocker && (
+        <BlockerCard
+          testId="approval-blocker"
+          view={blockerView(blocker.error, blocker.detail, {
+            verb: 'approved',
+            role: w.role ?? 'ViewerAuditor',
+            actionTypes: scenario ? approvedActionTypesOf(scenario) : [],
+            clock,
+            deadlineLocal: planADeadline,
+            snapshotRevision: snapshot.revision,
+          })}
+        />
+      )}
       <section className="fm-panel p5-card p5-card--accent-brand p5-stack" aria-label="Approval request">
         <div className="p5-row" style={{ justifyContent: 'space-between' }}>
           <h2>Approval request — Plan {sel.strategy}</h2>
@@ -421,22 +455,6 @@ export function ApprovalsView() {
           <table className="fm-table p5-table">
             <caption className="p2-sr sr-only">Approval request details</caption>
             <tbody>
-              <tr>
-                <th scope="row">Incident</th>
-                <td className="p5-mono">{sel.incidentId}</td>
-              </tr>
-              <tr>
-                <th scope="row">Scenario</th>
-                <td className="p5-mono">
-                  {sel.scenarioId} · v{sel.version}
-                </td>
-              </tr>
-              <tr>
-                <th scope="row">Snapshot</th>
-                <td className="p5-mono">
-                  {snapshot.id} rev {snapshot.revision} · <abbr title={sel.fingerprint}>{shortFingerprint(sel.fingerprint)}</abbr>
-                </td>
-              </tr>
               {scenario && scenario.id === sel.scenarioId && (
                 <>
                   <tr>
@@ -461,12 +479,19 @@ export function ApprovalsView() {
           </table>
         </div>
 
+        <P5Details summary="Audit details">
+          Incident {sel.incidentId} · Scenario {sel.scenarioId} v{sel.version} · Snapshot {snapshot.id} rev {snapshot.revision} ·{' '}
+          <abbr title={sel.fingerprint}>{shortFingerprint(sel.fingerprint)}</abbr>
+        </P5Details>
+
         {scenario && (
           <div>
-            <h3>Action scope ({scenario.proposedActions.length} actions)</h3>
+            <h3>What you&apos;re approving ({scenario.proposedActions.length} actions)</h3>
             <ul className="p5-list" data-testid="action-scope">
               {scenario.proposedActions.map((a, i) => (
-                <li key={`${a.actionType}-${a.targetId ?? i}`}>{scopeLine(a, scenario)}</li>
+                <li key={`${a.actionType}-${a.targetId ?? i}`} title={`${a.actionType}${a.targetId ? ` ${a.targetId}` : ''}`}>
+                  {scopeLine(a, scenario, scopeCtx)}
+                </li>
               ))}
             </ul>
           </div>
@@ -476,15 +501,10 @@ export function ApprovalsView() {
         </p>
         <p>
           {sel.strategy === 'A'
-            ? `Valid until demo clock 10:45 (prep cutoff). Current demo clock: ${clock}.`
-            : 'No time-based expiry; invalidated by snapshot change.'}
+            ? `Valid until demo clock ${planADeadline ?? 'prep cutoff'} (prep cutoff). Current demo clock: ${clock}.`
+            : 'No time-based expiry; invalidated if stock or delivery data changes.'}
         </p>
 
-        {blocker && (
-          <div className="p5-alert p5-alert--danger fm-banner fm-banner--danger" role="alert" data-testid="approval-blocker">
-            <strong>{blocker.error}</strong>: {p5ErrorMessage(blocker.error, blocker.detail)}
-          </div>
-        )}
 
         <label htmlFor={reasonId}>Approval reason (required)</label>
         <textarea id={reasonId} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} aria-describedby={`${reasonId}-hint`} />
@@ -504,14 +524,16 @@ export function ApprovalsView() {
           <Button variant="danger" disabled={viewer} onClick={() => setDialog('escalate')}>
             Escalate
           </Button>
-          {(decisionBlocked || viewer) && <span className="p5-reason">Reject unavailable: {viewer ? 'ViewerAuditor is read-only.' : 'see blocker above.'}</span>}
+          {(decisionBlocked || viewer) && (
+            <span className="p5-reason">Reject unavailable: {viewer ? 'Viewer (audit only) is read-only.' : 'see the message above.'}</span>
+          )}
         </div>
       </section>
 
       {dialog === 'confirm' && (
         <Dialog title="Confirm simulated approval" onClose={() => setDialog(null)}>
           <p>
-            Approve <span className="p5-mono">{sel.scenarioId}</span> version {sel.version} with{' '}
+            Approve <span title={sel.scenarioId}>Plan {sel.strategy}</span> (version {sel.version}) with{' '}
             {scenario?.proposedActions.length ?? 0} actions? Tasks are created but not executed. No external effects.
           </p>
           <div className="p5-row">
@@ -527,7 +549,7 @@ export function ApprovalsView() {
       {dialog === 'reject' && (
         <ReasonDialog
           title={`Reject Plan ${sel.strategy}`}
-          description={`Records a REJECTED decision for ${sel.scenarioId} v${sel.version}. No tasks are created.`}
+          description={`Records a REJECTED decision for Plan ${sel.strategy} (version ${sel.version}). No tasks are created.`}
           confirmLabel="Reject plan"
           onCancel={() => setDialog(null)}
           onConfirm={(r) => {

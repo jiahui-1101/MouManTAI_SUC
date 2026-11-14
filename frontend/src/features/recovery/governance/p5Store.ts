@@ -99,13 +99,33 @@ export function devMockDeps(world: MockWorld = createMockWorld()): P5DepsAdapter
   };
 }
 
+/** In-memory presentation state. Lives on the runtime, so it survives in-app navigation between P5 pages. */
+export interface P5UiState {
+  presentationMode: boolean;
+  shortcutsOpen: boolean;
+  setPresentationMode(on: boolean): void;
+  togglePresentationMode(): void;
+  setShortcutsOpen(open: boolean): void;
+}
+
+export function createP5UiStore(initial: { presentationMode?: boolean } = {}): StoreApi<P5UiState> {
+  return createStore<P5UiState>()((set) => ({
+    presentationMode: initial.presentationMode ?? false,
+    shortcutsOpen: false,
+    setPresentationMode: (on) => set({ presentationMode: on }),
+    togglePresentationMode: () => set((s) => ({ presentationMode: !s.presentationMode, shortcutsOpen: false })),
+    setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+  }));
+}
+
 export interface P5Runtime {
   adapter: P5DepsAdapter;
   store: StoreApi<P5State>;
+  ui: StoreApi<P5UiState>;
 }
 
-export function createP5Runtime(adapter: P5DepsAdapter): P5Runtime {
-  return { adapter, store: createStore<P5State>()(createP5Slice(adapter.deps)) };
+export function createP5Runtime(adapter: P5DepsAdapter, ui: StoreApi<P5UiState> = createP5UiStore()): P5Runtime {
+  return { adapter, store: createStore<P5State>()(createP5Slice(adapter.deps)), ui };
 }
 
 let defaultRuntime: P5Runtime | null = null;
@@ -176,6 +196,11 @@ export function useP5Runtime(): P5Runtime {
 /** Zustand hook over the P5 slice of the active runtime. */
 export function useP5Store<T>(selector: (s: P5State) => T): T {
   return useStore(useP5Runtime().store, selector);
+}
+
+/** Presentation-mode flag and toggles (default OFF). */
+export function useP5Ui<T>(selector: (s: P5UiState) => T): T {
+  return useStore(useP5Runtime().ui, selector);
 }
 
 /** Re-renders when the outside world (snapshot, scenarios, clock, role) changes. */

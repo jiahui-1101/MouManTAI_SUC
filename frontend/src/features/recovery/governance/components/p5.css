@@ -1281,3 +1281,168 @@ a.fm-btn--danger * {
     display: block;
   }
 }
+
+/* ===================== Pre-demo refinements (P5 UX review) ===================== */
+
+/* Incident context bar */
+.p5-context-bar { display: grid; gap: 6px; padding: 10px 16px; }
+.p5-context-bar__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; }
+.p5-context-bar__headline { margin: 0; font-size: 15px; min-width: 0; }
+.p5-context-bar__controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.p5-context-bar__role { display: inline-flex !important; align-items: center; gap: 6px; font-weight: 500 !important; margin: 0; }
+.p5-context-bar__role select { width: auto; min-width: 160px; padding: 4px 8px; }
+.p5-context-bar__truth { justify-content: flex-start; gap: 6px 10px; }
+.p5-context-bar__disclaimer { font-size: 12px; }
+
+/* Truth / status pills (text + colour, never colour alone) */
+.p5-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 999px; padding: 2px 10px; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--border-default); background: var(--surface-secondary); color: var(--text-primary);
+}
+.p5-pill--sim { background: var(--status-simulated-soft); color: var(--status-simulated); border-color: transparent; }
+.p5-pill--ok { background: var(--status-success-soft); color: var(--status-success); border-color: transparent; }
+.p5-pill--warn { background: var(--status-warning-soft); color: var(--status-warning); border-color: transparent; }
+.p5-pill--danger { background: var(--status-danger-soft); color: var(--status-danger); border-color: transparent; }
+
+/* Presentation toggle */
+.p5-present-toggle {
+  font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  border-radius: 999px; padding: 4px 12px;
+  border: 1px solid var(--border-strong); background: var(--surface-primary); color: var(--text-primary);
+}
+.p5-present-toggle--on { background: var(--brand-primary); border-color: var(--brand-primary); color: var(--text-on-brand); }
+.p5-present-toggle:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+
+/* Audit details disclosure */
+.p5-details { font-size: 12px; color: var(--text-secondary); }
+.p5-details summary { cursor: pointer; font-weight: 600; }
+.p5-details__body { margin-top: 4px; overflow-wrap: anywhere; }
+
+/* Decision strip */
+.p5-decision-strip { align-items: stretch; }
+.p5-decision-card { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; }
+.p5-decision-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.p5-decision-card__head h2 { font-size: 17px; margin: 0; }
+.p5-decision-card__actions { margin-top: auto; align-items: center; }
+.p5-decision-lines { display: grid; gap: 6px; margin: 0; }
+.p5-decision-lines > div { display: grid; grid-template-columns: minmax(130px, 38%) 1fr; gap: 8px; align-items: baseline; }
+.p5-decision-lines dt { color: var(--text-secondary); font-size: 13px; }
+.p5-decision-lines dd { margin: 0; font-size: 14px; }
+.p5-decision-lines dd strong { font-size: 18px; }
+.p5-decision-lines__giveup dd { font-weight: 600; }
+.p5-full-compare > summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+
+/* Blocker cards (staged wow moments) */
+.p5-blocker {
+  display: flex; gap: 14px; align-items: flex-start;
+  padding: 16px 18px; border-radius: var(--radius-lg);
+  border: 2px solid var(--status-danger); background: var(--status-danger-soft); color: var(--text-primary);
+}
+.p5-blocker--warn { border-color: var(--status-warning); background: var(--status-warning-soft); }
+.p5-blocker__icon { font-size: 28px; line-height: 1; }
+.p5-blocker__body { display: grid; gap: 4px; min-width: 0; }
+.p5-blocker__headline { margin: 0; font-size: 18px; }
+.p5-blocker__next { font-weight: 600; }
+
+/* Outcome hero */
+.p5-hero {
+  padding: 18px 20px; border-radius: var(--radius-lg);
+  border: 2px solid var(--border-strong); background: var(--surface-secondary); color: var(--text-primary);
+}
+.p5-hero--success { border-color: var(--status-success); background: var(--status-success-soft); }
+.p5-hero--warn { border-color: var(--status-warning); background: var(--status-warning-soft); }
+.p5-hero--danger { border-color: var(--status-danger); background: var(--status-danger-soft); }
+.p5-hero__status { margin: 0; font-family: var(--font-heading); font-size: 28px; font-weight: 800; line-height: 1.2; }
+.p5-hero--success .p5-hero__status { color: var(--status-success); }
+.p5-hero--danger .p5-hero__status { color: var(--status-danger); }
+.p5-hero--warn .p5-hero__status { color: var(--status-warning); }
+.p5-hero__why { margin: 4px 0 0; font-size: 16px; }
+.p5-hero__note { margin: 6px 0 0; font-size: 13px; font-weight: 600; }
+@media (prefers-reduced-motion: no-preference) {
+  .p5-hero { transition: background-color 400ms ease, border-color 400ms ease; }
+  .p5-hero--flash { animation: p5-hero-flash 1.2s ease-out; }
+  @keyframes p5-hero-flash {
+    0% { box-shadow: 0 0 0 0 var(--focus-color); transform: scale(1); }
+    25% { box-shadow: 0 0 0 8px transparent; transform: scale(1.01); }
+    100% { box-shadow: 0 0 0 0 transparent; transform: scale(1); }
+  }
+}
+
+/* Checklists */
+.p5-checklist { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.p5-checklist__item { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* Execution */
+.p5-kpi-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .p5-kpi-grid--3 { grid-template-columns: 1fr; } }
+.p5-advance-summary { font-weight: 600; margin: 0; }
+.p5-task-detail { background: var(--surface-secondary); padding: 10px 12px; border-radius: var(--radius-md); }
+.p5-task-audit { margin-top: 4px; background: var(--surface-secondary); }
+.p5-task-audit > summary { cursor: pointer; font-weight: 600; color: var(--text-primary); }
+
+/* Decision memory */
+.p5-case-card { display: grid; gap: 8px; border-left: 4px solid var(--border-strong); }
+.p5-case-card--success { border-left-color: var(--status-success); }
+.p5-case-card--danger { border-left-color: var(--status-danger); }
+.p5-case-card--warn { border-left-color: var(--status-warning); }
+.p5-case-card h3 { margin: 0; font-size: 16px; }
+.p5-filters > summary { cursor: pointer; font-weight: 600; }
+
+/* Shortcuts list */
+.p5-shortcuts { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.p5-shortcuts kbd {
+  font-family: var(--font-mono); font-size: 12px; padding: 1px 6px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-secondary);
+}
+
+/* ---- Above-the-fold compaction (Compare at 1280×720 @125%) ---- */
+.p5 { gap: 14px; }
+.p5-workflow-header { margin-bottom: 0; gap: 10px; }
+.p5-context-bar { gap: 4px; padding: 8px 14px; }
+.p5-context-bar__truth { display: flex; flex-wrap: wrap; gap: 6px; }
+.p5-context-bar__foot { justify-content: flex-start; gap: 4px 12px; }
+.p5-context-bar__role select { min-width: 0; }
+.p5-impact-card { padding: 10px 14px; }
+.p5-impact-card h3 { margin: 2px 0 0; font-size: 15px; }
+.p5-decision-card { gap: 8px; padding: 12px 14px; }
+.p5-decision-card__head h2 { font-size: 15.5px; }
+.p5-decision-lines { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+.p5-decision-lines > div { display: block; }
+.p5-decision-lines dt { font-size: 12px; }
+.p5-decision-lines dd { font-size: 13.5px; }
+.p5-decision-lines dd strong { font-size: 17px; }
+.p5-decision-lines__giveup { grid-column: 1 / -1; }
+
+/* Presentation mode: same content, tighter chrome. Truth labels and guards are unchanged. */
+body[data-p5-presenting='true'] .p5-impact-sub { display: none; }
+body[data-p5-presenting='true'] .p5-impact-card .p5-badge { display: none; }
+body[data-p5-presenting='true'] .p5-stepper__link { padding: 6px 10px; gap: 2px; }
+.p5 { gap: 10px; }
+.p5-context-bar__row { gap: 4px 12px; }
+.p5-decision-card { gap: 6px; padding: 10px 14px; }
+.p5-decision-card__head { gap: 4px 8px; line-height: 1.25; }
+.p5-decision-lines {
+  grid-template-areas: 'spend coverage' 'confirmed giveup';
+  align-items: start;
+}
+.p5-decision-lines > div:nth-child(1) { grid-area: spend; }
+.p5-decision-lines > div:nth-child(2) { grid-area: coverage; }
+.p5-decision-lines > div:nth-child(3) { grid-area: confirmed; }
+.p5-decision-lines > .p5-decision-lines__giveup { grid-area: giveup; grid-column: auto; }
+.p5-decision-lines dt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p5-decision-lines dd { line-height: 1.3; }
+.p5-decision-lines { grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); }
+body[data-p5-presenting='true'] .p5-stepper__link { flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; padding: 6px 10px; }
+body[data-p5-presenting='true'] .p5-stepper__status { padding: 2px 6px; }
+.p5-impact-card { padding: 6px 14px; }
+.p5-context-bar { padding: 6px 14px; }
+.p5-decision-card { padding: 8px 14px; gap: 4px; }
+.p5-decision-lines { gap: 4px 12px; }
+.p5-decision-lines dd { line-height: 1.22; }
+.p5-decision-card__actions .fm-btn, .p5-decision-card__actions .p5-btn { padding-top: 6px; padding-bottom: 6px; }
+.p5 { gap: 8px; }
+.p5-workflow-header { gap: 8px; }
+
+.p5-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.p5-context-bar__status { font-size: 12px; font-weight: 600; color: var(--text-primary); }
