@@ -18,6 +18,7 @@ import {
   recordSupplierIncident,
   reviseSnapshot,
   type RestaurantState,
+  type SupplierIncidentReport,
 } from "./restaurantState";
 
 export type ActivityType =
@@ -181,6 +182,58 @@ export function simulateVerification(incidentId: string): void {
     ...state,
     restaurant,
     messages: state.messages.map((m) => (m.incidentId === incidentId ? { ...m, senderLabel: "Demo Poultry Supply A (simulated verified contact)" } : m)),
+    activity: [...state.activity, ...events],
+  });
+}
+
+/** A P1-reviewed supplier message forwarded to P2 by the shared-state bridge (store/demoStore.ts). */
+export interface VerifiedSupplierMessage {
+  incidentId: string;
+  messageId: string;
+  channel: Channel;
+  receivedAtIso: string;
+  senderLabel: string;
+  subject?: string;
+  text: string;
+  poId: string;
+  supplierId: string;
+  ingredientId: string;
+  incidentType: SupplierIncidentReport["incidentType"];
+  claimedDeliveryTodayKgMilli: number;
+  etaLocal: SupplierIncidentReport["etaLocal"];
+}
+
+/**
+ * Production INCIDENT_VERIFIED consumer for P1. Uses the same pure reducer as the
+ * test-mode path, so a second channel links to the existing incident (no extra
+ * claim) and physical stock is never modified. Idempotent per message ID.
+ */
+export function applyVerifiedSupplierMessage(report: VerifiedSupplierMessage): void {
+  const before = state.restaurant;
+  const prior = before.incidents.find((i) => i.poId === report.poId && i.type === report.incidentType);
+  if (prior?.messageIds.includes(report.messageId) && prior.status !== "PENDING_VERIFICATION") return;
+  const restaurant = recordSupplierIncident(before, { ...report, verification: "VERIFIED" });
+  if (restaurant === before) return;
+  const incident = restaurant.incidents.find((i) => i.poId === report.poId && i.type === report.incidentType)!;
+  const message: SimulatedMessage = {
+    id: report.messageId,
+    channel: report.channel,
+    provenance: "SIMULATED_CHANNEL",
+    receivedAtIso: report.receivedAtIso,
+    senderLabel: report.senderLabel,
+    subject: report.subject,
+    text: report.text,
+    incidentId: incident.id,
+  };
+  const events: ActivityEvent[] = [event({ type: "MESSAGE_RECEIVED", incidentId: incident.id, provenance: "SIMULATED_CHANNEL", detail: `P1 reviewed ${CHANNEL_LABEL[report.channel]} message ${report.messageId}` })];
+  if (prior) events.push(event({ type: "MESSAGE_LINKED", incidentId: incident.id, provenance: "SIMULATED_CHANNEL", detail: `${report.messageId} linked to ${incident.id}; no additional shortage applied` }));
+  if (incident.status === "VERIFIED" && prior?.status !== "VERIFIED") {
+    events.push(event({ type: "INCIDENT_VERIFIED", incidentId: incident.id, fromStatus: "PENDING_VERIFICATION", toStatus: "VERIFIED", provenance: "SIMULATED_CHANNEL", detail: "Sender and PO verified by P1 human review" }));
+  }
+  if (restaurant.snapshot.revision !== before.snapshot.revision) events.push(snapshotEvent(restaurant, incident.id));
+  setState({
+    restaurant,
+    messages: state.messages.some((m) => m.id === message.id) ? state.messages : [...state.messages, message],
     activity: [...state.activity, ...events],
   });
 }
