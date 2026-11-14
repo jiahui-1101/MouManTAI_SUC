@@ -34,8 +34,8 @@ describe("Plan B shared inputs", () => {
     verifyAndAssess();
     const before = getP2State().restaurant;
     app("/recovery/plan-b");
-    fireEvent.click(screen.getByRole("button", { name: "8.00 kg" }));
-    expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
+    fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "8000" } });
+    expect(screen.getByText("Chicken shortfall · 0.75 kg")).toBeTruthy();
     expect(getP2State().restaurant).toBe(before);
     expect(before.snapshot.ingredientLots.find((l) => l.id === "HP-LOT-CH-001")!.onHandMilli).toBe(10000);
   });

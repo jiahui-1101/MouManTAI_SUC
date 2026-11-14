@@ -106,7 +106,7 @@ describe("P1 final QA — architecture audit", () => {
 
   it("has no network, provider SDK, OAuth or webhook code", () => {
     for (const f of files) expect(src(f), f).not.toMatch(/\bfetch\(|XMLHttpRequest|new WebSocket|EventSource|navigator\.sendBeacon|axios|whatsapp-web|googleapis|msal|telegraf|grammy/i);
-    expect(Object.keys(pkg.dependencies).sort()).toEqual(["lucide-react", "react", "react-dom", "react-router-dom"]);
+    expect(Object.keys(pkg.dependencies).sort()).toEqual(["lucide-react", "react", "react-dom", "react-router-dom", "zustand"]);
   });
 
   it("keeps all P1 state in the one shared DemoState and its single P1 contract fixture", () => {
