@@ -171,3 +171,14 @@ The user's scope override takes precedence where the documents discuss real or r
 - Inbox and Message Intelligence status/timeline read the real incident (`IncidentHandoff` panel, inbox correlation line).
 - Tests: `tests/incidentCorrelation.test.tsx` (mandatory reset → WA confirm → OL/TG link → 3 messages/1 incident/20000 → reset pending; idempotency; incompatible links; handoff ack). 63/63 tests, typecheck and build pass.
 - Push: blocked from this session (GitHub push not permitted); push `feature/p1-mock-messaging` from a local terminal.
+
+## Prompt 5 milestone — P3/P5 evidence handoffs (2026-11-14)
+
+- Added exact `HP-MSG-OL-OFFER` (HP-SUP-002, Outlook) via new `SUPPLIER_OFFER` fixture; `InboxMessage.kind` distinguishes `DISRUPTION_REPORT` / `SUPPLIER_OFFER`.
+- `parseMockSupplierOffer` grounds 15 kg chilled chicken, RM16/kg, RM15 freight, stated ETA 10:15, conditional — with exact spans; fail-closed otherwise.
+- `demoStore.reviewSupplierOffer` (qualify/reject/unresolved, reason required, idempotent) appends `HUMAN_REVIEW` versions; qualification blocked for non-approved senders. Offers cannot link to incidents; `business.supplierOffers` (HP-OFFER-002) and stock never change.
+- Read-only, deep-frozen selectors: `selectSupplierOfferEvidence` (P3), `selectMessageEvidence`, `selectIncidentEvidence` (P5), all with explicit non-authorization/non-receipt/non-success limits.
+- UI: offer review workspace in Message Intelligence, offer note in Inbox, Audit evidence panel on every message.
+- Contract: `docs/development/P1_EVIDENCE_API.md`. Tests: `evidenceHandoff.test.tsx`, `offerEvidenceUi.test.tsx`; 69/69 tests, typecheck, build pass.
+- Remaining dependency: P2/P3/P5 consumer pages are not built; they must read these selectors (see API doc).
+- Push: still blocked from this session; push from a local terminal.
