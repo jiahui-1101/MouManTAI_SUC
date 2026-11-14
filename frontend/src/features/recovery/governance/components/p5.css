@@ -792,6 +792,97 @@ a.fm-btn--danger * {
 }
 
 /* ==========================================================================
+   Waiting State Card on Recovery Comparison (/recovery/compare)
+   ========================================================================== */
+
+.p5-waiting-card {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-default);
+  border-top: 3px solid var(--brand-primary);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: var(--shadow-panel);
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.p5-waiting-card:hover,
+.p5-waiting-card:focus-within {
+  border-color: var(--brand-primary);
+  box-shadow: 0 6px 16px rgba(173, 72, 8, 0.10);
+  transform: translateY(-1px);
+}
+
+.p5-waiting-title {
+  margin: 0 0 8px 0;
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.p5-waiting-desc {
+  margin: 0 0 18px 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.p5-waiting-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.p5-waiting-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.p5-waiting-step strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.p5-waiting-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.p5-waiting-card a.p5-waiting-btn,
+.p5-waiting-card .p5-waiting-btn {
+  background: var(--surface-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-strong) !important;
+  text-decoration: none !important;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease, transform 100ms ease;
+}
+
+.p5-waiting-card a.p5-waiting-btn:hover,
+.p5-waiting-card .p5-waiting-btn:hover,
+.p5-waiting-card a.p5-waiting-btn:focus-visible,
+.p5-waiting-card .p5-waiting-btn:focus-visible {
+  background: var(--brand-primary-soft) !important;
+  color: var(--brand-primary-text) !important;
+  border-color: var(--brand-primary) !important;
+  text-decoration: none !important;
+}
+
+/* ==========================================================================
    Approval History Expandable Details Drawer
    ========================================================================== */
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearPublishedScenarios,
   createPlanAPublisher,
@@ -7,14 +7,30 @@ import {
   createRootP5Selectors,
   createRootStoreAdapter,
   getPublishedScenario,
+  getUpstreamWorkflowStage,
+  hasActiveDisruption,
+  isImpactAssessed,
+  isIncidentVerified,
+  publishPlanAFromShared,
   type RootIncident,
   type RootSnapshot,
   type RootStoreContract,
 } from './p5RootAdapter';
 import type { ApprovalRecord, ExecutionAction, P5Event, RecoveryScenarioWithActions } from './p5Contracts';
 import { devScenarioA, devScenarioB } from '../../../__dev__/mockScenarios';
+import {
+  __resetP2StoreForTests,
+  assessImpactAction,
+  resetDemo,
+  simulateSupplierReport,
+  simulateVerification,
+} from '../../../services/mock/restaurantStore';
 
 describe('p5RootAdapter', () => {
+  beforeEach(() => {
+    __resetP2StoreForTests();
+    clearPublishedScenarios();
+  });
   const sampleSnapshot: RootSnapshot = {
     id: 'HP-SNAP-001',
     revision: 1,
@@ -238,10 +254,89 @@ describe('p5RootAdapter', () => {
     expect(selectors.selectAwaitingEvidenceCount(rootState as any)).toBe(1);
   });
 
-  it('createRestaurantStoreAdapter dynamically resolves scenarios and supports publication', async () => {
-    clearPublishedScenarios();
+  it('gates scenarios and active incident on full upstream workflow progression', () => {
+    expect(hasActiveDisruption()).toBe(false);
+    expect(isIncidentVerified()).toBe(false);
+    expect(isImpactAssessed()).toBe(false);
+    expect(getUpstreamWorkflowStage()).toBe('NO_DISRUPTION');
+
     const adapter = createRestaurantStoreAdapter();
     expect(adapter.wired).toBe(true);
+
+    // 1. Initial pristine state: scenarios and incident are null
+    expect(adapter.getView().scenarioA).toBeNull();
+    expect(adapter.getView().scenarioB).toBeNull();
+    expect(adapter.deps.getActiveIncident()).toBeNull();
+    expect(adapter.deps.getScenario('A')).toBeNull();
+    expect(adapter.deps.getScenario('B')).toBeNull();
+    expect(adapter.deps.getImpact()).toBeNull();
+
+    // 2. Step 1: Simulate supplier report (pending verification)
+    simulateSupplierReport('WHATSAPP', 'PENDING');
+    expect(hasActiveDisruption()).toBe(true);
+    expect(isIncidentVerified()).toBe(false);
+    expect(isImpactAssessed()).toBe(false);
+    expect(getUpstreamWorkflowStage()).toBe('PENDING_VERIFICATION');
+
+    // Scenarios and impact MUST still be null while pending verification
+    expect(adapter.getView().scenarioA).toBeNull();
+    expect(adapter.getView().scenarioB).toBeNull();
+    expect(adapter.deps.getScenario('A')).toBeNull();
+    expect(adapter.deps.getScenario('B')).toBeNull();
+    expect(adapter.deps.getImpact()).toBeNull();
+    expect(adapter.deps.getActiveIncident()?.id).toBe('HP-INC-001');
+
+    // 3. Step 2: Verification complete, but impact not yet assessed
+    simulateVerification('HP-INC-001');
+    expect(isIncidentVerified()).toBe(true);
+    expect(isImpactAssessed()).toBe(false);
+    expect(getUpstreamWorkflowStage()).toBe('PENDING_IMPACT');
+
+    // Scenarios still null until impact is assessed
+    expect(adapter.getView().scenarioA).toBeNull();
+    expect(adapter.getView().scenarioB).toBeNull();
+    expect(adapter.deps.getScenario('A')).toBeNull();
+    expect(adapter.deps.getScenario('B')).toBeNull();
+
+    // 4. Step 3: Assess impact
+    assessImpactAction('HP-INC-001');
+    expect(isImpactAssessed()).toBe(true);
+    expect(getUpstreamWorkflowStage()).toBe('IMPACT_ASSESSED');
+
+    // Plan B is now ready from stock/schedule; Plan A waits for publication
+    expect(adapter.getView().scenarioB?.id).toBe('HP-SC-B-001');
+    expect(adapter.deps.getScenario('B')?.id).toBe('HP-SC-B-001');
+    expect(adapter.getView().scenarioA).toBeNull();
+    expect(adapter.deps.getScenario('A')).toBeNull();
+
+    // 5. Step 4: Publish Plan A
+    publishPlanAFromShared();
+    expect(adapter.getView().scenarioA?.id).toBe('HP-SC-A-001');
+    expect(adapter.deps.getScenario('A')?.id).toBe('HP-SC-A-001');
+
+    // 6. Reset demo
+    resetDemo();
+    expect(hasActiveDisruption()).toBe(false);
+    expect(isIncidentVerified()).toBe(false);
+    expect(isImpactAssessed()).toBe(false);
+    expect(getUpstreamWorkflowStage()).toBe('NO_DISRUPTION');
+    expect(adapter.getView().scenarioA).toBeNull();
+    expect(adapter.getView().scenarioB).toBeNull();
+    expect(adapter.deps.getActiveIncident()).toBeNull();
+    expect(adapter.deps.getScenario('A')).toBeNull();
+    expect(adapter.deps.getScenario('B')).toBeNull();
+  });
+
+  it('createRestaurantStoreAdapter dynamically resolves scenarios and supports publication', async () => {
+    simulateSupplierReport('WHATSAPP', 'PENDING');
+    simulateVerification('HP-INC-001');
+    assessImpactAction('HP-INC-001');
+
+    const adapter = createRestaurantStoreAdapter();
+    expect(adapter.wired).toBe(true);
+
+    // Publish Plan A so both plans are present
+    publishPlanAFromShared();
 
     const view = adapter.getView();
     expect(view.snapshot?.id).toBe('HP-SNAP-001');
@@ -256,7 +351,7 @@ describe('p5RootAdapter', () => {
     const current = publisher.readCurrent();
     expect(current.source).toBeDefined();
 
-    // Commit Plan A scenario
+    // Commit custom Plan A scenario
     const sampleHandoff = {
       id: 'HP-SC-A-001',
       incidentId: 'HP-INC-001',
@@ -279,7 +374,7 @@ describe('p5RootAdapter', () => {
       type: 'SCENARIO_A_READY',
       scenario: sampleHandoff,
       idempotencyKey: 'test-key-1',
-      expectedSnapshotRevision: 1,
+      expectedSnapshotRevision: view.snapshot?.revision ?? 1,
       detail: {
         conditions: [],
         sourceLabels: ['LIVE_CHANNEL', 'SIMULATED_CALCULATION'],

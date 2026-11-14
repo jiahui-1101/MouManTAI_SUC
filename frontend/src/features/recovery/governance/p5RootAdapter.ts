@@ -334,8 +334,13 @@ const publishedScenarios: {
   B?: RecoveryScenarioWithActions | null;
 } = {};
 
+const publicationListeners = new Set<() => void>();
+let scenarioPublicationVersion = 0;
+
 export function publishScenarioToAdapter(scenario: RecoveryScenarioWithActions): void {
   publishedScenarios[scenario.strategy] = scenario;
+  scenarioPublicationVersion++;
+  publicationListeners.forEach((l) => l());
 }
 
 export function getPublishedScenario(strategy: ScenarioStrategy): RecoveryScenarioWithActions | null {
@@ -345,7 +350,74 @@ export function getPublishedScenario(strategy: ScenarioStrategy): RecoveryScenar
 export function clearPublishedScenarios(): void {
   publishedScenarios.A = null;
   publishedScenarios.B = null;
+  scenarioPublicationVersion++;
+  publicationListeners.forEach((l) => l());
 }
+
+/**
+ * Checks whether P2 has an active disruption report simulated (e.g. from Simulate supplier report).
+ */
+export function hasActiveDisruption(): boolean {
+  const p2 = getP2State();
+  const inc = p2.restaurant.incidents.find((i) => i.id === HP_IDS.incident) ?? p2.restaurant.incidents[0];
+  return Boolean(inc && inc.messageIds && inc.messageIds.length > 0);
+}
+
+/**
+ * Checks whether P2 incident has been verified (P1/P2 message verification).
+ */
+export function isIncidentVerified(): boolean {
+  const p2 = getP2State();
+  const inc = p2.restaurant.incidents.find((i) => i.id === HP_IDS.incident) ?? p2.restaurant.incidents[0];
+  return Boolean(inc && inc.status !== 'PENDING_VERIFICATION' && inc.messageIds && inc.messageIds.length > 0);
+}
+
+/**
+ * Checks whether P2 impact assessment has completed for the current snapshot.
+ */
+export function isImpactAssessed(): boolean {
+  if (!isIncidentVerified()) return false;
+  const p2 = getP2State();
+  const inc = p2.restaurant.incidents.find((i) => i.id === HP_IDS.incident) ?? p2.restaurant.incidents[0];
+  if (!inc) return false;
+  const handoff = buildP5Handoff(p2.restaurant, inc.id);
+  if (handoff.ready) return true;
+  const rawImpact = p2.restaurant.impacts[inc.id];
+  return Boolean(
+    rawImpact &&
+    rawImpact.summary &&
+    (rawImpact.status === 'ASSESSED' || rawImpact.status === 'BREACH_RISK') &&
+    rawImpact.snapshotFingerprint === p2.restaurant.snapshot.fingerprint,
+  );
+}
+
+export type UpstreamWorkflowStage = 'NO_DISRUPTION' | 'PENDING_VERIFICATION' | 'PENDING_IMPACT' | 'IMPACT_ASSESSED';
+
+export function getUpstreamWorkflowStage(): UpstreamWorkflowStage {
+  if (!hasActiveDisruption()) return 'NO_DISRUPTION';
+  if (!isIncidentVerified()) return 'PENDING_VERIFICATION';
+  if (!isImpactAssessed()) return 'PENDING_IMPACT';
+  return 'IMPACT_ASSESSED';
+}
+
+/**
+ * Bridge helper: publishes canonical Plan A into p5RootAdapter.
+ */
+export function publishPlanAFromShared(override?: Partial<RecoveryScenarioWithActions>): RecoveryScenarioWithActions {
+  const p2 = getP2State();
+  const snap = p2.restaurant.snapshot;
+  const inc = p2.restaurant.incidents.find((i) => i.id === HP_IDS.incident) ?? p2.restaurant.incidents[0];
+  const scA = devScenarioA(snap.fingerprint, snap.revision);
+  if (inc) scA.incidentId = inc.id;
+  const finalScenario: RecoveryScenarioWithActions = {
+    ...scA,
+    ...override,
+  };
+  publishScenarioToAdapter(finalScenario);
+  return finalScenario;
+}
+
+export const publishCanonicalPlanA = publishPlanAFromShared;
 
 /**
  * Creates a PlanAPublisher that connects P3's external supply recovery proposals
@@ -401,9 +473,11 @@ export function createPlanAPublisher(
  */
 export function createRestaurantStoreAdapter(
   dispatchRootEvent?: RootEventDispatcher,
-): P5DepsAdapter {
+): P5DepsAdapter & { bindStore?: (store: any) => void } {
   let currentRole: DemoRole = 'Owner';
   const roleListeners = new Set<() => void>();
+  let hadDisruption = hasActiveDisruption();
+  let boundP5Store: { getState: () => { p5: { resetP5: () => void } } } | null = null;
 
   function notifyRoleChange() {
     roleListeners.forEach((l) => l());
@@ -421,8 +495,11 @@ export function createRestaurantStoreAdapter(
   }
 
   function getActiveIncidentData(): ActiveIncidentRef | null {
+    if (!hasActiveDisruption()) {
+      return null;
+    }
     const p2 = getP2State();
-    const inc = p2.restaurant.incidents[0];
+    const inc = p2.restaurant.incidents.find((i) => i.id === HP_IDS.incident) ?? p2.restaurant.incidents[0];
     if (inc) {
       return {
         id: inc.id,
@@ -431,17 +508,15 @@ export function createRestaurantStoreAdapter(
         poId: inc.poId,
       };
     }
-    return {
-      id: HP_IDS.incident,
-      type: 'UNAVAILABLE',
-      ingredientId: HP_IDS.chicken,
-      poId: HP_IDS.po,
-    };
+    return null;
   }
 
   function getImpactData(): ImpactSummaryLike | null {
+    if (!isImpactAssessed()) {
+      return null;
+    }
     const p2 = getP2State();
-    const inc = p2.restaurant.incidents[0];
+    const inc = p2.restaurant.incidents.find((i) => i.id === HP_IDS.incident) ?? p2.restaurant.incidents[0];
     const snap = p2.restaurant.snapshot;
     const po = snap.purchaseOrders.find((p) => p.id === (inc?.poId ?? HP_IDS.po));
     const claim = snap.supplierClaims.find((c) => c.poId === (inc?.poId ?? HP_IDS.po));
@@ -475,7 +550,10 @@ export function createRestaurantStoreAdapter(
     return null;
   }
 
-  function getScenarioData(strategy: ScenarioStrategy): RecoveryScenarioWithActions {
+  function getScenarioData(strategy: ScenarioStrategy): RecoveryScenarioWithActions | null {
+    if (!isImpactAssessed()) {
+      return null;
+    }
     const snapRef = getSnapshotRef();
     const incidentData = getActiveIncidentData();
 
@@ -488,7 +566,12 @@ export function createRestaurantStoreAdapter(
       };
     }
 
-    // 2. Dynamic generation for Strategy B from P4 domain engine
+    // 2. Plan A requires explicit publication (from P3 or bridge)
+    if (strategy === 'A') {
+      return null;
+    }
+
+    // 3. Dynamic generation for Strategy B from P4 domain engine
     if (strategy === 'B') {
       try {
         const p2 = getP2State();
@@ -555,10 +638,7 @@ export function createRestaurantStoreAdapter(
       return b;
     }
 
-    // 3. Fallback for Strategy A to canonical devScenarioA
-    const a = devScenarioA(snapRef.fingerprint, snapRef.revision);
-    if (incidentData) a.incidentId = incidentData.id;
-    return a;
+    return null;
   }
 
   const deps: P5Deps & { resolveMenuDisplayName(menuId: string): string } = {
@@ -581,15 +661,22 @@ export function createRestaurantStoreAdapter(
 
   let cachedP2State: unknown = null;
   let cachedRole: DemoRole = currentRole;
+  let cachedPublicationVersion = -1;
   let cachedView: P5WorldView | null = null;
 
   function computeView(): P5WorldView {
     const p2 = getP2State();
-    if (cachedView && cachedP2State === p2 && cachedRole === currentRole) {
+    if (
+      cachedView &&
+      cachedP2State === p2 &&
+      cachedRole === currentRole &&
+      cachedPublicationVersion === scenarioPublicationVersion
+    ) {
       return cachedView;
     }
     cachedP2State = p2;
     cachedRole = currentRole;
+    cachedPublicationVersion = scenarioPublicationVersion;
 
     const snapRef = getSnapshotRef();
     const inc = getActiveIncidentData();
@@ -609,12 +696,29 @@ export function createRestaurantStoreAdapter(
   return {
     wired: true,
     deps,
+    bindStore(store: any) {
+      boundP5Store = store;
+    },
     subscribe(cb: () => void) {
-      const unsubP2 = subscribeP2(cb);
+      const unsubP2 = subscribeP2(() => {
+        const currentDisruption = hasActiveDisruption();
+        if (hadDisruption && !currentDisruption) {
+          clearPublishedScenarios();
+          try {
+            boundP5Store?.getState().p5.resetP5();
+          } catch {
+            // ignore
+          }
+        }
+        hadDisruption = currentDisruption;
+        cb();
+      });
       roleListeners.add(cb);
+      publicationListeners.add(cb);
       return () => {
         unsubP2();
         roleListeners.delete(cb);
+        publicationListeners.delete(cb);
       };
     },
     getView: computeView,

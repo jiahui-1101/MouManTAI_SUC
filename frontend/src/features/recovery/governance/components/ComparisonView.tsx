@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button, StatusBadge, AlertBanner } from '../../../../components/ui';
 import { formatKgMilli, formatSenAsRM } from '../format';
+import { publishPlanAFromShared } from '../p5RootAdapter';
 import type { RecoveryScenarioWithActions, ScenarioStrategy, SnapshotRef } from '../p5Contracts';
 import { BENIGN_ERRORS, p5ErrorMessage } from '../p5Errors';
 import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
@@ -68,8 +69,10 @@ function ImpactStrip() {
   const { impact } = useP5World();
   if (!impact) {
     return (
-      <div className="fm-panel p5-card" role="region" aria-label="Impact context">
-        <p className="p5-muted">Impact summary not available yet.</p>
+      <div role="region" aria-label="Impact context" style={{ marginBottom: '16px' }}>
+        <AlertBanner tone="info" title="Impact context">
+          Impact summary not available yet.
+        </AlertBanner>
       </div>
     );
   }
@@ -231,10 +234,19 @@ function PlanColumn(props: {
           <h2>{title} not ready</h2>
         </div>
         <p className="p5-muted">The plan owner has not published this plan yet.</p>
-        <div style={{ marginTop: 'auto' }}>
+        <div className="p5-row" style={{ marginTop: 'auto', gap: '8px', flexWrap: 'wrap' }}>
           <Link to={PLAN_ROUTE[strategy]} className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
             Go to {title}
           </Link>
+          {isA && (
+            <button
+              type="button"
+              className="fm-btn fm-btn--primary p5-btn p5-btn--primary"
+              onClick={() => publishPlanAFromShared()}
+            >
+              Propose Plan A
+            </button>
+          )}
         </div>
       </section>
     );
@@ -316,11 +328,17 @@ function PlanColumn(props: {
 
 export function ComparisonView() {
   const w = useP5World();
-  const { store } = useP5Runtime();
+  const { store, adapter } = useP5Runtime();
   const p5 = useP5Store((s) => s.p5);
   const [message, setMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<'escalate' | 'revise' | null>(null);
+
+  useEffect(() => {
+    if (adapter && 'bindStore' in adapter && typeof (adapter as any).bindStore === 'function') {
+      (adapter as any).bindStore(store);
+    }
+  }, [adapter, store]);
 
   if (!w.wired || !w.snapshot) {
     return (
@@ -334,6 +352,12 @@ export function ComparisonView() {
   const readiness = selectComparisonReadiness(w.scenarioA, w.scenarioB);
   const viewer = w.role === 'ViewerAuditor';
   const escalatedBlock = p5.escalationState === 'ESCALATED' && !p5.recalculationRequestedSinceEscalation;
+
+  useEffect(() => {
+    if (readiness === 'WAITING_BOTH' && (p5.selection !== null || p5.approvals.length > 0)) {
+      store.getState().p5.resetP5();
+    }
+  }, [readiness, p5.selection, p5.approvals.length, store]);
 
   const blockedReason = (s: RecoveryScenarioWithActions | null): string | null => {
     if (!s) return 'Plan not ready';
@@ -364,20 +388,90 @@ export function ComparisonView() {
       <EscalationPanel onMessage={setMessage} />
 
       {readiness === 'WAITING_BOTH' ? (
-        <div className="fm-panel p5-card p5-stack" data-testid="waiting-both">
-          <h2>Waiting for Plan A and Plan B</h2>
-          <p className="p5-muted">Comparison opens once the plan owners publish their plans.</p>
-          <div className="p5-row">
-            <Link to="/recovery/plan-a" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
+        <div
+          className="fm-panel p5-card p5-stack p5-waiting-card"
+          data-testid="waiting-both"
+        >
+          <h2 className="p5-waiting-title">
+            Waiting for Plan A and Plan B
+          </h2>
+          <p className="p5-waiting-desc">
+            {!w.incidentId ? (
+              <>
+                No supplier disruption has been reported yet. Trigger <strong>Simulate supplier report</strong> in the
+                top-right <strong>Supplier disruption demo</strong> panel to open recovery comparison, or check status on
+                Overview, Inbox, or Incidents.
+              </>
+            ) : !w.impact ? (
+              <>
+                Supplier disruption report is pending verification or impact assessment. Confirm the report and evaluate
+                demand gap in Impact Explorer before comparing recovery plans.
+              </>
+            ) : (
+              <>
+                Impact assessed. Recovery proposals are being generated. Prepare or review proposals on Plan A and Plan B.
+              </>
+            )}
+          </p>
+
+          <div className="p5-waiting-steps">
+            <div className="p5-waiting-step">
+              <StatusBadge tone={w.incidentId ? 'success' : 'warning'}>
+                {w.incidentId ? 'Done' : 'Pending'}
+              </StatusBadge>
+              <span>
+                <strong>Step One:</strong> Receive and verify supplier disruption message (Demo panel → Simulate supplier report → Inbox / Message Intelligence)
+              </span>
+            </div>
+            <div className="p5-waiting-step">
+              <StatusBadge tone={w.impact ? 'success' : w.incidentId ? 'warning' : 'neutral'}>
+                {w.impact ? 'Done' : 'Pending'}
+              </StatusBadge>
+              <span>
+                <strong>Step Two:</strong> Assess stock and menu impact (Incidents / Impact Explorer)
+              </span>
+            </div>
+            <div className="p5-waiting-step">
+              <StatusBadge tone="neutral">Pending</StatusBadge>
+              <span>
+                <strong>Step Three:</strong> Prepare Plan A and Plan B for comparison
+              </span>
+            </div>
+          </div>
+
+          <div className="p5-waiting-actions">
+            <Link to="/inbox" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary p5-waiting-btn">
+              Go to Inbox
+            </Link>
+            <Link to="/impact" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary p5-waiting-btn">
+              Go to Impact Explorer
+            </Link>
+            <Link to="/recovery/plan-a" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary p5-waiting-btn">
               Go to Plan A
             </Link>
-            <Link to="/recovery/plan-b" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
+            <Link to="/recovery/plan-b" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary p5-waiting-btn">
               Go to Plan B
+            </Link>
+            <Link to="/overview" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary p5-waiting-btn">
+              Go to Overview
+            </Link>
+            <Link to="/incidents" className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary p5-waiting-btn">
+              Go to Incidents
             </Link>
           </div>
         </div>
       ) : (
         <>
+          {readiness === 'ONLY_B' && (
+            <AlertBanner tone="info" title="Plan B is ready — waiting for Plan A proposal">
+              Plan B (Internal Stock & Prep) is calculated and ready. Plan A is awaiting external sourcing proposal from Plan A page.
+            </AlertBanner>
+          )}
+          {readiness === 'ONLY_A' && (
+            <AlertBanner tone="info" title="Plan A is ready — waiting for Plan B">
+              Plan A (External Supplier Sourcing) is ready. Plan B is awaiting internal stock calculation.
+            </AlertBanner>
+          )}
           {readiness === 'FINGERPRINT_MISMATCH' && (
             <AlertBanner tone="danger" title="Snapshot Mismatch">
               Plans were calculated on different snapshots. Choosing is disabled until both are recalculated.

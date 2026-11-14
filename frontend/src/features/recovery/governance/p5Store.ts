@@ -1,7 +1,6 @@
 import { createContext, createElement, useContext, useSyncExternalStore, type ReactNode } from 'react';
 import { createStore, useStore, type StoreApi } from 'zustand';
 import { createMockWorld, type MockWorld } from '../../../__dev__/p5MockWorld';
-import { isP5DevMocksEnabled } from '../../../__dev__/mockScenarios';
 import type { DemoRole, ImpactSummaryLike, RecoveryScenarioWithActions, SnapshotRef } from './p5Contracts';
 import type { P5Deps } from './p5Deps';
 import { createRestaurantStoreAdapter, createRootStoreAdapter, type RootStoreContract } from './p5RootAdapter';
@@ -110,10 +109,14 @@ export function createP5Runtime(adapter: P5DepsAdapter): P5Runtime {
 }
 
 let defaultRuntime: P5Runtime | null = null;
-/** Adapter chosen at startup: dev mocks behind the flag, otherwise the live restaurant store adapter. */
+/** Adapter chosen at startup: defaults to createRestaurantStoreAdapter() for live upstream workflow. */
 export function getDefaultP5Runtime(): P5Runtime {
-  defaultRuntime ??= createP5Runtime(isP5DevMocksEnabled() ? devMockDeps() : createRestaurantStoreAdapter());
+  defaultRuntime ??= createP5Runtime(createRestaurantStoreAdapter());
   return defaultRuntime;
+}
+
+export function resetDefaultP5Runtime(): void {
+  defaultRuntime = null;
 }
 
 const P5RuntimeContext = createContext<P5Runtime | null>(null);
