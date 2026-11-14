@@ -4,6 +4,7 @@
  * Evidence is NOT approval authorization, receipt proof, confirmed procurement or outcome SUCCESS.
  */
 import { fingerprint, selectExtractionVersions, selectOfferReviewVersions, type DemoState, type InboxMessage } from "../../store/demoStore";
+import { HP_SUPPLIER_OFFERS } from "../../data/fixtures/happyPotato";
 import type { EvidenceSpan } from "./mockMessageRuleExtractor";
 import type { ExtractionVersion } from "./messageReview";
 import { parseMockSupplierOffer, type OfferClaim, type OfferQualification, type OfferReviewVersion } from "./supplierOffer";
@@ -118,7 +119,7 @@ export function selectSupplierOfferEvidence(state: DemoState): readonly Supplier
     const parsed = parseMockSupplierOffer(m);
     if (!parsed.claim) return [];
     const c = parsed.claim;
-    const match = state.business.supplierOffers.find((o) =>
+    const match = HP_SUPPLIER_OFFERS.find((o) =>
       o.supplierId === c.supplierId && o.ingredientId === c.ingredientId && o.quantityKgMilli === c.quantityKgMilli &&
       o.pricePerKgSen === c.pricePerKgSen && o.freightSen === c.freightSen && o.etaLocal === c.statedEtaLocal && o.spec === c.spec);
     const reviewVersions = selectOfferReviewVersions(state, m.id);

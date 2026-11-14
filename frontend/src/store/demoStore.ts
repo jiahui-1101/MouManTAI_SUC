@@ -1,4 +1,10 @@
-import { CANONICAL_BUSINESS } from "../data/fixtures/happyPotatoP1Contract";
+import {
+  applyVerifiedSupplierMessage,
+  getP2State,
+  resetDemo as resetP2Demo,
+  subscribeP2,
+} from "../services/mock/restaurantStore";
+import { selectCurrentImpact } from "../services/mock/restaurantState";
 import { parseMockSupplierMessage } from "../features/messaging/mockMessageRuleExtractor";
 import { useSyncExternalStore } from "react";
 import { CANONICAL_MESSAGE } from "../features/messaging/mockMessageRegistry";
@@ -92,7 +98,7 @@ export type IncidentHandoffStatus = "NOT_PUBLISHED" | "AWAITING_P2_CONSUMER" | "
 
 export type P1PublishedEvent =
   | { type: "MESSAGE_EXTRACTION_REVIEWED"; sequence: number; messageId: string; extractionVersionId: string; atIso: string }
-  | { type: "INCIDENT_VERIFIED"; sequence: number; incidentId: "HP-INC-001"; poId: "HP-PO-1042"; ingredientId: "HP-ING-CHICKEN"; messageIds: readonly string[]; snapshotId: "HP-SNAP-001"; snapshotRevision: 1; claimedShortfallKgMilli: number; atIso: string };
+  | { type: "INCIDENT_VERIFIED"; sequence: number; incidentId: "HP-INC-001"; poId: "HP-PO-1042"; ingredientId: "HP-ING-CHICKEN"; messageIds: readonly string[]; snapshotId: "HP-SNAP-001"; snapshotRevision: number; claimedShortfallKgMilli: number; atIso: string };
 
 export type DemoFixtureId = "CORE_CHANNELS" | "REVIEW_STATES" | "SUPPLIER_OFFER" | "EMPTY";
 
@@ -321,7 +327,8 @@ function initialIncident() {
     supplierId: "HP-SUP-001" as const,
     type: "UNAVAILABLE" as const,
     snapshotId: "HP-SNAP-001" as const,
-    snapshotRevision: 1 as const,
+    /** Revision of the authoritative P2 snapshot on which verification was performed. */
+    snapshotRevision: 1 as number,
     status: "PENDING_VERIFICATION" as "PENDING_VERIFICATION" | "VERIFIED",
     claimedShortfallKgMilli: 20000,
     messageIds: [] as InboxMessage["id"][],
@@ -346,11 +353,11 @@ function createDemoState() {
   const incident = initialIncident();
   return {
     ...initialState(),
-    business: CANONICAL_BUSINESS,
-    snapshot: {
-      ...CANONICAL_BUSINESS.snapshot,
-      fingerprint: fingerprint(CANONICAL_BUSINESS),
-    },
+    /**
+     * Authoritative business slice (snapshot, PO, inventory, P2 incident, impacts).
+     * Owned by P2's restaurantStore; this is the same object reference, never a copy.
+     */
+    restaurant: getP2State().restaurant,
     incident,
     reviews: [] as {
       messageId: InboxMessage["id"];
@@ -375,10 +382,15 @@ function freeze(value: unknown): void {
     Object.freeze(value);
   }
 }
-freeze(state);
+function freezeP1(value: DemoState) {
+  // The P2 restaurant slice is owned and versioned by restaurantStore; do not freeze it here.
+  for (const [key, child] of Object.entries(value)) if (key !== "restaurant") freeze(child);
+  Object.freeze(value);
+}
+freezeP1(state);
 
 function emit() {
-  freeze(state);
+  freezeP1(state);
   listeners.forEach((listener) => listener());
 }
 
@@ -453,6 +465,7 @@ export const demoStore = {
       offerReviews: [],
       publishedEvents: [],
     };
+    resetSharedBusiness();
     emit();
   },
   setMockLoadStatus(loadStatus?: "LOADING" | "ERROR") {
@@ -465,6 +478,7 @@ export const demoStore = {
   },
   reset() {
     state = createDemoState();
+    resetSharedBusiness();
     emit();
   },
   /** Appends an immutable HUMAN_CORRECTION version; raw text and earlier versions are untouched. */
@@ -518,9 +532,11 @@ export const demoStore = {
     emit();
     return next;
   },
-  /** Called by the P2 consumer once it has actually processed the verified incident. */
+  /** Acknowledges the P2 handoff only if P2 has actually produced a current authoritative impact. */
   acknowledgeIncidentHandoff() {
+    const impact = selectCurrentImpact(state.restaurant, state.incident.id);
     if (state.incident.status !== "VERIFIED" || state.incident.handoff.status === "ACKNOWLEDGED_BY_P2") return;
+    if (!impact || (impact.status !== "ASSESSED" && impact.status !== "BREACH_RISK")) return;
     state = { ...state, incident: { ...state.incident, handoff: { ...state.incident.handoff, status: "ACKNOWLEDGED_BY_P2" } } };
     emit();
   },
@@ -555,6 +571,8 @@ function commitIncidentLink(messageId: InboxMessage["id"], at: string) {
   if (blockers.length) throw new Error(blockers.join(" "));
   const message = state.messages.find((item) => item.id === messageId)!;
   const latest = latestVersionOrThrow(messageId);
+  const verifiedOnRevision = state.incident.status === "VERIFIED" ? state.incident.snapshotRevision : state.restaurant.snapshot.revision;
+  forwardToP2(message, latest);
   const extraction = parseMockSupplierMessage(message);
   const reviews = [
     ...state.reviews,
@@ -567,6 +585,7 @@ function commitIncidentLink(messageId: InboxMessage["id"], at: string) {
     status: "VERIFIED" as const,
     messageIds: [...state.incident.messageIds, messageId],
     verifiedAtIso: state.incident.verifiedAtIso ?? at,
+    snapshotRevision: verifiedOnRevision,
     handoff: wasVerified ? state.incident.handoff : { ...state.incident.handoff, status: "AWAITING_P2_CONSUMER" as const },
   };
   state = {
@@ -633,6 +652,7 @@ export const selectPublishedEvents = (value: DemoState): readonly P1PublishedEve
 function dispatch(event: DemoEvent) {
   if (event.type === "DEMO_RESET") {
     state = createDemoState();
+    resetSharedBusiness();
   } else if (event.type === "MESSAGE_RECEIVED") {
     executeIngestMockMessage(event.message);
     return;
@@ -668,9 +688,15 @@ function dispatch(event: DemoEvent) {
       throw new Error("Reviewed messages required");
     }
     if (state.incident.status === "VERIFIED" && event.messageIds.every((id) => state.incident.messageIds.includes(id))) return;
+    const verifiedOnRevision = state.incident.status === "VERIFIED" ? state.incident.snapshotRevision : state.restaurant.snapshot.revision;
+    for (const id of event.messageIds.filter((m) => !state.incident.messageIds.includes(m))) {
+      const message = state.messages.find((m) => m.id === id)!;
+      forwardToP2(message, latestVersionOrThrow(id));
+    }
     const messageIds = [...new Set([...state.incident.messageIds, ...event.messageIds])];
     const newIncident = {
       ...state.incident,
+      snapshotRevision: verifiedOnRevision,
       status: "VERIFIED" as const,
       messageIds,
       verifiedAtIso: state.incident.verifiedAtIso ?? new Date().toISOString(),
@@ -692,14 +718,68 @@ function dispatch(event: DemoEvent) {
 export const selectActiveIncident = (value: DemoState) => value.incident;
 export const selectMessagesForIncident = (value: DemoState) =>
   value.messages.filter((message) => value.incident.messageIds.includes(message.id));
-export const selectOperationalSnapshot = (value: DemoState) => ({
-  ...value.snapshot,
-  capturedAtIso: "2026-11-21T09:00:00+08:00",
-  demoBusinessDate: value.business.fixtureBusinessDate,
-  ingredientLots: value.business.inventoryLots,
-  purchaseOrders: value.business.purchaseOrders,
-  menuItems: value.business.menuItems,
-  confirmedOrders: value.business.confirmedOrderGroups,
-  forecasts: value.business.forecastDemands,
-  resources: value.business.resources,
+/** Authoritative operational snapshot (P2-owned HP-SNAP-001, current revision). */
+export const selectOperationalSnapshot = (value: DemoState) => value.restaurant.snapshot;
+/** Authoritative P2 incident entity (same ID as the P1 verification record). */
+export const selectBusinessIncident = (value: DemoState) => value.restaurant.incidents.find((i) => i.id === value.incident.id) ?? null;
+/** P2 impact for the active incident, only if computed on the current snapshot. */
+export const selectActiveImpact = (value: DemoState) => selectCurrentImpact(value.restaurant, value.incident.id);
+
+/* ---------- P1 <-> P2 shared-state bridge ---------- */
+
+const CHANNEL_SENDER = (m: InboxMessage) => `${m.senderDisplay} (P1-verified ${m.channel.toLowerCase()} demo contact)`;
+
+/** Forward one P1-confirmed message to P2's INCIDENT_VERIFIED consumer (idempotent on P2's side). */
+function forwardToP2(message: InboxMessage, latest: ExtractionVersion) {
+  const v = latest.values;
+  applyVerifiedSupplierMessage({
+    incidentId: state.incident.id,
+    messageId: message.id,
+    channel: message.channel,
+    receivedAtIso: message.receivedAtIso,
+    senderLabel: CHANNEL_SENDER(message),
+    subject: message.subject,
+    text: message.rawText,
+    poId: v.poId!,
+    supplierId: v.supplierId!,
+    ingredientId: CANONICAL_INGREDIENT,
+    incidentType: v.incidentType!,
+    claimedDeliveryTodayKgMilli: v.claimedDeliveryKgMilli!,
+    etaLocal: v.etaStatus === "KNOWN" && v.etaLocal ? (v.etaLocal.slice(11, 16) as `${number}:${number}`) : null,
+  });
+}
+const CANONICAL_INGREDIENT = "HP-ING-CHICKEN";
+
+let resettingFromP1 = false;
+let lastSeenP2Reset: unknown = getP2State().activity[0];
+
+function resetSharedBusiness() {
+  resettingFromP1 = true;
+  try {
+    resetP2Demo();
+    lastSeenP2Reset = getP2State().activity[0];
+  } finally {
+    resettingFromP1 = false;
+  }
+  state = { ...state, restaurant: getP2State().restaurant };
+}
+
+/** P2 -> P1: mirror the authoritative slice, follow P2 resets, acknowledge real P2 consumption. */
+subscribeP2(() => {
+  const p2 = getP2State();
+  if (resettingFromP1) return;
+  const resetEvent = p2.activity[0];
+  if (resetEvent?.type === "DEMO_RESET" && resetEvent !== lastSeenP2Reset && p2.restaurant.incidents.length === 0) {
+    lastSeenP2Reset = resetEvent;
+    state = { ...createDemoState(), activeFixture: state.activeFixture, messages: fixtureMessages(state.activeFixture), preferences: state.preferences };
+    state = { ...state, selectedId: state.messages[0]?.id ?? "HP-MSG-WA-001" };
+  }
+  if (state.restaurant === p2.restaurant) return;
+  let incident = state.incident;
+  const impact = selectCurrentImpact(p2.restaurant, incident.id);
+  if (incident.status === "VERIFIED" && incident.handoff.status === "AWAITING_P2_CONSUMER" && impact && (impact.status === "ASSESSED" || impact.status === "BREACH_RISK")) {
+    incident = { ...incident, handoff: { ...incident.handoff, status: "ACKNOWLEDGED_BY_P2" } };
+  }
+  state = { ...state, restaurant: p2.restaurant, incident };
+  emit();
 });

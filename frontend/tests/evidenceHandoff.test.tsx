@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { demoStore, fingerprint, selectActiveIncident } from "../src/store/demoStore";
 import { selectIncidentEvidence, selectMessageEvidence, selectSupplierOfferEvidence } from "../src/features/messaging/evidenceSelectors";
+import { HP_SUPPLIER_OFFERS } from "../src/data/fixtures/happyPotato";
 import { CANONICAL_OFFER_MESSAGE } from "../src/features/messaging/supplierOffer";
 
 const s = () => demoStore.getSnapshot();
@@ -14,15 +15,15 @@ describe("P3 supplier-offer evidence", () => {
     expect(offer!.claim).toEqual({ rfqId: "HP-RFQ-1042", supplierId: "HP-SUP-002", ingredientId: "HP-ING-CHICKEN", spec: "CHILLED", quantityKgMilli: 15000, pricePerKgSen: 1600, freightSen: 1500, statedEtaLocal: "10:15", conditional: true });
     offer!.evidenceSpans.forEach((sp) => expect(CANONICAL_OFFER_MESSAGE.slice(sp.start, sp.end)).toBe(sp.text));
     expect(offer!.evidenceSpans.map((sp) => sp.text)).toContain("subject to confirmation");
-    const business = s().business.supplierOffers.find((o) => o.id === "HP-OFFER-002")!;
+    const business = HP_SUPPLIER_OFFERS.find((o) => o.id === "HP-OFFER-002")!;
     expect(offer!.matchesCanonicalOfferId).toBe(business.id);
     expect(offer!.status).toBe("OFFER_CLAIM");
     expect(offer!.limits).toMatchObject({ isReceiptProof: false, isConfirmedProcurement: false, isCompletedSupplierAction: false });
   });
 
   it("requires explicit qualification, versions it, and never touches business offers, stock or incident", () => {
-    const businessBefore = s().business;
-    const lotsBefore = JSON.stringify(s().business.inventoryLots);
+    const businessBefore = s().restaurant;
+    const lotsBefore = JSON.stringify(s().restaurant.snapshot.ingredientLots);
     expect(() => demoStore.reviewSupplierOffer("HP-MSG-OL-OFFER", "QUALIFIED", " ")).toThrow(/reason/);
     expect(() => demoStore.reviewSupplierOffer("HP-MSG-WA-001", "QUALIFIED", "x")).toThrow(/Not a supplier offer/);
     demoStore.reviewSupplierOffer("HP-MSG-OL-OFFER", "QUALIFIED", "Approved alternate supplier", "2026-11-21T09:20:00+08:00");
@@ -32,9 +33,9 @@ describe("P3 supplier-offer evidence", () => {
     expect(offer!.reviewVersions.map((v) => `${v.version}:${v.decision}`)).toEqual(["1:EXTRACTED", "2:QUALIFIED"]);
     expect(offer!.reviewVersions[1]).toMatchObject({ actor: "Demo operator (demo-reviewer-01)", createdAtIso: "2026-11-21T09:20:00+08:00" });
     expect(s().messages.find((m) => m.id === "HP-MSG-OL-OFFER")!.verification).toBe("VERIFIED_DEMO_CONTACT");
-    expect(s().business).toBe(businessBefore);
-    expect(s().business.supplierOffers).toHaveLength(2);
-    expect(JSON.stringify(s().business.inventoryLots)).toBe(lotsBefore);
+    expect(s().restaurant).toBe(businessBefore);
+    expect(HP_SUPPLIER_OFFERS).toHaveLength(2);
+    expect(JSON.stringify(s().restaurant.snapshot.ingredientLots)).toBe(lotsBefore);
     expect(() => demoStore.linkMessageToIncident("HP-MSG-OL-OFFER")).toThrow();
     expect(selectActiveIncident(s()).messageIds).toEqual([]);
     expect(Object.isFrozen(offer)).toBe(true);

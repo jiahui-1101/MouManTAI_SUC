@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { selectActiveIncident, selectMessagesForIncident, useDemoState } from "../../store/demoStore";
+import { selectActiveImpact, selectActiveIncident, selectBusinessIncident, selectMessagesForIncident, useDemoState } from "../../store/demoStore";
+import { isImpactStale } from "../../services/mock/restaurantState";
 
 const kg = (n: number) => `${(n / 1000).toFixed(3)} kg`;
 const HANDOFF_TEXT = {
@@ -13,14 +14,20 @@ export function IncidentHandoff() {
   const state = useDemoState();
   const incident = selectActiveIncident(state);
   const linked = selectMessagesForIncident(state);
-  const lot = state.business.inventoryLots.find((l) => l.ingredientId === incident.ingredientId);
+  const snapshot = state.restaurant.snapshot;
+  const lot = snapshot.ingredientLots.find((l) => l.ingredientId === incident.ingredientId && l.accepted);
+  const business = selectBusinessIncident(state);
+  const impact = selectActiveImpact(state);
+  const stale = isImpactStale(state.restaurant, incident.id);
   return <section className="mi-handoff" aria-label="Incident handoff">
     <h3>{incident.id} · {incident.status === "VERIFIED" ? "Verified" : "Pending verification"}</h3>
     <dl>
       <div><dt>PO / ingredient</dt><dd>{incident.poId} · {incident.ingredientId}</dd></div>
-      <div><dt>Snapshot</dt><dd>{incident.snapshotId} rev {incident.snapshotRevision}</dd></div>
+      <div><dt>Snapshot</dt><dd data-testid="incident-snapshot">{snapshot.id} rev {snapshot.revision} (verified on rev {incident.snapshotRevision})</dd></div>
+      <div><dt>P2 incident</dt><dd data-testid="p2-incident-status">{business ? `${business.status} · ${business.messageIds.length} message${business.messageIds.length === 1 ? "" : "s"}` : "Not received by P2"}</dd></div>
+      <div><dt>P2 impact</dt><dd data-testid="p2-impact-status">{impact ? `${impact.status} on rev ${impact.snapshotRevision}` : stale ? "STALE — reassess in Impact Explorer" : "Not assessed yet"}</dd></div>
       <div><dt>Supplier claim shortfall</dt><dd data-testid="incident-shortfall">{kg(incident.claimedShortfallKgMilli)} (one claim, not multiplied)</dd></div>
-      <div><dt>Accepted physical stock</dt><dd>{lot ? kg(lot.onHandMilli) : "—"} (shared snapshot, unchanged by P1)</dd></div>
+      <div><dt>Accepted physical stock</dt><dd>{lot ? kg(lot.onHandMilli) : "—"} (physical stock, never changed by a supplier claim)</dd></div>
       <div><dt>Evidence messages</dt><dd data-testid="incident-messages">{linked.length ? linked.map((m) => `${m.id} (${m.channel})`).join(", ") : "None yet"}</dd></div>
       <div><dt>P2 handoff</dt><dd data-testid="handoff-status">{HANDOFF_TEXT[incident.handoff.status]}</dd></div>
     </dl>

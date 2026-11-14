@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
+import { assessImpactAction } from "../src/services/mock/restaurantStore";
 import { routes } from "../src/app/router";
 import { demoStore, incidentLinkBlockers, selectActiveIncident, selectExtractionVersions, selectMessagesForIncident, selectOperationalSnapshot } from "../src/store/demoStore";
 
@@ -86,6 +87,8 @@ describe("incident verification and cross-channel correlation", () => {
     act(() => demoStore.acknowledgeIncidentHandoff());
     expect(selectActiveIncident(s()).handoff.status).toBe("NOT_PUBLISHED");
     act(() => { demoStore.confirmExtractionReview("HP-MSG-WA-001"); demoStore.acknowledgeIncidentHandoff(); });
+    expect(selectActiveIncident(s()).handoff.status).toBe("AWAITING_P2_CONSUMER"); // no P2 impact yet: manual ack refused
+    act(() => assessImpactAction("HP-INC-001")); // real P2 consumption acknowledges automatically
     renderAt("/message-intelligence?message=HP-MSG-WA-001");
     expect(screen.getByTestId("handoff-status").textContent).toBe("Acknowledged by P2 Impact consumer.");
   });

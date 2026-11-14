@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import pkg from "../package.json";
+import { HP_SUPPLIER_OFFERS } from "../src/data/fixtures/happyPotato";
 import { routes } from "../src/app/router";
 import { demoStore, selectActiveIncident, selectExtractionVersions, selectMessagesForIncident, selectOperationalSnapshot, selectPublishedEvents, CANONICAL_MOCK_ENVELOPES } from "../src/store/demoStore";
 import { inboxStore } from "../src/features/messaging/inboxStore";
@@ -91,7 +92,7 @@ describe("P1 final QA — end-to-end offline flow", () => {
     demoStore.loadFixture("SUPPLIER_OFFER");
     demoStore.reviewSupplierOffer("HP-MSG-OL-OFFER", "QUALIFIED", "approved");
     const offer = selectSupplierOfferEvidence(s())[0]!;
-    expect(offer.matchesCanonicalOfferId).toBe(s().business.supplierOffers[0]!.id);
+    expect(offer.matchesCanonicalOfferId).toBe(HP_SUPPLIER_OFFERS[0]!.id);
     expect(selectMessageEvidence(s(), "HP-MSG-OL-OFFER")!.offerReviewVersions).toEqual(offer.reviewVersions);
     expect(offer.reviewVersions).toHaveLength(2);
     expect(Object.values(offer.limits).every((v) => v === false)).toBe(true);
@@ -113,9 +114,10 @@ describe("P1 final QA — architecture audit", () => {
     const p1Files = files.filter((f) => /\/(features\/messaging|pages\/(Inbox|MessageIntelligence|Channels|Settings))\//.test(f));
     // P1 code never creates its own store; it only reads the shared demoStore.
     for (const f of p1Files) expect(src(f), f).not.toMatch(/useSyncExternalStore\(|createStore|restaurantStore/);
-    const p1FixtureImporters = files.filter((f) => /fixtures\/happyPotatoP1Contract/.test(src(f)));
-    expect(p1FixtureImporters.map((f) => f.split("/src/")[1])).toEqual(["store/demoStore.ts"]);
-    expect(files.filter((f) => /"HP-OFFER-002"/.test(src(f))).map((f) => f.split(/[\\/]/).pop())).toEqual(["happyPotatoP1Contract.ts"]);
+    // One shared business fixture; P1's former contract copy is gone and business state lives in P2's restaurantStore.
+    expect(files.some((f) => /happyPotatoP1Contract/.test(f))).toBe(false);
+    expect(files.filter((f) => /"HP-OFFER-002"/.test(src(f))).map((f) => f.split(/[\\/]/).pop())).toEqual(["happyPotato.ts"]);
+    expect(files.filter((f) => /createHappyPotatoSeedSnapshot\(\)/.test(src(f))).map((f) => f.split("/src/")[1]).sort()).toEqual(["data/fixtures/happyPotato.ts", "services/mock/restaurantState.ts"]);
   });
 
 });
