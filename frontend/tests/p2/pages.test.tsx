@@ -68,7 +68,7 @@ describe("Operations Overview", () => {
     expect(within(kpi("Active supply incidents")).getByText("0")).toBeTruthy();
     // Not assessed → never a default zero
     expect(within(kpi("Confirmed orders at risk")).getByText("—")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Open supplier inbox/ }).getAttribute("href")).toBe("/inbox");
+    expect(screen.getByText("No action needed")).toBeTruthy();
   });
 
   it("treats an unverified report as pending, not complete", () => {
@@ -77,29 +77,34 @@ describe("Operations Overview", () => {
     expect(within(kpi("Active supply incidents")).getByText("0")).toBeTruthy();
     expect(within(kpi("Active supply incidents")).getByText("+1 awaiting verification")).toBeTruthy();
     expect(screen.getAllByText("Pending verification").length).toBeGreaterThan(0);
-    expect(screen.getByText("Not applied (unverified)")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Review supplier message/ }).getAttribute("href")).toBe("/message-intelligence");
+    expect(screen.getByText("Claim not applied yet")).toBeTruthy();
+    expect(getP2State().restaurant.snapshot.revision).toBe(1);
   });
 
   it("shows Pending for verified-but-unassessed, then values after assessment", () => {
     act(() => void simulateSupplierReport("WHATSAPP", "VERIFIED"));
     renderAt("/overview");
     expect(within(kpi("Confirmed orders at risk")).getByText("Pending")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Assess business impact/ }));
+    screen.getByText("Supplier disruption demo").closest("details")!.open = true;
+    fireEvent.click(screen.getByRole("button", { name: "Assess impact" }));
     expect(within(kpi("Active supply incidents")).getByText("1")).toBeTruthy();
     expect(within(kpi("Affected menu items")).getByText("3")).toBeTruthy();
     expect(within(kpi("Confirmed orders at risk")).getByText("0")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Review Plan A/ }).getAttribute("href")).toBe("/recovery/plan-a");
-    expect(screen.getByRole("link", { name: /Review Plan B/ }).getAttribute("href")).toBe("/recovery/plan-b");
+    expect(screen.getByRole("link", { name: /Plan A · External supplier/ }).getAttribute("href")).toBe("/recovery/plan-a");
+    expect(screen.getByRole("link", { name: /Plan B · Internal recovery/ }).getAttribute("href")).toBe("/recovery/plan-b");
   });
 
   it("separates supplier claim from physical stock on the disruption card", () => {
     verifiedAssessed();
     renderAt("/overview");
-    const card = screen.getByRole("link", { name: "Open incident HP-INC-001" });
-    expect(within(card).getByText("Reported PO shortage").nextElementSibling?.textContent).toBe("20kg");
-    expect(within(card).getByText("Accepted on-hand chicken").nextElementSibling?.textContent).toBe("10kg");
-    expect(within(card).getByText("Claimed delivery today").nextElementSibling?.textContent).toBe("0kg");
+    for (const [tile, label, quantity] of [
+      ["PO shortage", "Reported shortage", "20kg"],
+      ["On-hand stock", "Physical on hand", "10kg"],
+      ["Claimed today", "Claimed delivery today", "0kg"],
+    ]) {
+      fireEvent.click(screen.getByRole("button", { name: `Show details: ${tile}` }));
+      expect(screen.getByText(label!, { selector: "dt" }).nextElementSibling?.textContent).toBe(quantity);
+    }
   });
 
   it("lists three chicken menus as affected and fries-only as unaffected", () => {
@@ -137,7 +142,8 @@ describe("Operations Overview", () => {
     act(() => simulateChickenRecount(8000));
     expect(screen.getByText("Impact is stale")).toBeTruthy();
     expect(within(kpi("Confirmed orders at risk")).getByText("Pending")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Re-assess impact/ }));
+    screen.getByText("Supplier disruption demo").closest("details")!.open = true;
+    fireEvent.click(screen.getByRole("button", { name: "Update impact" }));
     expect(within(kpi("Confirmed orders at risk")).getByText("9")).toBeTruthy();
     expect(screen.getByText("Confirmed demand exceeds eligible chicken")).toBeTruthy();
   });

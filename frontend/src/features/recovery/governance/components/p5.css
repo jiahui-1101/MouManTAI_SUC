@@ -262,9 +262,6 @@
   border-left-color: var(--action-primary);
   box-shadow: 0 6px 16px rgba(173, 72, 8, 0.10);
 }
-  background: var(--p5-brand-soft);
-  border-left: 3px solid var(--p5-brand-text);
-}
 .p5-kpi-val {
   font-size: 20px;
   font-weight: 700;
