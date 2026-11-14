@@ -69,16 +69,15 @@ describe("pages", () => {
     expect(screen.getByText("External supply workspace is waiting")).toBeTruthy();
   });
 
-  it("opens the local Plan B demo from the no-incident landing", async () => {
-    renderAt("/recovery/plan-b");
-    expect(screen.getByRole("heading", { name: "No incident · Working well" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("link", { name: /Open Plan B recovery/ }));
-    expect(await screen.findByText("LOCAL DEMO")).toBeTruthy();
+  it("keeps Plan B waiting before incident verification", () => {
+    renderAt("/recovery/plan-b?view=recovery");
+    expect(screen.getByRole("heading", { name: "Internal recovery workspace is waiting" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Stock Allocation" })).toBeNull();
   });
 
   it("shows the Plan B allocation and menu proposal", () => {
     verifyAndAssessSharedIncident();
-    renderAt("/recovery/plan-b?view=recovery");
+    renderAt("/recovery/plan-b");
     expect(heading()).toBe("Plan B — Internal Recovery");
     expect(screen.getByRole("tab", { name: "Stock Allocation" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Order Protection" })).toBeTruthy();
@@ -87,7 +86,7 @@ describe("pages", () => {
 
   it("recalculates stock across tabs and resets to the canonical demo", async () => {
     verifyAndAssessSharedIncident();
-    renderAt("/recovery/plan-b?view=recovery");
+    renderAt("/recovery/plan-b");
     fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "8000" } });
     expect(screen.getByText("Chicken shortfall · 0.75 kg")).toBeTruthy();
     expect(screen.getByText(/Chicken shortfall · 0.75 kg/)).toBeTruthy();
@@ -109,7 +108,8 @@ describe("pages", () => {
     expect(screen.getByText("95", { exact: true })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Before Incident" }));
     expect(screen.queryByRole("button", { name: "Edit Schedule" })).toBeNull();
-    expect(screen.getByText(/20.00 kg expected, pending receipt/)).toBeTruthy();
+    expect(screen.getByText("Expected, pending receipt")).toBeTruthy();
+    expect(screen.getByText("20.00 kg", { exact: true })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "After Incident" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit Schedule" }));
     fireEvent.change(screen.getByLabelText("Duration (minutes)"), { target: { value: "35" } });
