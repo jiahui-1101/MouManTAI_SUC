@@ -37,7 +37,7 @@ describe("Plan A shared inputs", () => {
     const selectB = screen.getAllByRole("button").find((b) => /select/i.test(b.textContent ?? "") && !(b as HTMLButtonElement).disabled);
     expect(selectB).toBeTruthy();
     fireEvent.click(selectB!);
-    fireEvent.click(screen.getByRole("button", { name: "Generate Plan A preview" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate preview" }));
     expect(screen.getAllByText(/RM\s?255(\.00)?/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/goods received|PO approved/i)).toBeNull();
   });
