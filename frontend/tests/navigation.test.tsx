@@ -23,7 +23,7 @@ describe("route configuration", () => {
 });
 
 describe("pages", () => {
-  it.each(NAV_ITEMS.map((item) => [item.path, item.title]))(
+  it.each(NAV_ITEMS.filter(({ path }) => path !== "/recovery/plan-b" && path !== "/prep-planning").map((item) => [item.path, item.title]))(
     "%s shows heading %s and an empty body",
     (path, title) => {
       renderAt(path);
@@ -33,6 +33,22 @@ describe("pages", () => {
       expect(body.textContent).toBe("");
     },
   );
+
+  it("shows the Plan B allocation and menu proposal", () => {
+    renderAt("/recovery/plan-b");
+    expect(heading()).toBe("Plan B — Internal Recovery");
+    expect(screen.getByRole("table", { name: "Menu availability proposal" })).toBeTruthy();
+    expect(screen.getByText("Preview proposed menu changes")).toBeTruthy();
+  });
+
+  it("shows prep and lets the manager inspect the tenders batch", () => {
+    renderAt("/prep-planning");
+    expect(heading()).toBe("Prep Planning");
+    const batch = screen.getByRole("button", { name: /Chicken Tenders, 15 Confirmed/ });
+    fireEvent.click(batch);
+    expect(batch.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("heading", { name: "HP-BATCH-B-03 · Chicken Tenders" })).toBeTruthy();
+  });
 
   it("shows the product name", () => {
     renderAt("/overview");

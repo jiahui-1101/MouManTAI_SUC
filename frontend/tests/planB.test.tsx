@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { calculatePlanB, isCurrentScenario } from "./planB";
-import { preview } from "./preview";
+import { calculatePlanB, isCurrentScenario } from "../src/features/recovery/plan-b/planB";
+import { preview } from "../src/features/recovery/plan-b/preview";
 
 function plan(input = preview) {
   const result = calculatePlanB(input);
@@ -26,10 +26,10 @@ describe("Happy Potato internal recovery", () => {
   });
   it("excludes expired and unaccepted chicken and blocks unapproved recipes", () => {
     for (const change of [{ expiresOn: preview.date }, { accepted: false }]) {
-      expect(plan({ ...preview, lots: [{ ...preview.lots[0], ...change }, preview.lots[1]] }).scenario.feasibility).toBe("BREACH_RISK");
+      expect(plan({ ...preview, lots: preview.lots.map(lot => lot.ingredient === "chicken" ? { ...lot, ...change } : lot) }).scenario.feasibility).toBe("BREACH_RISK");
     }
-    expect(plan({ ...preview, menus: [{ ...preview.menus[0], approved: false }, ...preview.menus.slice(1)] }).scenario.feasibility).toBe("BREACH_RISK");
-    expect(calculatePlanB({ ...preview, lots: [{ ...preview.lots[0], grams: null }, preview.lots[1]] }).status).toBe("UNKNOWN");
+    expect(plan({ ...preview, menus: preview.menus.map(menu => menu.id === "HP-MENU-CP" ? { ...menu, approved: false } : menu) }).scenario.feasibility).toBe("BREACH_RISK");
+    expect(calculatePlanB({ ...preview, lots: preview.lots.map(lot => lot.ingredient === "chicken" ? { ...lot, grams: null } : lot) }).status).toBe("UNKNOWN");
   });
   it("marks unknown holding conditional and invalidates stale scenarios", () => {
     expect(plan({ ...preview, holdingKnown: false }).scenario.feasibility).toBe("CONDITIONAL");
