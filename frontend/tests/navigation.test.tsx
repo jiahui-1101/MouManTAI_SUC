@@ -37,8 +37,25 @@ describe("pages", () => {
   it("shows the Plan B allocation and menu proposal", () => {
     renderAt("/recovery/plan-b");
     expect(heading()).toBe("Plan B — Internal Recovery");
-    expect(screen.getByRole("table", { name: "Menu availability proposal" })).toBeTruthy();
-    expect(screen.getByText("Preview proposed menu changes")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Stock Allocation" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Order Protection" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Menu Recovery" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /View Prep Planning/ }).getAttribute("href")).toBe("/prep-planning");
+  });
+
+  it("recalculates stock across tabs and resets to the canonical demo", async () => {
+    renderAt("/recovery/plan-b");
+    fireEvent.click(screen.getByRole("button", { name: "8.00 kg" }));
+    expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
+    expect(screen.getByText(/0.75 kg shortfall/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Order Protection" }));
+    expect(screen.getByText("At risk · review")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Menu Recovery" }));
+    expect(screen.getAllByText("At risk").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Stock Allocation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset Demo" }));
+    expect(screen.getByText("10.00 kg", { selector: "strong" })).toBeTruthy();
+    expect(screen.getByText("Plan Feasible*")).toBeTruthy();
   });
 
   it("shows prep and lets the manager inspect the tenders batch", () => {

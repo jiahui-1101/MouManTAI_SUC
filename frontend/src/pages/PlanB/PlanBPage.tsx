@@ -1,71 +1,106 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { AlertTriangle, Check, Package, RotateCcw, ShieldCheck, Soup, TrendingDown } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
+import { calculatePlanB } from "../../features/recovery/plan-b/planB";
 import { preview } from "../../features/recovery/plan-b/preview";
-import { demoPlan, kg, Metrics, Pending, Table } from "../../features/recovery/plan-b/RecoveryView";
+import { kg, Pending, Table } from "../../features/recovery/plan-b/RecoveryView";
+import "../../features/recovery/plan-b/recovery.css";
+
+type Tab = "stock" | "orders" | "menu";
 
 export function PlanBPage() {
-  const title = "Plan B — Internal Recovery";
-  const plan = demoPlan;
-  if (plan.status !== "READY") return <PageContainer title={title}><Pending status={plan.status} /></PageContainer>;
-  const { scenario, rows } = plan;
-  const confirmedAssigned = plan.blocked ? 0 : plan.confirmedChicken;
-  const extra = plan.assigned - confirmedAssigned;
+  const [chickenGrams, setChickenGrams] = useState(10000);
+  const [tab, setTab] = useState<Tab>("stock");
+  const [query, setQuery] = useState("");
+  const [selectedMenu, setSelectedMenu] = useState<string | null>(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const input = useMemo(() => ({
+    ...preview,
+    fingerprint: chickenGrams === 10000 ? preview.fingerprint : `${preview.fingerprint}-chicken-${chickenGrams}`,
+    lots: preview.lots.map(lot => lot.ingredient === "chicken" ? { ...lot, grams: chickenGrams } : lot),
+  }), [chickenGrams]);
+  const result = useMemo(() => calculatePlanB(input), [input]);
+  if (result.status !== "READY") return <PageContainer title="Plan B — Internal Recovery"><Pending status={result.status} /></PageContainer>;
+
+  const { scenario, rows } = result;
+  const baseline = calculatePlanB(preview);
+  const feasible = scenario.feasibility === "FEASIBLE";
+  const breach = scenario.feasibility === "BREACH_RISK";
+  const confirmedAllocated = breach ? 0 : result.confirmedChicken;
+  const additionalAllocated = breach ? 0 : result.assigned - confirmedAllocated;
   const combo = rows.find(row => row.id === "HP-MENU-HC");
-  const incident = preview.incident!;
-  return <PageContainer title={title}><div className="p4">
-    <header className="p4-hero">
-      <p className="p4-kicker">Synthetic business data · Demo calculation · Proposal only</p>
-      <h2>Recover using existing stock</h2>
-      <p>The supplier expects to deliver {kg(incident.claimed)} against the {kg(incident.ordered)} chicken purchase order. The kitchen has {kg(plan.chicken)} of accepted chicken on hand.</p>
-      <p><span className="p4-pill">Zero new purchases · RM0 external purchase cost</span></p>
-      <small>{incident.id} · {preview.snapshotId} rev {preview.revision} · {preview.date} MYT · Temporary preview</small>
+  const actions = scenario.proposals.filter(proposal => proposal.newOrderQuota > 0);
+  const filteredRows = rows.filter(row => row.name.toLowerCase().includes(query.toLowerCase()));
+  const protectedOrders = rows.filter(row => row.chicken > 0);
+  const setPreset = (grams: number) => setChickenGrams(grams);
+
+  return <PageContainer title="Plan B — Internal Recovery"><main className="p4 p4-dashboard">
+    <header className="p4-green-hero">
+      <div className="p4-brandline"><span>HAPPY POTATO <span>/ OPERATIONS</span></span><span className="p4-demo-tag">DEMO DATA</span></div>
+      <p className="p4-kicker">PLAN B · INTERNAL RECOVERY</p>
+      <h2>Make the most of your available stock.</h2>
+      <p>Chicken delivery disruption · {preview.incident?.id} · Happy Potato — Demo Outlet</p>
+      <div className="p4-hero-status"><span><Package size={15}/> No new purchase</span><span>{breach ? <><AlertTriangle size={15}/> BREACH_RISK · review needed</> : <><Check size={15}/> {feasible ? "Plan feasible under demo assumptions" : "Schedule needs review"}</>}</span><span>Mock data · {preview.date} MYT</span></div>
     </header>
-    {scenario.feasibility === "BREACH_RISK" && <p className="p4-alert" role="alert">Confirmed orders are at risk. Chicken deficit {kg(plan.deficit)}. Review stock and recipes, then escalate affected orders for manual customer renegotiation.</p>}
-    {scenario.feasibility === "INFEASIBLE" && <p className="p4-alert" role="alert">The stock allocation has a schedule conflict. Review prep planning before relying on these projections.</p>}
-    <Metrics items={[
-      ["Usable chicken", kg(plan.chicken), "Accepted physical stock"],
-      ["Confirmed chicken portions", scenario.confirmedChickenPortionsProtected, "Protected in allocation"],
-      ["More Happy Combos", combo?.quota ?? 0, "Proposed new-order quota"],
-      ["Chicken forecast unmet", scenario.forecastChickenPortionsUnmet, "Projected portions"],
-    ]} />
-    <div className="p4-split">
-      <section className="p4-panel"><h2>Chicken stock allocation</h2>
-        <div className="p4-stock" aria-hidden="true">
-          <span style={{ width: (plan.chicken ? confirmedAssigned / plan.chicken * 100 : 0) + "%" }} />
-          <span style={{ width: (plan.chicken ? extra / plan.chicken * 100 : 0) + "%" }} />
-        </div>
-        <ul className="p4-legend">{[
-          ["Confirmed reserved", confirmedAssigned], ["After confirmed demand", plan.discretionary],
-          ["Additional allocation", extra], ["Total assigned", plan.assigned], ["Left", plan.residual],
-        ].map(([label, grams]) => <li key={label}><b>{kg(Number(grams))}</b>{label}</li>)}</ul>
-      </section>
-      <section className="p4-panel"><h2>Frozen fries</h2>
-        <p><strong>{kg(plan.fries)}</strong> accepted · {kg(plan.friesForecastGrams)} forecast requirement</p>
-        <p>{kg(plan.friesAssigned)} planned for combo sides and regular fries. Regular fries availability depends on kitchen capacity.</p>
-      </section>
-    </div>
-    <section className="p4-panel"><h2>Confirmed orders and menu recovery</h2>
-      <p>Reserve stock for existing orders first. Proposed limits apply to new orders only.</p>
-      <Table caption="Menu availability proposal" headers={["Menu", "Confirmed demand", "Protected", "New limit", "Chicken per portion", "Chicken assigned", "Proposed action"]}>
-        {rows.map(row => <tr key={row.id}>
-          <th scope="row">{row.name}</th><td className="p4-number">{row.confirmed}</td><td className="p4-number">{row.protected}</td>
-          <td className="p4-number">{row.quota}</td><td className="p4-number">{row.chicken} g</td>
-          <td className="p4-number">{kg((row.protected + row.quota) * row.chicken)}</td>
-          <td><span className="p4-pill" data-tone={row.quota ? undefined : "warn"}>{plan.blocked ? "Review required" : !row.quota ? "Pause new orders" : row.chicken ? "Limited" : "Available with capacity"}</span></td>
-        </tr>)}
+
+    {breach && <div className="p4-breach" role="alert"><AlertTriangle aria-hidden="true"/><div><strong>Confirmed demand is under-provisioned</strong><p>{protectedOrders.reduce((n, row) => n + row.confirmed, 0)} confirmed portions require {kg(result.confirmedChicken)}. Available stock is {kg(result.chicken)}, leaving a {kg(result.deficit)} shortfall. Full protection is not possible. Review and renegotiate affected orders manually.</p></div></div>}
+
+    <section className="p4-kpi-strip" aria-label="Plan B summary">
+      <article><span className="p4-kpi-icon"><Package/></span><div><small>Available stock</small><strong>{kg(result.chicken)}</strong><span>Accepted chicken</span></div></article>
+      <article><span className="p4-kpi-icon"><ShieldCheck/></span><div><small>Confirmed demand</small><strong>{protectedOrders.reduce((n, row) => n + row.confirmed, 0)}</strong><span>{breach ? "At risk · not fully protected" : "Portions planned for protection"}</span></div></article>
+      <article><span className="p4-kpi-icon"><Soup/></span><div><small>Extra Happy Combos</small><strong>{combo?.quota ?? 0}</strong><span>Proposed additional quota</span></div></article>
+      <article><span className="p4-kpi-icon"><TrendingDown/></span><div><small>Unmet forecast</small><strong>{scenario.forecastChickenPortionsUnmet}</strong><span>Potential portions, not cancellations</span></div></article>
+    </section>
+
+    <nav className="p4-tabs" role="tablist" aria-label="Plan B details">
+      {([ ["stock", "Stock Allocation"], ["orders", "Order Protection"], ["menu", "Menu Recovery"] ] as const).map(([id, label]) => <button key={id} type="button" role="tab" id={`p4-tab-${id}`} aria-selected={tab === id} aria-controls={`p4-panel-${id}`} onClick={() => setTab(id)}>{label}</button>)}
+    </nav>
+
+    {tab === "stock" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-stock" aria-labelledby="p4-tab-stock">
+      <div className="p4-section-heading"><div><p className="p4-kicker">SHARED CHICKEN LOT · HP-LOT-CH-001</p><h2>Chicken allocation</h2><p>Accepted physical stock only. The unreceived 20 kg purchase order is excluded.</p></div><span className={`p4-pill ${breach ? "p4-risk-pill" : "p4-ready-pill"}`}>{breach ? "BREACH_RISK" : feasible ? "Plan Feasible*" : "Schedule needs review"}</span></div>
+      <div className="p4-stock-workspace"><div className="p4-stock-visual">
+      <div className="p4-stock-summary"><strong>{kg(result.chicken)} <small>available</small></strong><span>Confirmed {kg(confirmedAllocated)}</span><span>New {kg(additionalAllocated)}</span><span>Left {kg(Math.max(0, result.residual))}</span></div>
+      <div className="p4-stock p4-stock-green" role="img" aria-label={`Chicken allocation: confirmed ${kg(confirmedAllocated)}, new ${kg(additionalAllocated)}, left ${kg(Math.max(0, result.residual))}`}>
+        <span style={{ width: `${result.chicken ? confirmedAllocated / result.chicken * 100 : 0}%` }}/><span style={{ width: `${result.chicken ? additionalAllocated / result.chicken * 100 : 0}%` }}/>
+      </div>
+      <div className="p4-allocation-legend"><span><i className="is-confirmed"/>Confirmed orders <b>{kg(confirmedAllocated)}</b></span><span><i className="is-new"/>Additional combos <b>{kg(additionalAllocated)}</b></span><span><i className="is-left"/>Remaining <b>{kg(Math.max(0, result.residual))}</b></span></div>
+      <p className="p4-note">Confirmed demand {kg(result.confirmedChicken)} · Allocated {kg(result.assigned)} · {scenario.forecastChickenPortionsServed} portions planned</p></div>
+      <aside className="p4-simulation"><h3>What-if simulation</h3><p>Change accepted chicken stock to compare with the 10 kg baseline.</p>
+        <label htmlFor="demo-chicken-stock">Accepted chicken stock <strong>{kg(chickenGrams)}</strong></label>
+        <input id="demo-chicken-stock" type="range" min="0" max="15000" step="250" value={chickenGrams} onChange={event => setChickenGrams(Number(event.target.value))} aria-valuetext={kg(chickenGrams)}/>
+        <div className="p4-range-labels"><span>0 kg</span><span>15 kg</span></div>
+        <div className="p4-presets">{[8000, 10000, 12000].map(value => <button key={value} type="button" aria-pressed={chickenGrams === value} onClick={() => setPreset(value)}>{kg(value)}</button>)}<button type="button" className="p4-reset" onClick={() => setChickenGrams(10000)} disabled={chickenGrams === 10000}><RotateCcw size={15}/>Reset Demo</button></div>
+      <dl className="p4-impact" aria-live="polite"><div><dt>Extra combos</dt><dd>{combo?.quota ?? 0} <small>baseline {baseline.status === "READY" ? baseline.rows.find(row => row.id === "HP-MENU-HC")?.quota : "—"}</small></dd></div><div><dt>Confirmed shortfall</dt><dd>{kg(result.deficit)}</dd></div><div><dt>Unmet forecast</dt><dd>{scenario.forecastChickenPortionsUnmet} portions</dd></div></dl></aside></div>
+      <Table caption="Chicken portions and shared lot allocation" headers={["Menu item", "Portions planned", "Chicken allocated"]}>
+        {protectedOrders.map(row => <tr key={row.id}><th scope="row">{row.name}</th><td>{row.protected + row.quota} <small>({row.protected} confirmed{row.quota ? ` + ${row.quota} new` : ""})</small></td><td>{kg((row.protected + row.quota) * row.chicken)}</td></tr>)}
       </Table>
-      <details><summary>Preview proposed menu changes</summary>
-        <p>Awaiting manager review. The proposal applies to the {preview.date} demo service window. POS changes require a separate manual update.</p>
-        <ul>{scenario.proposals.map(proposal => <li key={proposal.id}>{rows.find(row => row.id === proposal.menuId)?.name} · {proposal.newOrderQuota} new portions</li>)}</ul>
-      </details>
-      <details><summary>Stock source and service window</summary>
-        <p>Confirmed service deadline 12:30 PM MYT. Additional combo deadline 2:30 PM MYT.</p>
-        <ul>{plan.lots.map(lot => <li key={lot.id}>{lot.id} · {kg(lot.grams ?? 0)}</li>)}</ul>
-      </details>
-    </section>
-    <section className="p4-panel"><h2>Service tradeoff</h2>
-      <p>{plan.blocked ? "Review confirmed obligations before opening new orders." : "The allocation protects " + scenario.confirmedChickenPortionsProtected + " confirmed chicken portions and leaves " + scenario.forecastChickenPortionsUnmet + " forecast-only chicken portions unmet."}</p>
-      <Link to="/prep-planning">View the kitchen prep plan</Link>
-    </section>
-  </div></PageContainer>;
+      <details className="p4-fries-detail"><summary>Frozen fries detail</summary><p>{kg(result.fries)} accepted. Original forecast requirement: {kg(result.friesForecastGrams)}. Conditional Plan B planned use: {kg(result.friesAssigned)}, with {kg(result.fries - result.friesAssigned)} remaining.</p></details>
+
+    </section>}
+
+    {tab === "orders" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-orders" aria-labelledby="p4-tab-orders">
+      <div className="p4-section-heading"><div><p className="p4-kicker">CUSTOMER COMMITMENTS</p><h2>Confirmed order protection</h2><p>Confirmed demand is a subset of forecast. No orders are automatically changed.</p></div><span className={`p4-pill ${breach ? "p4-risk-pill" : "p4-ready-pill"}`}>{breach ? "Full protection at risk" : "Protect confirmed first"}</span></div>
+      <div className="p4-order-callout"><ShieldCheck/><div><strong>{protectedOrders.reduce((n, row) => n + row.confirmed, 0)} confirmed chicken portions</strong><p>{breach ? `Demand is ${kg(result.deficit)} above stock. No full-fulfillment guarantee.` : `${kg(result.confirmedChicken)} reserved from the shared chicken lot before any new demand.`}</p></div></div>
+      <Table caption="Confirmed chicken orders" headers={["Menu", "Confirmed portions", "Chicken per portion", "Demand", "Status"]}>
+        {protectedOrders.map(row => <tr key={row.id}><th scope="row">{row.name}</th><td>{row.confirmed}</td><td>{row.chicken} g</td><td>{kg(row.confirmed * row.chicken)}</td><td><span className={`p4-pill ${breach ? "p4-risk-pill" : "p4-ready-pill"}`}>{breach ? "At risk · review" : "Planned for protection"}</span></td></tr>)}
+      </Table>
+      <p className="p4-note">Supplier claim: 0 kg delivered today against PO HP-PO-1042 for 20 kg. Current physical accepted stock is shown separately above.</p>
+    </section>}
+
+    {tab === "menu" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-menu" aria-labelledby="p4-tab-menu">
+      <div className="p4-section-heading"><div><p className="p4-kicker">MANAGER REVIEW · PROPOSAL ONLY</p><h2>Menu recovery</h2><p>Suggested limits apply to new orders only. Existing customer commitments remain visible.</p></div><button className="p4-action-button" type="button" onClick={() => setActionsOpen(true)}>Preview proposed actions</button></div>
+      <label className="p4-search-label" htmlFor="menu-search">Find a menu item</label><input className="p4-search" id="menu-search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search menus"/>
+      <Table caption="Menu availability and proposed new order limits" headers={["Menu item", "Confirmed", "New order limit", "Availability", "Suggested action"]}>
+        {filteredRows.map(row => <tr key={row.id}><th scope="row"><button className="p4-row-detail" type="button" onClick={() => setSelectedMenu(row.id)}>{row.name}</button></th><td>{row.confirmed}{breach && row.chicken > 0 ? " · at risk" : ""}</td><td>{row.quota}</td><td><span className={`p4-pill ${breach && row.chicken ? "p4-risk-pill" : "p4-ready-pill"}`}>{breach && row.chicken ? "At risk" : !row.chicken ? "Available · capacity conditional" : row.quota ? "Limited" : "Pause new orders"}</span></td><td>{breach && row.chicken ? "Review commitments" : row.chicken && !row.quota ? "Pause NEW orders" : row.quota ? `Allow up to ${row.quota} new` : "Capacity check"}</td></tr>)}
+      </Table>
+      <p className="p4-note">Flavoured Fries uses no chicken. Its availability depends on other ingredients and kitchen capacity.</p>
+    </section>}
+
+    <footer className="p4-footer"><span>* Synthetic demo feasibility · New external purchase: <strong>0 kg · RM0</strong></span><Link to="/prep-planning">View Prep Planning <span aria-hidden="true">→</span></Link></footer>
+
+    {selectedMenu && <div className="p4-dialog-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget) setSelectedMenu(null); }}><section className="p4-dialog" role="dialog" aria-modal="true" aria-labelledby="menu-dialog-title"><button type="button" className="p4-dialog-close" onClick={() => setSelectedMenu(null)} aria-label="Close menu details">×</button><p className="p4-kicker">MENU DETAIL</p><h2 id="menu-dialog-title">{rows.find(row => row.id === selectedMenu)?.name}</h2><p>Confirmed portions: {rows.find(row => row.id === selectedMenu)?.confirmed}. Proposed new order limit: {rows.find(row => row.id === selectedMenu)?.quota}.</p><p>Recipe unchanged. Manager review required before any manual menu update.</p></section></div>}
+    {actionsOpen && <div className="p4-dialog-backdrop" role="presentation" onClick={event => { if (event.target === event.currentTarget) setActionsOpen(false); }}><section className="p4-dialog" role="dialog" aria-modal="true" aria-labelledby="actions-dialog-title"><button type="button" className="p4-dialog-close" onClick={() => setActionsOpen(false)} aria-label="Close proposed actions">×</button><p className="p4-kicker">DRAFT · NO MENU CHANGES MADE</p><h2 id="actions-dialog-title">Proposed recovery actions</h2>{breach ? <p>Current stock is insufficient. Pause new chicken orders and review confirmed commitments with a manager.</p> : actions.length ? <ul>{actions.map(action => <li key={action.id}>{rows.find(row => row.id === action.menuId)?.name}: allow up to {action.newOrderQuota} additional new portions.</li>)}</ul> : <p>No additional chicken menu portions are available at this stock level.</p>}<p>These suggestions require manager review and a manual update. This preview cannot approve, publish, or execute them.</p></section></div>}
+  </main></PageContainer>;
 }
+

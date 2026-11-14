@@ -12,6 +12,9 @@ describe("Happy Potato internal recovery", () => {
     const result = plan();
     expect(result).toMatchObject({ chicken: 10000, confirmedChicken: 8750, discretionary: 1250, assigned: 9950, residual: 50, fries: 30000, friesForecastGrams: 27000, chickenForecastGrams: 22000, issues: [] });
     expect(result.rows.map(row => row.quota)).toEqual([0, 0, 12, 55]);
+    expect(result.fries).toBe(30000);
+    expect(result.friesForecastGrams).toBe(27000);
+    expect(result.friesAssigned).toBe(23760);
     expect(result.scenario).toMatchObject({ feasibility: "FEASIBLE", forecastChickenPortionsServed: 72, forecastChickenPortionsUnmet: 78, confirmedChickenPortionsProtected: 60, newPurchaseKgMilli: 0, additionalCostSen: 0 });
     expect(result.scenario.batches.map(batch => batch.status)).toEqual(Array(4).fill("PLANNED"));
   });
@@ -22,7 +25,10 @@ describe("Happy Potato internal recovery", () => {
   it("flags a 750g confirmed deficit", () => {
     const result = plan({ ...preview, lots: preview.lots.map(lot => lot.ingredient === "chicken" ? { ...lot, grams: 8000 } : lot) });
     expect(result.deficit).toBe(750);
-    expect(result.scenario.feasibility).toBe("BREACH_RISK");
+    expect(result.scenario).toMatchObject({ feasibility: "BREACH_RISK", confirmedChickenPortionsProtected: 0, newPurchaseKgMilli: 0, additionalCostSen: 0 });
+    expect(result.scenario.forecastChickenPortionsServed).toBe(0);
+    expect(result.assigned).toBe(0);
+    expect(result.rows.filter(row => row.chicken > 0).every(row => row.protected === 0 && row.quota === 0)).toBe(true);
   });
   it("excludes expired and unaccepted chicken and blocks unapproved recipes", () => {
     for (const change of [{ expiresOn: preview.date }, { accepted: false }]) {
