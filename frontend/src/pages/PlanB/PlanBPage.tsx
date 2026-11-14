@@ -1,3 +1,4 @@
+import { OrderProtection } from "../../features/recovery/plan-b/OrderProtection";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AlertTriangle, Check, Drumstick, Utensils, Package, ShieldCheck, Soup, Layers } from "lucide-react";
@@ -152,20 +153,7 @@ function PlanBWorkspace({ preview, baselineChicken, demoReason }: { preview: Pla
       <p className="p4-sim-note">{friesDeficit > 0 ? "Review the confirmed Combo and Regular Fries commitments." : `${kg(result.confirmedFries)} required for confirmed meals. Extra portions depend on fryer capacity.`}</p></aside></div>
     </section>}
 
-    {tab === "orders" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-orders" aria-labelledby="p4-tab-orders">
-      <div className="p4-section-heading"><div><p className="p4-kicker">CUSTOMER COMMITMENTS</p><h2>Confirmed order protection</h2><p>Confirmed demand is a subset of forecast. No orders are automatically changed.</p></div><span className={`p4-pill ${breach ? "p4-risk-pill" : "p4-ready-pill"}`}>{breach ? "Full protection at risk" : "Protect confirmed first"}</span></div>
-      <div className="p4-order-callout"><ShieldCheck/><div><strong>{protectedOrders.reduce((n, row) => n + row.confirmed, 0)} confirmed chicken portions</strong><p>{breach ? `Full order protection needs review.` : `${kg(result.confirmedChicken)} reserved from the shared chicken lot before any new demand.`}</p></div></div>
-      <Table caption="Confirmed chicken orders" headers={["Menu", "Confirmed portions", "Chicken per portion", "Demand", "Status"]}>
-        {protectedOrders.map(row => <tr key={row.id}><th scope="row">{row.name}</th><td>{row.confirmed}</td><td>{row.chicken} g</td><td>{kg(row.confirmed * row.chicken)}</td><td><span className={`p4-pill ${breach ? "p4-risk-pill" : "p4-ready-pill"}`}>{breach ? "At risk · review" : "Planned for protection"}</span></td></tr>)}
-      </Table>
-      <h3>Frozen fries for confirmed orders</h3>
-      <p><strong>{rows.reduce((sum, row) => sum + row.confirmed, 0)} confirmed portions across all menus.</strong></p>
-      <p>{kg(result.confirmedFries)} required from {kg(result.fries)} accepted stock. Combo portions appear in both ingredient tables and count once in the order total.</p>
-      <Table caption="Confirmed portions requiring fries" headers={["Menu item", "Confirmed portions", "Fries required"]}>
-        {friesRows.map(row => <tr key={row.id}><th scope="row">{row.name}</th><td>{row.confirmed}</td><td>{kg(row.confirmed * row.fries)}</td></tr>)}
-      </Table>
-      <p className="p4-note">Supplier claim: 0 kg delivered today against PO HP-PO-1042 for 20 kg. Current physical accepted stock is shown separately above.</p>
-    </section>}
+    {tab === "orders" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-orders" aria-labelledby="p4-tab-orders"><OrderProtection plan={result} /></section>}
 
     {tab === "menu" && <section className="p4-panel p4-tab-panel" role="tabpanel" id="p4-panel-menu" aria-labelledby="p4-tab-menu">
       <div className="p4-section-heading"><div><p className="p4-kicker">MANAGER REVIEW · PROPOSAL ONLY</p><h2>Menu recovery</h2><p>Suggested limits apply to new orders only. Existing customer commitments remain visible.</p></div><button className="p4-action-button" type="button" onClick={() => setActionsOpen(true)}>Preview proposed actions</button></div>
