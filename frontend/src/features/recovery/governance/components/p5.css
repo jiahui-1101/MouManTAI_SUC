@@ -1,0 +1,130 @@
+/* P5-only styles. Builds on tokens.css; local status colours are scoped to .p5. */
+.p5 {
+  --p5-danger: #a32020;
+  --p5-danger-soft: #fbeaea;
+  --p5-warn: #8a5a00;
+  --p5-warn-soft: #fdf3dc;
+  --p5-info-soft: #eef2f7;
+  display: grid;
+  gap: 20px;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  min-width: 0;
+}
+@media (prefers-color-scheme: dark) {
+  .p5 {
+    --p5-danger: #ff8c8c;
+    --p5-danger-soft: #3a1a1a;
+    --p5-warn: #f2c46b;
+    --p5-warn-soft: #33290f;
+    --p5-info-soft: #1b2530;
+  }
+}
+.p5 h2 { font-family: var(--font-heading); font-size: 17px; margin: 0; }
+.p5 h3 { font-family: var(--font-heading); font-size: 14px; margin: 0 0 6px; }
+.p5 p { margin: 0; }
+.p5 a { color: var(--brand); }
+.p5-muted { color: var(--ink-2); }
+.p5-mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+
+.p5-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 0;
+}
+.p5-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.p5-stack { display: grid; gap: 10px; }
+
+.p5-badge {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--paper);
+}
+.p5-badge--brand { background: var(--brand-soft); color: var(--brand); border-color: transparent; }
+.p5-badge--danger { background: var(--p5-danger-soft); color: var(--p5-danger); border-color: var(--p5-danger); }
+.p5-badge--warn { background: var(--p5-warn-soft); color: var(--p5-warn); border-color: var(--p5-warn); }
+
+.p5-alert {
+  border-radius: 8px;
+  padding: 10px 14px;
+  border-left: 4px solid var(--line);
+  background: var(--p5-info-soft);
+}
+.p5-alert--danger { border-left-color: var(--p5-danger); background: var(--p5-danger-soft); color: var(--p5-danger); }
+.p5-alert--warn { border-left-color: var(--p5-warn); background: var(--p5-warn-soft); color: var(--p5-warn); }
+.p5-alert--ok { border-left-color: var(--brand); background: var(--brand-soft); }
+
+.p5-grid2 { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1024px) { .p5-grid2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+
+.p5-table { width: 100%; border-collapse: collapse; }
+.p5-table th, .p5-table td { text-align: left; vertical-align: top; padding: 8px 6px; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.p5-table th { width: 42%; color: var(--ink-2); font-weight: 500; }
+.p5-list { list-style: disc; padding-left: 20px; display: grid; gap: 4px; }
+
+.p5-btn {
+  font: inherit;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.p5-btn--primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.p5-btn--danger { color: var(--p5-danger); border-color: var(--p5-danger); }
+.p5-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.p5-btn:focus-visible, .p5 select:focus-visible, .p5 textarea:focus-visible, .p5 summary:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.p5-reason { font-size: 12px; color: var(--p5-danger); }
+
+.p5 textarea, .p5 select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.p5 label { font-weight: 600; display: grid; gap: 6px; }
+
+.p5-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  z-index: 50;
+}
+.p5-dialog {
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 20px;
+  width: min(480px, 100%);
+  display: grid;
+  gap: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.p5-dev {
+  border: 2px dashed var(--p5-warn);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--p5-warn-soft);
+}
+.p5-dev summary { cursor: pointer; font-weight: 700; color: var(--p5-warn); }
+.p5-dev .p5-row { margin-top: 10px; }
