@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search } from "lucide-react";
 import { StatusBadge, type StatusTone } from "../../components/ui";
+import { PAGE_SIZE, Pager, pageOf } from "./Pager";
 import { selectExtractionVersions, type DemoState, type InboxMessage } from "../../store/demoStore";
 
 type QueueTab = "ACTIVE" | "HISTORY";
@@ -33,18 +34,22 @@ export function ReviewQueue({ state, selectedId }: { state: DemoState; selectedI
   const [query, setQuery] = useState("");
   const items = useMemo(() => state.messages.map((m) => toItem(state, m)), [state]);
   const active = items.filter((i) => !i.closed);
-  const visible = items
+  const filtered = items
     .filter((i) => (tab === "ACTIVE" ? !i.closed : i.closed))
     .filter((i) => `${i.title} ${i.message.senderDisplay} ${i.reason} ${i.message.id}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const [page, setPage] = useState(() => pageOf(filtered.findIndex((i) => i.message.id === selectedId)));
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(page, pages);
+  const visible = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
   return <section className="rq" aria-labelledby="rq-title">
     <header className="rq__head">
       <div><p className="rq__eyebrow">Human review</p><h2 id="rq-title" className="rq__title">Review queue</h2></div>
       <span className="rq__count">{active.length} active</span>
     </header>
     <div className="rq__tools">
-      <label className="rq__search"><Search aria-hidden="true" size={16} /><span className="sr-only">Search review queue</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search subject, sender, reason" /></label>
+      <label className="rq__search"><Search aria-hidden="true" size={16} /><span className="sr-only">Search review queue</span><input value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} placeholder="Search subject, sender, reason" /></label>
       <div className="rq__tabs" role="group" aria-label="Queue view">
-        {(["ACTIVE", "HISTORY"] as const).map((t) => <button key={t} type="button" aria-pressed={tab === t} className={tab === t ? "is-active" : ""} onClick={() => setTab(t)}>{t === "ACTIVE" ? "Active reviews" : "History"}</button>)}
+        {(["ACTIVE", "HISTORY"] as const).map((t) => <button key={t} type="button" aria-pressed={tab === t} className={tab === t ? "is-active" : ""} onClick={() => { setTab(t); setPage(1); }}>{t === "ACTIVE" ? "Active reviews" : "History"}</button>)}
       </div>
     </div>
     <ul className="rq__list" aria-label="Review queue items">
@@ -65,5 +70,6 @@ export function ReviewQueue({ state, selectedId }: { state: DemoState; selectedI
         </div>
       </li>)}
     </ul>
+    <Pager total={filtered.length} page={current} pageSize={PAGE_SIZE} onPage={setPage} label="Review queue pages" />
   </section>;
 }

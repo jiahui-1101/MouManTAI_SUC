@@ -1,5 +1,5 @@
 import "../p1.css";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
@@ -22,6 +22,7 @@ import { StatusBadge, Tabs } from "../../components/ui";
 import { EvidencePanel } from "../../features/messaging/EvidencePanel";
 import { OfferReview } from "../../features/messaging/OfferReview";
 import { ReviewQueue } from "../../features/messaging/ReviewQueue";
+import { SplitLayout } from "../../features/messaging/SplitLayout";
 import { segmentRawText } from "../../features/messaging/segmentRawText";
 
 const TITLE = titleFor("/message-intelligence");
@@ -47,10 +48,9 @@ export function MessageIntelligencePage() {
     return <PageContainer title={TITLE}><div className="fm-empty mi-empty"><strong>No messages to review</strong><p>The active demo scenario has no supplier messages.</p><Link to="/channels">Load a demo scenario</Link></div></PageContainer>;
   }
   // First visit: the full message queue only. The review panel opens after a message is chosen.
-  if (!messageId) return <PageContainer title={TITLE}><div className="mi-layout mi-layout--queue"><ReviewQueue state={state} selectedId={null} /></div></PageContainer>;
-  const message = state.messages.find((m) => m.id === messageId);
+  const message = messageId ? state.messages.find((m) => m.id === messageId) : undefined;
   return <PageContainer title={TITLE}>
-    <ResizableLayout>
+    <SplitLayout open={Boolean(messageId)}>
       <ReviewQueue state={state} selectedId={message?.id ?? null} />
       <div className="mi-layout__detail">
         <Link className="mi-close" to="/message-intelligence" aria-label="Close review panel">×</Link>
@@ -58,41 +58,10 @@ export function MessageIntelligencePage() {
           ? <div role="alert" className="fm-empty mi-empty"><strong>Message not found</strong><p>{messageId} is not in the active offline fixture.</p><Link to="/inbox">Back to inbox</Link></div>
           : message.kind === "SUPPLIER_OFFER" ? <OfferReview key={message.id} message={message} /> : <Workspace key={message.id} message={message} />}
       </div>
-    </ResizableLayout>
+    </SplitLayout>
   </PageContainer>;
 }
 
-const DEFAULT_QUEUE_PCT = 55;
-const MIN_PCT = 30;
-const MAX_PCT = 70;
-/** Queue | drag handle | detail. Width is a % of the layout. Drag, ←/→ (Shift = larger), Home or double-click resets. */
-function ResizableLayout({ children }: { children: [ReactNode, ReactNode] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [pct, setPct] = useState(DEFAULT_QUEUE_PCT);
-  const clamp = (v: number) => Math.round(Math.max(MIN_PCT, Math.min(MAX_PCT, v)));
-  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    const box = ref.current?.getBoundingClientRect();
-    if (!box || box.width === 0) return;
-    const move = (e: PointerEvent) => setPct(clamp(((e.clientX - box.left) / box.width) * 100));
-    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.classList.remove("is-resizing"); };
-    document.body.classList.add("is-resizing");
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  };
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? 10 : 2;
-    const next = event.key === "ArrowLeft" ? pct - step : event.key === "ArrowRight" ? pct + step : event.key === "Home" ? DEFAULT_QUEUE_PCT : null;
-    if (next === null) return;
-    event.preventDefault();
-    setPct(clamp(next));
-  };
-  return <div className="mi-layout" ref={ref} style={{ "--rq-pct": `${pct}fr`, "--detail-pct": `${100 - pct}fr` } as CSSProperties}>
-    {children[0]}
-    <div className="mi-resizer" role="separator" aria-orientation="vertical" aria-label="Resize review queue" aria-valuenow={pct} aria-valuemin={MIN_PCT} aria-valuemax={MAX_PCT} aria-valuetext={`Queue ${pct}% of width`} tabIndex={0} onPointerDown={onPointerDown} onKeyDown={onKeyDown} onDoubleClick={() => setPct(DEFAULT_QUEUE_PCT)} title="Drag to resize · double-click to reset"><span /></div>
-    {children[1]}
-  </div>;
-}
 
 function Workspace({ message }: { message: InboxMessage }) {
   const state = useDemoState();

@@ -218,3 +218,17 @@ describe("Review layout", () => {
     }
   });
 });
+
+describe("Review queue pagination", () => {
+  it("shows five messages per page with Previous/Next and keeps the selected page", () => {
+    demoStore.loadFixture("SUPPLIER_OFFER");
+    renderAt("/message-intelligence");
+    expect(screen.getByText("Showing 1–5 of 6")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Previous page" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("Showing 6–6 of 6")).toBeTruthy();
+    fireEvent.click(screen.getByRole("link", { name: /Open review HP-MSG-OL-OFFER/ }));
+    expect(screen.getByText("Showing 6–6 of 6")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Page 2" }).getAttribute("aria-current")).toBe("page");
+  });
+});

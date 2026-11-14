@@ -67,6 +67,7 @@ describe("Inbox controls", () => {
 
   it("C-09 Impact Explorer link appears only after real verification", async () => {
     const r = app("/inbox");
+    fireEvent.click(list().getByRole("button", { name: /Demo Poultry Supply A09:01 MYT/ }));
     const detail = () => within(screen.getByRole("article", { name: "Selected message" }));
     expect(detail().queryByRole("link", { name: "Impact Explorer" })).toBeNull();
     act(() => { demoStore.confirmExtractionReview("HP-MSG-WA-001"); });
@@ -209,13 +210,14 @@ describe("Channels and Settings controls", () => {
     const r = app("/settings");
     fireEvent.click(screen.getByRole("checkbox", { name: /Show processing timeline/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /Show unread messages first/ }));
-    act(() => demoStore.select("HP-MSG-WA-001"));
+    act(() => demoStore.select("HP-MSG-WA-001")); // opening a message shows its detail panel
     await nav(r, "/inbox");
     expect(screen.queryByRole("list", { name: "Processing timeline" })).toBeNull();
     expect(list().getAllByRole("button").at(-1)!.textContent).toMatch(/Demo Poultry Supply A/);
     await nav(r, "/settings");
     fireEvent.click(btn(/Reset demo/));
     expect(s().preferences).toEqual({ unreadFirst: false, showProcessingTimeline: true });
+    act(() => demoStore.select("HP-MSG-WA-001"));
     await nav(r, "/inbox");
     expect(screen.getByRole("list", { name: "Processing timeline" })).toBeTruthy();
   });
