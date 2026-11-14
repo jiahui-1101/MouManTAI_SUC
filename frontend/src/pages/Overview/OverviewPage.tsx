@@ -258,7 +258,7 @@ function DisruptionPanel({ incident, link, po, claim, ready }: {
 function DisruptionDetail({ title, icon, alert, link, onClose, children }: { title: string; icon: ReactNode; alert?: boolean; link: string; onClose: () => void; children: ReactNode }) {
   const panelRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    if (window.matchMedia("(max-width: 900px)").matches) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (window.matchMedia?.("(max-width: 900px)").matches) panelRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }, [title]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -355,7 +355,7 @@ function ReadinessDetail({ r, onClose }: { r: ReadinessRow; onClose: () => void 
   const panelRef = useRef<HTMLElement>(null);
   useEffect(() => {
     // On narrow screens the panel stacks below the cards, so bring it into view.
-    if (window.matchMedia("(max-width: 900px)").matches) panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (window.matchMedia?.("(max-width: 900px)").matches) panelRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   }, [r.ingredientId]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
