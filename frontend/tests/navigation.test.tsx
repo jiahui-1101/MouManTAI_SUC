@@ -30,7 +30,23 @@ function verifyAndAssessSharedIncident() {
 }
 
 /** Routes whose pages have been implemented; all others must still be empty shells. */
-const IMPLEMENTED = new Set(["/inbox", "/message-intelligence", "/channels", "/settings", "/overview", "/incidents", "/impact", "/recovery/plan-a", "/recovery/plan-b", "/prep-planning"]);
+const IMPLEMENTED = new Set([
+  "/inbox",
+  "/message-intelligence",
+  "/channels",
+  "/settings",
+  "/overview",
+  "/incidents",
+  "/impact",
+  "/recovery/plan-a",
+  "/recovery/plan-b",
+  "/prep-planning",
+  "/recovery/compare",
+  "/approvals",
+  "/execution",
+  "/outcomes",
+  "/decision-memory",
+]);
 
 describe("pages", () => {
   it.each(NAV_ITEMS.map((item) => [item.path, item.title]))("%s shows heading %s", (path, title) => {
@@ -53,46 +69,57 @@ describe("pages", () => {
     expect(screen.getByText("External supply workspace is waiting")).toBeTruthy();
   });
 
-  it("shows Plan B pending until P1 verification and P2 impact exist", () => {
+  it("opens the local Plan B demo from the no-incident landing", async () => {
     renderAt("/recovery/plan-b");
-    expect(screen.getByText("Waiting for a verified supplier incident and stock snapshot.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "No incident · Working well" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("link", { name: /Open Plan B recovery/ }));
+    expect(await screen.findByText("LOCAL DEMO")).toBeTruthy();
   });
 
   it("shows the Plan B allocation and menu proposal", () => {
     verifyAndAssessSharedIncident();
-    renderAt("/recovery/plan-b");
+    renderAt("/recovery/plan-b?view=recovery");
     expect(heading()).toBe("Plan B — Internal Recovery");
     expect(screen.getByRole("tab", { name: "Stock Allocation" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Order Protection" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Menu Recovery" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /View Prep Planning/ }).getAttribute("href")).toBe("/prep-planning");
   });
 
   it("recalculates stock across tabs and resets to the canonical demo", async () => {
     verifyAndAssessSharedIncident();
-    renderAt("/recovery/plan-b");
-    fireEvent.click(screen.getByRole("button", { name: "8.00 kg" }));
-    expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
-    expect(screen.getByText(/0.75 kg shortfall/)).toBeTruthy();
+    renderAt("/recovery/plan-b?view=recovery");
+    fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "8000" } });
+    expect(screen.getByText("Chicken shortfall · 0.75 kg")).toBeTruthy();
+    expect(screen.getByText(/Chicken shortfall · 0.75 kg/)).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Order Protection" }));
-    expect(within(screen.getByRole("tabpanel", { name: "Order Protection" })).getAllByText("At risk · review").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Missing ingredients 2" }));
+    expect(within(screen.getByRole("tabpanel", { name: "Order Protection" })).getAllByText(/Missing .* chicken/).length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Menu Recovery" }));
     expect(screen.getAllByText("At risk").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Stock Allocation" }));
-    fireEvent.click(screen.getByRole("button", { name: "Reset Demo" }));
+    fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "10000" } });
     expect(within(screen.getByRole("region", { name: "Plan B summary" })).getByText("10.00 kg", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("Plan Feasible*")).toBeTruthy();
   });
 
-  it("shows prep and lets the manager inspect the tenders batch", () => {
+  it("compares read-only original prep with the editable recovery queue", () => {
     renderAt("/prep-planning");
-    expect(heading()).toBe("Prep Planning");
-    const batch = screen.getByRole("button", { name: /Chicken Tenders, 15 Confirmed/ });
-    fireEvent.click(batch);
-    expect(batch.getAttribute("aria-pressed")).toBe("true");
-    expect(screen.getByRole("heading", { name: "HP-BATCH-B-03 · Chicken Tenders" })).toBeTruthy();
+    const timeline = screen.getByRole("region", { name: "Kitchen timeline in MYT" });
+    expect(timeline.querySelectorAll(".prep-bar").length).toBeGreaterThan(4);
+    expect(screen.getByText("95", { exact: true })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Before Incident" }));
+    expect(screen.queryByRole("button", { name: "Edit Schedule" })).toBeNull();
+    expect(screen.getByText(/20.00 kg expected, pending receipt/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "After Incident" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit Schedule" }));
+    fireEvent.change(screen.getByLabelText("Duration (minutes)"), { target: { value: "35" } });
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(screen.getAllByText(/misses its ready time by/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Batch List" }));
+    expect(screen.getByRole("cell", { name: "35" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reset Schedule" }));
+    expect(screen.queryByRole("cell", { name: "35" })).toBeNull();
   });
-
   it("shows the product name", () => {
     renderAt("/overview");
     const header = within(screen.getByRole("banner", { name: "MouManTAI portal" }));

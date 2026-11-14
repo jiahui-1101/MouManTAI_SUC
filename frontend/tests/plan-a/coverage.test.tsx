@@ -1,5 +1,6 @@
 import { afterEach, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { RecoveryProjection } from "../../src/features/recovery/plan-a/components/RecoveryProjection";
 import { SupplyCoverage } from "../../src/features/recovery/plan-a/components/SupplyCoverage";
 import { buildPlanAScenario } from "../../src/features/recovery/plan-a/domain";
 import { makeCanonicalSourcingInput, makePlanAScenarioInput } from "./domain/happyPotatoFactory";
@@ -17,4 +18,18 @@ it("shows physical vs conditional supply and moves the forecast marker when sour
   expect(parseFloat(screen.getByTestId("coverage-physical").style.width)).toBeCloseTo(12000/(12000+15000)*100);
   expect(parseFloat(screen.getByTestId("coverage-forecast").style.left)).toBeCloseTo(22000/(12000+15000)*100);
   expect(screen.getByRole("img").getAttribute("aria-label")).toContain("projected residual 5kg");
+});
+
+it("keeps unfamiliar assumptions and every evidence reference accessible in structured projection details", () => {
+  const result = buildPlanAScenario(makePlanAScenarioInput());
+  if (!result.ok) throw Error(result.error.message);
+  result.value.assumptions.push("Confirm loading-bay access with the outlet manager.");
+  const before = structuredClone(result.value);
+  render(<RecoveryProjection scenario={result.value}/>);
+  expect(screen.getByText("Confirm loading-bay access with the outlet manager.")).toBeTruthy();
+  for (const ref of result.value.evidenceRefs) expect(screen.getByText(ref)).toBeTruthy();
+  expect(screen.getByText(/Supplier-claimed ETA 10:15 · Assumed acceptance 10:30 · Unverified/)).toBeTruthy();
+  expect(screen.getByText("Refresh before approval")).toBeTruthy();
+  expect(screen.getByText(/Incoming supply is conditional/)).toBeTruthy();
+  expect(result.value).toEqual(before);
 });

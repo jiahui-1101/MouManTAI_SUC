@@ -55,7 +55,7 @@ it("publishes only on explicit click, leaves PO drafts unsent and does not wire 
   render(<MemoryRouter><PlanAWorkspace {...adapted.value} publisher={publisher}/></MemoryRouter>);
   expect(commitScenarioA).not.toHaveBeenCalled();
   const click=(name:string)=>fireEvent.click(screen.getByRole("button",{name}));
-  click("Select HP-OFFER-002");click("Generate Plan A preview");click("Create Internal PO Draft");
+  click("Select HP-OFFER-002");click("Generate preview");click("Create Internal PO Draft");
   expect(commitScenarioA).not.toHaveBeenCalled();click("Propose Plan A");
   await waitFor(()=>expect(screen.getByText(/Scenario storage acknowledged/)).toBeTruthy());
   expect((screen.getByRole("textbox",{name:"Internal PO Draft content"}) as HTMLTextAreaElement).value).toContain("NOT_APPROVED / NOT_SENT");
@@ -64,7 +64,7 @@ it("publishes only on explicit click, leaves PO drafts unsent and does not wire 
 });
 it("shows publication pending instead of a fake proposal action without a dispatcher",()=>{
   const adapted=adaptPlanAInputs(makeIntegrationRead());if(!adapted.ok)throw Error(adapted.message);
-  render(<MemoryRouter><PlanAWorkspace {...adapted.value}/></MemoryRouter>);expect(screen.getByText(/publication is pending the shared scenario dispatcher/)).toBeTruthy();expect(screen.queryByRole("button",{name:"Propose Plan A"})).toBeNull();
+  render(<MemoryRouter><PlanAWorkspace {...adapted.value}/></MemoryRouter>);expect(screen.getByText(/Shared comparison not connected yet/)).toBeTruthy();expect(screen.queryByRole("button",{name:"Propose Plan A"})).toBeNull();
 });
 it("does not revive an in-flight publication notice after inputs change and are restored",async()=>{
   const {publisher}=dependencies();

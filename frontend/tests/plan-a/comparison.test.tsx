@@ -9,7 +9,7 @@ it("keeps PO shortfall, accepted stock and forecast gap separate", () => {
   const result = deriveRecoverySourcingNeed(makeCanonicalSourcingInput());
   if (!result.ok) throw Error(result.error.message);
   render(<SupplyNeedSummary need={result.value}/>);
-  for (const [label, value] of [["Supplier-reported PO shortfall", "20kg"], ["Accepted physical stock", "10kg"], ["Forecast ingredient gap", "12kg"]]) {
+  for (const [label, value] of [["Supplier-reported PO shortfall", "20kg"], ["Accepted stock", "10kg"], ["Forecast gap", "12kg"]]) {
     expect(screen.getByText(label!).parentElement?.textContent).toContain(value);
   }
 });

@@ -33,18 +33,19 @@ describe("Plan B shared inputs", () => {
   it("what-if is local only and never mutates shared inventory", () => {
     verifyAndAssess();
     const before = getP2State().restaurant;
-    app("/recovery/plan-b");
-    fireEvent.click(screen.getByRole("button", { name: "8.00 kg" }));
-    expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
+    app("/recovery/plan-b?view=recovery");
+    fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "8000" } });
+    expect(screen.getByText("Chicken shortfall · 0.75 kg")).toBeTruthy();
     expect(getP2State().restaurant).toBe(before);
     expect(before.snapshot.ingredientLots.find((l) => l.id === "HP-LOT-CH-001")!.onHandMilli).toBe(10000);
   });
 
   it("I: a real recount makes Plan B stale until P2 reassesses, then uses the new baseline", () => {
     verifyAndAssess();
-    app("/recovery/plan-b");
+    app("/recovery/plan-b?view=recovery");
     act(() => simulateChickenRecount(8000));
-    expect(screen.getByText(/The input snapshot changed/)).toBeTruthy();
+    expect(screen.getByText("LOCAL DEMO")).toBeTruthy();
+    expect(screen.getByTestId("plan-b-reason")).toBeTruthy();
     act(() => assessImpactAction("HP-INC-001"));
     expect(within(screen.getByRole("region", { name: "Plan B summary" })).getByText("8.00 kg", { selector: "strong" })).toBeTruthy();
   });

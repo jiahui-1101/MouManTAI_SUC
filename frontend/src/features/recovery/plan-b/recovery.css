@@ -54,7 +54,7 @@
 .p4-green-hero { display:grid; gap:.7rem; padding:clamp(1.2rem,3vw,2rem); border-radius:1.15rem; color:#f6f8f3; background:var(--p4-forest); }
 .p4-green-hero h2 { max-width:42rem; font-size:clamp(1.7rem,3vw,2.45rem); letter-spacing:-.035em; }
 .p4-green-hero > p:not(.p4-kicker) { color:#d6e8dc; }
-.p4-green-hero .p4-kicker { color:var(--p4-mint); }
+.p4-green-hero .p4-kicker { color: var(--brand-primary-text); }
 .p4-brandline,.p4-hero-status { display:flex; align-items:center; justify-content:space-between; gap:.75rem; flex-wrap:wrap; }
 .p4-brandline { font-size:.78rem; font-weight:800; letter-spacing:.09em; }
 .p4-brandline span span { color:#b8d7c5; font-weight:500; }
@@ -152,3 +152,197 @@
 .p4-dashboard .p4-impact div { justify-content: flex-start; align-items: baseline; }
 .p4-dashboard .p4-tab-panel th,
 .p4-dashboard .p4-tab-panel td { padding-block: .55rem; line-height: 1.3; }
+
+/* Match the portal's Impact page type scale and panel rhythm. */
+.p4-dashboard { font-size: 13px; gap: 10px; }
+.p4-dashboard .p4-green-hero { padding: 12px 14px; border-radius: 10px; }
+.p4-dashboard .p4-green-hero h2 { font-size: 20px; }
+.p4-dashboard .p4-hero-status { gap: 6px; }
+.p4-dashboard .p4-hero-status span { padding: 3px 8px; font-size: 12px; }
+.p4-dashboard .p4-kpi-strip article { padding: 9px 10px; border-radius: 10px; }
+.p4-dashboard .p4-kpi-icon { width: 28px; height: 28px; border-radius: 8px; }
+.p4-dashboard .p4-kpi-strip strong { font-size: 18px; }
+.p4-dashboard .p4-tabs button { min-height: 36px; padding: 5px 12px; }
+.p4-dashboard .p4-tab-panel { padding: 12px 14px; gap: 10px; border-radius: 10px; }
+.p4-dashboard .p4-tab-panel h2 { font-size: 17px; }
+.p4-dashboard .p4-tab-panel h3 { font-size: 14px; }
+.p4-dashboard .p4-stock-summary strong { font-size: 20px; }
+.p4-dashboard .p4-stock-green { height: 14px; }
+.p4-dashboard .p4-stock-visual,
+.p4-dashboard .p4-simulation { padding: 10px 12px; }
+.p4-dashboard .p4-tab-panel th,
+.p4-dashboard .p4-tab-panel td { padding: 7px 9px; }
+
+/* Portal orange accents and warm surfaces, scoped to Plan B. */
+.p4-dashboard {
+  --p4-forest: var(--ink);
+  --p4-emerald: var(--action-primary);
+  --p4-mint: #ffbc8e;
+  --p4-cream: var(--brand-primary-soft);
+  color: var(--ink);
+}
+.p4-dashboard .p4-green-hero { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-inline-start: 4px solid var(--brand-primary); }
+.p4-dashboard .p4-green-hero > p:not(.p4-kicker),
+.p4-dashboard .p4-brandline span span { color: var(--ink-2); }
+.p4-dashboard .p4-hero-status span { background: var(--brand-primary-soft); color: var(--brand-primary-text); }
+.p4-dashboard .p4-demo-tag { border-color: var(--line); color: var(--brand-primary-text); }
+.p4-dashboard .p4-kpi-icon { background: var(--brand-primary-soft); color: var(--brand-primary-text); }
+.p4-dashboard .p4-tabs,
+.p4-dashboard .p4-tab-panel thead th { background: var(--brand-primary-soft); }
+.p4-dashboard .p4-tabs button { color: var(--ink); }
+.p4-dashboard .p4-tabs button[aria-selected="true"] { color: var(--text-on-brand); }
+.p4-dashboard .p4-allocation-legend i.is-new { border-color: var(--brand-primary-text); }
+.p4-dashboard .p4-stock-green,
+.p4-dashboard .p4-allocation-legend i.is-left { background: #e9e1db; }
+.p4-dashboard .p4-order-callout { background: var(--brand-primary-soft); }
+.p4-dashboard :focus-visible { outline-color: var(--brand-primary-text); }
+
+.p4-dashboard .p4-stock-visual { min-width: 0; }
+.p4-dashboard .p4-stock-visual table { min-width: 0; }
+.p4-dashboard .p4-stock-visual td:last-child { white-space: nowrap; }
+.p4-fries-results { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+.p4-fries-results div { display: grid; align-content: start; gap: 3px; padding: 8px; border-radius: 6px; background: var(--surface); }
+.p4-fries-results strong { color: var(--action-primary); font-size: 18px; }
+.p4-fries-results [data-shortage="true"] strong { color: var(--status-danger); }
+
+.p4-usage-list { display: grid; }
+.p4-usage-list > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
+.p4-usage-list > div > span { display: grid; gap: 2px; }
+.p4-usage-list b { color: var(--action-primary); white-space: nowrap; }
+.p4-stock-workspace .p4-simulation { align-content: start; }
+
+.p4-ingredient--chicken { --ingredient-tint: var(--brand-primary-soft); --ingredient-accent: var(--action-primary); }
+.p4-ingredient--fries { --ingredient-tint: #fff6db; --ingredient-accent: #80580e; }
+.p4-dashboard .p4-ingredient-title { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 6px; background: var(--ingredient-tint); color: var(--ingredient-accent); }
+.p4-dashboard .p4-ingredient .p4-simulation,
+.p4-dashboard .p4-ingredient thead th { background: var(--ingredient-tint); }
+
+.p4-ingredient-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.p4-ingredient-heading small { font-size: 11px; }
+.p4-stock-meter { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.p4-available { background: var(--ingredient-tint); color: var(--ingredient-accent); border-radius: 7px; padding: 5px 9px; }
+.p4-available strong { font-size: 16px; white-space: nowrap; }
+.p4-available small { font-size: 11px; font-weight: 500; }
+
+.p4-menu-usage { margin: 0; padding: 0; list-style: none; }
+.p4-menu-usage li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 6px 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+.p4-menu-usage strong { grid-column: 3; grid-row: 1; color: var(--ingredient-accent); white-space: nowrap; }
+.p4-menu-usage small { grid-column: 2; grid-row: 1; text-align: right; }
+
+.p4-ingredient .p4-ingredient-title { flex: 1; flex-wrap: wrap; }
+.p4-ingredient .p4-ingredient-title .p4-lot-label { margin-inline-start: auto; font-size: .55em; font-weight: 500; }
+
+.p4-menu-bars li { row-gap: 4px; }
+.p4-menu-bar { grid-column: 1 / -1; height: 7px; overflow: hidden; border-radius: 8px; background: var(--ingredient-tint); }
+.p4-menu-bar span { display: block; height: 100%; border-radius: inherit; background: var(--ingredient-accent); }
+
+.p4-stock-meter { align-items: start; }
+.p4-meter-detail { display: grid; min-width: 0; gap: 6px; padding-top: 4px; }
+.p4-meter-detail .p4-allocation-legend { gap: 4px 10px; }
+
+.p4-dashboard .p4-meter-detail .p4-allocation-legend { gap: 3px 7px; }
+.p4-dashboard .p4-meter-detail .p4-allocation-legend span { gap: 3px; font-size: 10px; white-space: nowrap; }
+.p4-dashboard .p4-meter-detail .p4-allocation-legend i { width: 6px; height: 6px; flex: none; }
+
+.p4-ingredient--chicken { --ingredient-chart: #ff681f; --ingredient-chart-light: #ffc194; }
+.p4-ingredient--fries { --ingredient-tint: #eaf5ff; --ingredient-accent: #064cac; --ingredient-chart: #1673ed; --ingredient-chart-light: #8ec7ff; }
+.p4-dashboard .p4-ingredient .p4-stock-green span:first-child,
+.p4-ingredient .is-confirmed { background: var(--ingredient-chart); }
+.p4-dashboard .p4-ingredient .p4-stock-green span:nth-child(2),
+.p4-ingredient .is-new { background: var(--ingredient-chart-light); }
+.p4-ingredient .p4-simulation input { accent-color: var(--ingredient-chart); }
+.p4-usage-chart { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 0 7px; margin: 0; }
+.p4-usage-chart figcaption { grid-column: 1 / -1; font-weight: 650; margin-bottom: 19px; }
+.p4-usage-axis { display: flex; flex-direction: column; justify-content: space-between; height: 112px; transform: translateY(-6px); font-size: 10px; }
+.p4-usage-plot { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); margin: 0; padding: 0; list-style: none; }
+.p4-usage-column { height: 112px; display: flex; align-items: end; justify-content: center; border-bottom: 1px solid var(--line); background: repeating-linear-gradient(to bottom,var(--line) 0 1px,transparent 1px 25%); }
+.p4-usage-plot li:first-child .p4-usage-column { border-left: 1px solid var(--line); }
+.p4-usage-fill { position: relative; width: 60%; max-width: 64px; background: var(--ingredient-chart); border-radius: 5px 5px 0 0; }
+.p4-usage-fill strong { position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 11px; }
+.p4-usage-category { text-align: center; padding: 4px 2px 0; font-size: 11px; }
+.p4-usage-category small { display: block; }
+
+.p4-dashboard .p4-usage-chart {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f3f0ed;
+}
+
+.p4-dashboard .p4-ingredient--fries .p4-presets button {
+  color: var(--ingredient-accent);
+  border-color: var(--ingredient-chart-light);
+}
+.p4-dashboard .p4-ingredient--fries .p4-presets button[aria-pressed="true"] {
+  background: var(--ingredient-accent);
+  border-color: var(--ingredient-accent);
+  color: var(--text-on-brand);
+}
+.p4-dashboard .p4-ingredient--fries .p4-simulation :focus-visible {
+  outline-color: var(--ingredient-accent);
+}
+.p4-dashboard .p4-ingredient--fries .p4-simulation label strong,
+.p4-dashboard .p4-ingredient--fries .p4-fries-results [data-shortage="false"] strong,
+.p4-dashboard .p4-ingredient--fries .p4-fries-results div:not([data-shortage]) strong {
+  color: var(--ingredient-accent);
+}
+
+.p4-usage-column { position: relative; }
+.p4-usage-required { position: absolute; bottom: 0; width: 66%; max-width: 70px; border: 1px dashed var(--ingredient-accent); border-radius: 5px 5px 0 0; }
+.p4-usage-chart figcaption small { display: block; font-weight: 400; }
+
+.p4-chart-stock { grid-column: 1 / -1; display: grid; gap: 3px; margin-bottom: 18px; }
+.p4-chart-stock label { display: flex; justify-content: space-between; font-size: 11px; }
+.p4-chart-stock meter { width: 100%; height: 9px; }
+.p4-chart-stock meter::-webkit-meter-optimum-value { background: var(--ingredient-chart); }
+.p4-sim-note { border-top: 1px solid var(--line); padding-top: 8px; }
+
+.p4-dashboard .p4-ingredient-card {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.p4-dashboard .p4-ingredient-summary {
+  grid-column: 1 / -1;
+  padding: 0;
+  border: 0;
+}
+
+.p4-dashboard .p4-five-results { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.p4-five-results [data-estimate="true"] { background: #ffe0c9; }
+.p4-five-results [data-shortage="true"] { background: #fff0ef; }
+
+.p4-dashboard .p4-five-results { gap: 4px; }
+.p4-dashboard .p4-five-results > div { min-width: 0; padding: 5px; font-size: 10px; line-height: 1.25; overflow-wrap: anywhere; }
+.p4-dashboard .p4-five-results strong { font-size: clamp(10px, 1vw, 14px); line-height: 1.2; }
+.p4-dashboard .p4-five-results small { font-size: 9px; }
+
+.p4-dashboard .p4-ingredient .p4-simulation input[type="range"] { height: 27px; }
+.p4-dashboard .p4-ingredient .p4-simulation input[type="range"]::-webkit-slider-runnable-track { height: 12px; border-radius: 999px; }
+.p4-dashboard .p4-ingredient .p4-simulation input[type="range"]::-moz-range-track { height: 12px; border-radius: 999px; }
+
+.p4-ingredient-alert {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 7px 9px;
+  border: 1px solid #e99c98;
+  border-radius: 6px;
+  background: #fff0ef;
+  color: #982623;
+}
+
+.p4-landing { justify-items: start; gap: 8px; }
+.p4-landing h2, .p4-landing p { margin: 0; }
+.p4-landing-icon { display: inline-flex; padding: 8px; border-radius: 8px; color: var(--status-success); background: var(--paper); }
+.p4-landing .fm-btn { margin-top: 4px; text-decoration: none; }
