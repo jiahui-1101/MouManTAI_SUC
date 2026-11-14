@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import type { ImpactAssessment, Incident, OperationalSnapshot } from "../../../types/restaurant";
 import type { RestaurantState } from "../../../services/mock/restaurantState";
 import type { SimulatedMessage } from "../../../services/mock/restaurantStore";
@@ -16,6 +17,9 @@ import {
 import { CAPABILITY_INGREDIENT } from "../graph";
 import { INCIDENT_TYPE_LABEL, ingredientName, supplierName, type ImpactState } from "../../incidents/model";
 import { Badge, Card, Notice, Qty, StatusBadge, SyntheticTag, fmtQty } from "../../incidents/components/ui";
+import { DisruptionPanel } from "../../incidents/components/DisruptionPanel";
+import { useRestaurantStore } from "../../../services/mock/restaurantStore";
+import { readinessRows } from "../../incidents/model";
 import { ConfirmedCoverage } from "../../incidents/components/ImpactPreview";
 import { multiplyByPortions } from "../../../utils/quantity";
 
@@ -24,32 +28,17 @@ import { multiplyByPortions } from "../../../utils/quantity";
 export function ImpactContext({ incident, snapshot, messages, impactState }: { incident: Incident; snapshot: OperationalSnapshot; messages: SimulatedMessage[]; impactState: ImpactState }) {
   const po = snapshot.purchaseOrders.find((p) => p.id === incident.poId);
   const claim = snapshot.supplierClaims.find((c) => c.poId === incident.poId);
-  const evidence =
-    impactState === "NOT_VERIFIED" ? <Badge tone="warn">UNVERIFIED supplier claim</Badge> : <Badge tone="info">Verified sender · supplier claim (not a receipt)</Badge>;
+  const { restaurant } = useRestaurantStore();
+  const ready = readinessRows(restaurant).find((r) => r.ingredientId === incident.ingredientId);
   return (
-    <Card title="Incident context" actions={<SyntheticTag />}>
-      <div className="p2-context">
-        <div>
-          <p className="p2-eyebrow">{INCIDENT_TYPE_LABEL[incident.type]} · <span className="p2-mono">{incident.type}</span></p>
-          <p className="p2-disruption__id">{incident.id}</p>
-          <p className="p2-muted">
-            {supplierName(incident.supplierId)} · PO <span className="p2-mono">{incident.poId}</span> · {ingredientName(incident.ingredientId)}
-          </p>
-          <div className="p2-badges"><StatusBadge status={incident.status} />{evidence}</div>
-        </div>
-        <dl className="p2-context__facts">
-          <div><dt>Expected delivery</dt><dd>{po?.expectedKgMilli != null ? <Qty milli={po.expectedKgMilli} /> : "Unknown"}</dd></div>
-          <div><dt>Claimed delivery today</dt><dd>{claim ? <Qty milli={claim.claimedDeliveryTodayKgMilli} /> : "Not applied"}</dd></div>
-          <div><dt>Supplier-reported shortage</dt><dd><Qty milli={incident.claimedShortfallKgMilli} /></dd></div>
-          <div><dt>Snapshot</dt><dd className="p2-mono">{snapshot.id} · r{snapshot.revision}</dd></div>
-        </dl>
-      </div>
+    <Card title="Incident context" actions={<StatusBadge status={incident.status} />}>
+      <DisruptionPanel incident={incident} link={`/incidents?incident=${incident.id}`} po={po} claim={claim} ready={ready} />
       <details className="p2-evidence">
         <summary>Evidence details ({messages.length} linked message{messages.length === 1 ? "" : "s"})</summary>
         <ul className="p2-messages">
           {messages.map((m) => (
             <li key={m.id} className="p2-message">
-              <div className="p2-message__meta"><Badge tone="info">{m.channel}</Badge><Badge tone="sim">SIMULATED_CHANNEL</Badge><span className="p2-mono">{m.id}</span></div>
+              <div className="p2-message__meta"><Badge tone="neutral">{m.channel}</Badge><Badge tone="neutral">Simulated channel</Badge><span className="p2-mono">{m.id}</span></div>
               <blockquote className="p2-message__text">{m.text}</blockquote>
             </li>
           ))}
@@ -63,51 +52,105 @@ export function ImpactContext({ incident, snapshot, messages, impactState }: { i
 
 /* B — before vs after ------------------------------------------------------ */
 
+type CoverKey = "before" | "after";
+
+/** Ring showing how much of the forecast need a supply covers. */
+function NeedRing({ parts, need, tone }: { parts: Array<{ milli: number; cls: string }>; need: number; tone: "ok" | "bad" }) {
+  const R = 48, C = 2 * Math.PI * R;
+  const total = parts.reduce((n, p) => n + p.milli, 0);
+  const pct = need > 0 ? Math.round((total / need) * 100) : 0;
+  let acc = 0;
+  return (
+    <svg viewBox="0 0 120 120" className="p2-cc__ring" aria-hidden="true">
+      <circle cx="60" cy="60" r={R} className="p2-cc__track" />
+      {parts.map((p) => {
+        const f = need > 0 ? Math.min(p.milli / need, Math.max(1 - acc, 0)) : 0;
+        const el = <circle key={p.cls} cx="60" cy="60" r={R} className={p.cls} strokeDasharray={`${f * C} ${C}`} strokeDashoffset={-acc * C} transform="rotate(-90 60 60)" />;
+        acc += f;
+        return el;
+      })}
+      <text x="60" y="58" className={`p2-cc__pct p2-cc__pct--${tone}`}>{pct}%</text>
+      <text x="60" y="76" className="p2-cc__of">of need</text>
+    </svg>
+  );
+}
+
+function CoverageCompare({ stock, physical, incoming, claimed, after, need }: { stock: number; physical: number; incoming: number; claimed: number; after: number; need: number }) {
+  const [open, setOpen] = useState<CoverKey | null>(null);
+  const toggle = (k: CoverKey) => setOpen((c) => (c === k ? null : k));
+  const projected = stock + incoming;
+  const missing = Math.max(need - after, 0);
+  const cards: Array<{ key: CoverKey; title: string; total: number; sub: string; tone: "ok" | "bad"; parts: Array<{ milli: number; cls: string }>; badge: ReactNode }> = [
+    { key: "before", title: "Before the claim", total: projected, sub: `${fmtQty(stock)} kg stock + ${fmtQty(incoming)} kg PO`, tone: "ok",
+      parts: [{ milli: stock, cls: "p2-cc__stock" }, { milli: incoming, cls: "p2-cc__po" }], badge: <Badge tone="ok">Covered</Badge> },
+    { key: "after", title: "After the claim", total: after, sub: `${fmtQty(after)} kg stock · ${fmtQty(missing)} kg missing`, tone: "bad",
+      parts: [{ milli: after, cls: "p2-cc__stock" }], badge: <Badge tone="bad">Short {fmtQty(missing)} kg</Badge> },
+  ];
+  const sel = cards.find((c) => c.key === open) ?? null;
+  return (
+    <div className="p2-cc-wrap">
+      <div className={`p2-ready__stage${sel ? " p2-ready__stage--open" : ""}`}>
+        <div className="p2-cc">
+          {cards.map((c) => (
+            <div key={c.key} role="button" tabIndex={0} aria-pressed={open === c.key} aria-label={`Show details: ${c.title}`}
+              className={`p2-ready p2-ready--clickable p2-cc__card${open === c.key ? " p2-ready--selected" : ""}`}
+              onClick={() => toggle(c.key)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(c.key); } }}>
+              <div className="p2-ready__head"><span className="p2-ready__name">{c.title}</span>{c.badge}</div>
+              <div className="p2-cc__body">
+                <NeedRing parts={c.parts} need={need} tone={c.tone} />
+                <div className="p2-cc__text">
+                  <span className="p2-cc__total"><Qty milli={c.total} /></span>
+                  <span className="p2-cc__sub">{c.sub}</span>
+                  <span className="p2-cc__sub">Need {fmtQty(need)} kg for forecast</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {sel && (
+          <section className="p2-node-detail p2-ready__detail" aria-live="polite" aria-label={`Details: ${sel.title}`}>
+            <header className="p2-node-detail__head">
+              <div className="p2-node-detail__name">
+                <h3 className="p2-node-detail__title">{sel.title}</h3>
+                <p className="p2-eyebrow">Chicken vs forecast need</p>
+              </div>
+              <button type="button" className="p2-icon-btn" onClick={() => setOpen(null)} aria-label="Close details"><X size={16} aria-hidden="true" /></button>
+            </header>
+            {sel.badge}
+            <dl className="p2-mini">
+              <div><dt>Physical on hand</dt><dd><Qty milli={physical} /></dd></div>
+              <div><dt>Eligible stock</dt><dd><Qty milli={sel.key === "before" ? stock : after} /></dd></div>
+              {sel.key === "before"
+                ? <div><dt>Planned PO incoming</dt><dd><Qty milli={incoming} /></dd></div>
+                : <div><dt>Supplier-claimed today</dt><dd><Qty milli={claimed} /></dd></div>}
+              <div><dt>Total supply</dt><dd className="p2-strong"><Qty milli={sel.total} /></dd></div>
+              <div><dt>Forecast need</dt><dd><Qty milli={need} /></dd></div>
+              <div><dt>{sel.total >= need ? "Surplus" : "Missing"}</dt><dd className={sel.total >= need ? "p2-pos" : "p2-neg"}><Qty milli={Math.abs(sel.total - need)} /></dd></div>
+            </dl>
+            <p className="p2-fineprint">{sel.key === "before" ? "Assumes the planned PO arrives in full before the prep cutoff." : "The supplier says nothing arrives today; only physical stock counts."}</p>
+          </section>
+        )}
+      </div>
+      <p className="p2-legend p2-cc__legend">
+        <span className="p2-legend__item"><span className="p2-cc__key p2-cc__key--stock" /> Physical stock</span>
+        <span className="p2-legend__item"><span className="p2-cc__key p2-cc__key--po" /> Planned PO</span>
+        <span className="p2-legend__item"><span className="p2-cc__key p2-cc__key--miss" /> Missing vs need</span>
+        <span className="p2-ready__hint">Click a card for details</span>
+      </p>
+    </div>
+  );
+}
+
 export function BeforeAfter({ impact }: { impact: ImpactAssessment }) {
   const before = impact.before!;
   const after = impact.after!;
   const s = impact.summary!;
   const projectedBefore = before.availableAfterReservationsMilli + before.plannedIncomingMilli;
-  const scale = Math.max(projectedBefore, s.chickenForecastRequirementKgMilli, 1);
-  const pct = (m: number) => `${(m / scale) * 100}%`;
+  const afterTotal = s.chickenAvailableKgMilli;
+  const need = s.chickenForecastRequirementKgMilli;
   return (
-    <Card title="Before vs after the supplier claim">
-      <div className="p2-ba">
-        <div className="p2-ba__col">
-          <p className="p2-ba__title">Before disruption</p>
-          <div className="p2-bar p2-bar--lg" role="img" aria-label={`Before: ${fmtQty(before.physicalOnHandMilli)} kg physical plus ${fmtQty(before.plannedIncomingMilli)} kg planned incoming; forecast need ${fmtQty(s.chickenForecastRequirementKgMilli)} kg`}>
-            <span className="p2-bar__seg p2-bar__seg--stock" style={{ width: pct(before.availableAfterReservationsMilli) }} />
-            <span className="p2-bar__seg p2-bar__seg--incoming" style={{ width: pct(before.plannedIncomingMilli) }} />
-            <span className="p2-bar__mark p2-bar__mark--forecast" style={{ left: pct(s.chickenForecastRequirementKgMilli) }} />
-          </div>
-          <dl className="p2-mini">
-            <div><dt>Physical accepted chicken</dt><dd><Qty milli={before.physicalOnHandMilli} /></dd></div>
-            <div><dt>Planned incoming (PO, not stock)</dt><dd><Qty milli={before.plannedIncomingMilli} /></dd></div>
-            <div><dt>Projected total if received</dt><dd><Qty milli={projectedBefore} /></dd></div>
-          </dl>
-        </div>
-        <div className="p2-ba__col">
-          <p className="p2-ba__title">After supplier claim</p>
-          <div className="p2-bar p2-bar--lg" role="img" aria-label={`After: ${fmtQty(after.physicalOnHandMilli)} kg physical, ${fmtQty(after.supplierClaimedIncomingMilli)} kg claimed incoming; gap ${fmtQty(s.demandGapKgMilli)} kg to forecast need`}>
-            <span className="p2-bar__seg p2-bar__seg--stock" style={{ width: pct(after.availableAfterReservationsMilli) }} />
-            <span className="p2-bar__seg p2-bar__seg--gap" style={{ width: pct(s.demandGapKgMilli) }} />
-            <span className="p2-bar__mark p2-bar__mark--forecast" style={{ left: pct(s.chickenForecastRequirementKgMilli) }} />
-          </div>
-          <dl className="p2-mini">
-            <div><dt>Physical accepted chicken</dt><dd><Qty milli={after.physicalOnHandMilli} /></dd></div>
-            <div><dt>Supplier-claimed incoming today</dt><dd><Qty milli={after.supplierClaimedIncomingMilli} /></dd></div>
-            <div><dt>Conditional total (no-delivery scenario)</dt><dd><Qty milli={s.chickenAvailableKgMilli} /></dd></div>
-            <div><dt>Full forecast requirement</dt><dd><Qty milli={s.chickenForecastRequirementKgMilli} /></dd></div>
-            <div><dt>Forecast ingredient gap</dt><dd className="p2-strong"><Qty milli={s.demandGapKgMilli} /></dd></div>
-          </dl>
-        </div>
-      </div>
-      <p className="p2-legend">
-        <span className="p2-legend__key p2-legend__key--stock" /> Physical eligible
-        <span className="p2-legend__key p2-legend__key--incoming" /> Planned PO (never physical)
-        <span className="p2-legend__key p2-legend__key--gap" /> Forecast gap
-        <span className="p2-legend__key p2-legend__key--forecast" /> Forecast need
-      </p>
+    <Card title="Before vs after the supplier claim" className="p2-ba-card">
+      <CoverageCompare stock={before.availableAfterReservationsMilli} physical={before.physicalOnHandMilli} incoming={before.plannedIncomingMilli} claimed={after.supplierClaimedIncomingMilli} after={afterTotal} need={need} />
       <p className="p2-fineprint">
         The {fmtQty(impact.poShortfallKgMilli ?? 0)} kg PO shortfall (supplier vs PO) and the {fmtQty(s.demandGapKgMilli)} kg forecast gap (demand vs physical stock) are different metrics.
       </p>
@@ -220,7 +263,6 @@ export function MenuImpact({ state, ingredientId, impact, selectedMenuId, onSele
           </tfoot>
         </table>
       </div>
-      <p className="p2-fineprint">Recipe weights and demand are synthetic demo assumptions, not Happy Potato data. Confirmed portions are included in forecast.</p>
     </Card>
   );
 }
@@ -234,7 +276,7 @@ export function ConfirmedProtection({ state, impact }: { state: RestaurantState;
   const forecastChicken = impact.summary!.chickenForecastPortions;
   const confirmedChicken = impact.summary!.confirmedChickenPortions;
   return (
-    <Card title="Confirmed order protection">
+    <Card title="Confirmed order protection" className="p2-cop">
       <ConfirmedCoverage impact={impact} />
       <dl className="p2-facts p2-facts--4">
         <div><dt>Confirmed chicken portions</dt><dd className="p2-num">{confirmedChicken}</dd></div>
@@ -266,14 +308,13 @@ export function ConfirmedProtection({ state, impact }: { state: RestaurantState;
           </tbody>
         </table>
       </div>
-      <p className="p2-fineprint">Synthetic aggregate order groups — no customer data. No order is marked fulfilled or dropped by P2.</p>
     </Card>
   );
 }
 
 /* G — kitchen and time --------------------------------------------------------- */
 
-export function KitchenTime({ state, incident }: { state: RestaurantState; incident: Incident }) {
+export function KitchenTime({ state, incident, onSelectStation, selectedId }: { state: RestaurantState; incident: Incident; onSelectStation?: (nodeId: string) => void; selectedId?: string | null }) {
   const snap = state.snapshot;
   const claim = snap.supplierClaims.find((c) => c.poId === incident.poId);
   const po = snap.purchaseOrders.find((p) => p.id === incident.poId);
@@ -307,7 +348,11 @@ export function KitchenTime({ state, incident }: { state: RestaurantState; incid
             return l.ok && ing && l.recipe.components.some((c) => c.ingredientId === ing);
           });
           return (
-            <li key={r.id} className="p2-station">
+            <li key={r.id} className={`p2-station${onSelectStation ? " p2-station--clickable" : ""}${selectedId === `station:${r.id}` ? " p2-station--selected" : ""}`}
+              role={onSelectStation ? "button" : undefined} tabIndex={onSelectStation ? 0 : undefined}
+              aria-label={onSelectStation ? `Show ${r.name} in the dependency graph` : undefined}
+              onClick={onSelectStation ? () => onSelectStation(`station:${r.id}`) : undefined}
+              onKeyDown={onSelectStation ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelectStation(`station:${r.id}`); } } : undefined}>
               <div className="p2-station__head"><span className="p2-strong">{r.name}</span><span className="p2-mono p2-muted">{r.id}</span></div>
               <p className="p2-muted">{r.capability} · {served.length ? served.map((m) => m.name).join(", ") : "No menus in current BOM"}</p>
               {ing === incident.ingredientId ? <Badge tone="warn">Chicken supply constrained</Badge> : <Badge tone="ok">Unaffected ingredient</Badge>}
@@ -330,30 +375,42 @@ export function KitchenTime({ state, incident }: { state: RestaurantState; incid
 export function RecoveryNav({ incident, impactState, hasMessages }: { incident: Incident; impactState: ImpactState; hasMessages: boolean }) {
   const impactReady = impactState === "CURRENT";
   const scenariosReady = ["SCENARIOS_READY", "PENDING_APPROVAL", "APPROVED", "EXECUTING", "AWAITING_EVIDENCE", "CLOSED"].includes(incident.status);
-  const items: Array<{ label: string; to: string; enabled: boolean; reason: string }> = [
-    { label: "Explore Plan A", to: "/recovery/plan-a", enabled: impactReady, reason: "Needs a current, verified impact" },
-    { label: "Explore Plan B", to: "/recovery/plan-b", enabled: impactReady, reason: "Needs a current, verified impact" },
-    { label: "Compare recovery plans", to: "/recovery/compare", enabled: scenariosReady, reason: "Plan A and Plan B scenarios are not ready yet" },
-    { label: "View incident", to: `/incidents?incident=${incident.id}`, enabled: true, reason: "" },
-    { label: "View original supplier message", to: "/message-intelligence", enabled: hasMessages, reason: "No linked message in this session" },
+  const items: Array<{ badge: string; label: string; desc: string; to: string; enabled: boolean; reason: string }> = [
+    { badge: "A", label: "Plan A · External supplier", desc: "Source the missing chicken from alternative suppliers.", to: "/recovery/plan-a", enabled: impactReady, reason: "Needs a current, verified impact" },
+    { badge: "B", label: "Plan B · Internal recovery", desc: "No purchase: reallocate stock, adjust menu and prep.", to: "/recovery/plan-b", enabled: impactReady, reason: "Needs a current, verified impact" },
+    { badge: "⇄", label: "Compare recovery plans", desc: "Plan A and Plan B side by side on the same snapshot.", to: "/recovery/compare", enabled: scenariosReady, reason: "Plan A and Plan B scenarios are not ready yet" },
+    { badge: "i", label: "View incident", desc: `Lifecycle and evidence for ${incident.id}.`, to: `/incidents?incident=${incident.id}`, enabled: true, reason: "" },
+    { badge: "✉", label: "Original supplier message", desc: "The message this incident was raised from.", to: "/message-intelligence", enabled: hasMessages, reason: "No linked message in this session" },
   ];
   return (
     <Card title="Recovery navigation">
-      <ul className="p2-nav-ctas">
-        {items.map((i) => (
-          <li key={i.label}>
-            {i.enabled ? (
-              <Link to={i.to} className="p2-btn p2-btn--primary">{i.label} <ArrowRight size={16} aria-hidden="true" /></Link>
-            ) : (
-              <>
-                <button type="button" className="p2-btn" disabled aria-describedby={`why-${i.to}`}>{i.label}</button>
-                <span id={`why-${i.to}`} className="p2-muted">{i.reason}</span>
-              </>
-            )}
-          </li>
-        ))}
+      <ul className="p2-queue p2-queue--grid">
+        {items.slice(0, 3).map((i) => {
+          const body = (
+            <>
+              <span className={`p2-queue__num${i.badge === "A" || i.badge === "B" ? " p2-queue__num--plan" : ""}`} aria-hidden="true">{i.badge}</span>
+              <span className="p2-queue__text">
+                <span className="p2-queue__label">{i.label}</span>
+                <span className="p2-queue__desc">{i.enabled ? i.desc : i.reason}</span>
+              </span>
+              {i.enabled && <span className="p2-queue__cta"><span className="p2-queue__cta-text">Open</span><ArrowRight size={14} aria-hidden="true" /></span>}
+            </>
+          );
+          return (
+            <li key={i.label}>
+              {i.enabled
+                ? <Link to={i.to} className="p2-queue__row">{body}</Link>
+                : <div className="p2-queue__row p2-queue__row--disabled" aria-disabled="true">{body}</div>}
+            </li>
+          );
+        })}
       </ul>
-      <p className="p2-fineprint">P2 does not calculate or choose a recovery plan. Same snapshot fingerprint is passed to Plan A and Plan B.</p>
+      <div className="p2-navlinks">
+        <span className="p2-navlinks__label">Related</span>
+        {items.slice(3).map((i) => i.enabled
+          ? <Link key={i.label} to={i.to} className="p2-navlinks__link">{i.label} <ArrowRight size={13} aria-hidden="true" /></Link>
+          : <span key={i.label} className="p2-navlinks__link p2-navlinks__link--off" title={i.reason}>{i.label}</span>)}
+      </div>
     </Card>
   );
 }

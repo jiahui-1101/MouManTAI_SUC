@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
 import type { Channel } from "../../types/common";
@@ -71,6 +71,7 @@ function IncidentsContent() {
   const store = useRestaurantStore();
   const [params, setParams] = useSearchParams();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
   const rows = useMemo(() => buildRows(store), [store]);
   const selectedId = params.get("incident");
   const selected = store.restaurant.incidents.find((i) => i.id === selectedId);
@@ -98,12 +99,15 @@ function IncidentsContent() {
     <div className="p2">
       <div className={`p2-workspace ${selected ? "p2-workspace--with-detail" : ""}`}>
         <section className="p2-card p2-list" aria-label="Incident list">
-          <div className="p2-filters" role="search">
+          <div className={`p2-filters${showFilters ? " p2-filters--open" : ""}`} role="search">
             <label className="p2-field p2-field--search">
               <span className="p2-sr">Search by incident or PO ID</span>
               <Search size={16} aria-hidden="true" />
               <input type="search" placeholder="Search incident or PO ID" value={filters.query} onChange={set("query")} />
             </label>
+            <button type="button" className="p2-btn p2-filters__toggle" aria-expanded={showFilters} onClick={() => setShowFilters((v) => !v)}>
+              <SlidersHorizontal size={15} aria-hidden="true" /> Filters{filtersActive ? " •" : ""}
+            </button>
             <Select label="Status" value={filters.status} onChange={set("status")} options={LIFECYCLE.map((s) => [s, STATUS_LABEL[s as IncidentStatus]])} />
             <Select label="Severity" value={filters.severity} onChange={set("severity")} options={(["CRITICAL", "HIGH", "MEDIUM", "UNASSESSED"] as Severity[]).map((s) => [s, s.charAt(0) + s.slice(1).toLowerCase()])} />
             <Select label="Ingredient" value={filters.ingredient} onChange={set("ingredient")} options={unique(rows.map((r) => r.incident.ingredientId)).map((id) => [id, ingredientName(id)])} />
