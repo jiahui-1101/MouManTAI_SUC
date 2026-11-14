@@ -4,6 +4,7 @@ import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { routes } from "../src/app/router";
 import { demoStore, selectExtractionVersions } from "../src/store/demoStore";
 import { CANONICAL_MESSAGE } from "../src/features/messaging/mockMessageRegistry";
+import { chooseReviewStatus } from "./helpers.p1";
 import { confirmBlockers, ruleExtractionVersion, validateDraft, draftFromValues } from "../src/features/messaging/messageReview";
 
 beforeEach(() => demoStore.dispatch({ type: "DEMO_RESET" }));
@@ -195,7 +196,7 @@ describe("Review queue", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirm & verify incident/i }));
     expect(screen.getByText("4 active")).toBeTruthy();
     expect(queue().queryByRole("link", { name: /HP-MSG-WA-001/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    chooseReviewStatus("HISTORY");
     expect(queue().getByText("In incident HP-INC-001")).toBeTruthy();
     expect(queue().getByRole("link", { name: /Open review HP-MSG-WA-001/ }).getAttribute("aria-current")).toBe("page");
   });
@@ -205,11 +206,11 @@ describe("Review layout", () => {
   it("resizes the queue with the keyboard and keeps decisions visible above the tabs", () => {
     renderAt("/message-intelligence?message=HP-MSG-WA-001");
     const handle = screen.getByRole("separator", { name: "Resize review queue" });
-    expect(handle.getAttribute("aria-valuenow")).toBe("55"); // queue opens wider than the detail
+    expect(handle.getAttribute("aria-valuenow")).toBe("57"); // queue opens wider than the detail
     fireEvent.keyDown(handle, { key: "ArrowRight", shiftKey: true });
-    expect(handle.getAttribute("aria-valuenow")).toBe("65");
+    expect(handle.getAttribute("aria-valuenow")).toBe("67");
     fireEvent.keyDown(handle, { key: "Home" });
-    expect(handle.getAttribute("aria-valuenow")).toBe("55");
+    expect(handle.getAttribute("aria-valuenow")).toBe("57");
     expect(screen.queryByText(/Rule-based extraction — no AI model used/)).toBeNull();
     for (const tab of ["Check & correct", "History (1)", "Evidence & handoff"]) {
       fireEvent.click(screen.getByRole("tab", { name: tab }));

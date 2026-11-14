@@ -30,7 +30,7 @@ function channelLabel(channel: InboxChannel) { return channel === "OUTLOOK" ? "O
 function exactTime(iso: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(iso)) + " MYT"; }
 
 export function InboxPage() {
-  const { messages, selectedId, preferences, loadStatus, incident } = useInboxState();
+  const { messages, selectedId, preferences, loadStatus, incident, suppressedDuplicateCount } = useInboxState();
   const [query, setQuery] = useState("");
   const [criteria, setCriteria] = useState(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
@@ -74,6 +74,7 @@ export function InboxPage() {
         </button>)}
     </section>
     <Pager total={filtered.length} page={current} pageSize={PAGE_SIZE} onPage={setPage} label="Inbox pages" />
+    <p className="inbox__dup-note" title="Repeated provider events are ignored by channel, account and provider message ID."><strong>{suppressedDuplicateCount} duplicate{suppressedDuplicateCount === 1 ? "" : "s"} suppressed</strong> · repeated provider events are ignored</p>
   </section>;
 
   return <PageContainer title={titleFor("/inbox")} actions={ACTIONS}>

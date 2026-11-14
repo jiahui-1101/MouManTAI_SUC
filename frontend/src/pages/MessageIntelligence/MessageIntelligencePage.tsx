@@ -191,7 +191,7 @@ function Workspace({ message }: { message: InboxMessage }) {
     <div className="mi-actionbar">
       <span className="mi-avatar" aria-hidden="true">DO</span><span className="mi-actionbar__label">Reviewer</span><strong className="mi-actionbar__name">Demo operator</strong>
       <label className="mi-actionbar__note"><span className="sr-only">Review reason / note</span><input id="reviewNote" placeholder="Reason (needed to reject or hold)" value={note} onChange={(e) => { setNote(e.target.value); setErrors((x) => ({ ...x, form: undefined })); }} /></label>
-      <span className="mi-reject-label">Reject</span>
+      <button type="button" className="mi-reject-label mi-reject-link" disabled={locked} onClick={() => decide("REJECTED")}>Reject</button>
       <button type="button" className="fm-btn fm-btn--ghost" disabled={locked} onClick={() => decide("MARKED_UNRESOLVED")}>Mark unresolved</button>
           {linkMode
             ? <button type="button" className="fm-btn fm-btn--primary" disabled={blockers.length > 0 || pendingLink} aria-describedby="mi-blockers" onClick={() => setPendingLink(true)}>Link to existing incident {state.incident.id}</button>

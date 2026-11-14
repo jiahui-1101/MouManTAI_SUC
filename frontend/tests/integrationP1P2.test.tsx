@@ -5,6 +5,7 @@ import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { routes } from "../src/app/router";
 import { demoStore, selectActiveImpact, selectActiveIncident, selectBusinessIncident, selectOperationalSnapshot } from "../src/store/demoStore";
 import { getP2State, resetDemo, simulateChickenRecount } from "../src/services/mock/restaurantStore";
+import { openInboxRow } from "./helpers.p1";
 import { isImpactStale } from "../src/services/mock/restaurantState";
 
 const s = () => demoStore.getSnapshot();
@@ -19,7 +20,7 @@ describe("P1 -> P2 shared state", () => {
   it("A: Inbox -> Intelligence -> confirm -> P2 Incidents -> Assess impact -> P1 handoff acknowledged", async () => {
     const r = app("/inbox");
     expect(p2().incidents).toHaveLength(0);
-    act(() => demoStore.select("HP-MSG-WA-001"));
+    openInboxRow("Demo Poultry Supply A", "09:01");
     fireEvent.click(screen.getByRole("link", { name: "Open in Message Intelligence" }));
     fireEvent.click(screen.getByRole("button", { name: /confirm & verify incident/i }));
     // P2 received the same incident immediately, via its production reducer.
