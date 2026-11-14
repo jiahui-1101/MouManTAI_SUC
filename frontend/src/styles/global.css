@@ -262,7 +262,10 @@ ul { padding: 0; list-style: none; }
 .mi-history span { color: var(--ink-2); }
 .mi-link { border: 0; background: none; color: var(--brand); text-decoration: underline; cursor: pointer; font: inherit; }
 .mi-picker { display: grid; gap: 6px; padding: 0; list-style: none; }
-@media (max-width: 1023px) { .mi__grid, .mi-form fieldset { grid-template-columns: 1fr; } }
+@media (max-width: 1023px) { .mi__grid, .mi-form fieldset { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .mi-fields div, .mi-handoff dl div { grid-template-columns: minmax(0, 1fr); } .mi-fields dt { grid-row: auto; } }
+.mi, .mi__grid > * { min-width: 0; }
+.mi__original p, .mi__original span, .mi-handoff dd, .mi-chip { overflow-wrap: anywhere; }
 .mi-handoff { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); }
 .mi-handoff h3 { margin: 0 0 8px; font-family: var(--font-heading); font-size: 14px; }
 .mi-handoff dl { display: grid; gap: 6px; margin: 0; }
