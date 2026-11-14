@@ -2,7 +2,7 @@
 
 **Team:** NJHL — Wong Jia Hui · Bong Zi Shan · Lee Mei Shuet · Loh Su Ting · Gan Rui En
 
-[🌐 Live Demo](https://frontend-blue-pi-70ejij1ipo.vercel.app) · [🖥️ HTML Presentation](https://htmlpreview.github.io/?https://github.com/jiahui-1101/MouManTAI_SUC/blob/main/presentation/moumantai-presentation.html)
+[🌐 Live Demo](https://frontend-blue-pi-70ejij1ipo.vercel.app) · [🖥️ HTML Presentation](https://htmlpreview.github.io/?https://github.com/jiahui-1101/MouManTAI_SUC/blob/main/presentation/moumantai-presentation.html) · [📄 PDF Slides](presentation/moumantai-presentation.pdf)
 
 **AI Supply-to-Plate Recovery Intelligence** — a restaurant operations tool that turns a supplier disruption
 message (WhatsApp, Outlook email or Telegram) into an assessed impact, two recovery strategies
