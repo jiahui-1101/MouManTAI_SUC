@@ -214,6 +214,16 @@ const RESOURCES: ProductionResource[] = [
   { id: "HP-FRY-FRIES-A", name: "Fries Fryer A", capability: "DEMO_FROZEN_FRIES" },
 ];
 
+/**
+ * Canonical synthetic supplier offers (contract §2). Business reference quotes only:
+ * never stock, never an accepted PO. HP-MSG-OL-OFFER is a separate message *claim*
+ * that P1 must qualify before it can count as evidence for HP-OFFER-002.
+ */
+export const HP_SUPPLIER_OFFERS = [
+  { id: "HP-OFFER-002", supplierId: "HP-SUP-002", ingredientId: HP_IDS.chicken, quantityKgMilli: kg("15.000"), pricePerKgSen: 1600, freightSen: 1500, landedTotalSen: 25500, etaLocal: "10:15", spec: "CHILLED", qualification: "QUALIFIED_CONDITIONAL", provenance: HP_DATA_MODE },
+  { id: "HP-OFFER-003", supplierId: "HP-SUP-003", ingredientId: HP_IDS.chicken, quantityKgMilli: kg("15.000"), pricePerKgSen: 1400, freightSen: 1000, landedTotalSen: 22000, etaLocal: "13:30", spec: "FROZEN", qualification: "INCOMPATIBLE", provenance: HP_DATA_MODE },
+] as const;
+
 /** Fresh deep copy of the canonical seed snapshot HP-SNAP-001 revision 1. */
 export function createHappyPotatoSeedSnapshot(): OperationalSnapshot {
   const content: SnapshotContent = structuredClone({

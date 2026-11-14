@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { PAGE_ROUTES, routes } from "../src/app/router";
+import { demoStore } from "../src/store/demoStore";
+import { assessImpactAction } from "../src/services/mock/restaurantStore";
 import { NAV_ITEMS } from "../src/constants/navigation";
 
 afterEach(cleanup);
@@ -22,8 +24,13 @@ describe("route configuration", () => {
   });
 });
 
+/** Production Plan B reads shared state: verify HP-INC-001 in P1 and assess it in P2 first. */
+function verifyAndAssessSharedIncident() {
+  act(() => { demoStore.dispatch({ type: "DEMO_RESET" }); demoStore.confirmExtractionReview("HP-MSG-WA-001"); assessImpactAction("HP-INC-001"); });
+}
+
 /** Routes whose pages have been implemented; all others must still be empty shells. */
-const IMPLEMENTED = new Set(["/overview", "/incidents", "/impact", "/recovery/plan-a", "/recovery/plan-b", "/prep-planning"]);
+const IMPLEMENTED = new Set(["/inbox", "/message-intelligence", "/channels", "/settings", "/overview", "/incidents", "/impact", "/recovery/plan-a", "/recovery/plan-b", "/prep-planning"]);
 
 describe("pages", () => {
   it.each(NAV_ITEMS.map((item) => [item.path, item.title]))("%s shows heading %s", (path, title) => {
@@ -46,7 +53,13 @@ describe("pages", () => {
     expect(screen.getByText("External supply workspace is waiting")).toBeTruthy();
   });
 
+  it("shows Plan B pending until P1 verification and P2 impact exist", () => {
+    renderAt("/recovery/plan-b");
+    expect(screen.getByText("Waiting for a verified supplier incident and stock snapshot.")).toBeTruthy();
+  });
+
   it("shows the Plan B allocation and menu proposal", () => {
+    verifyAndAssessSharedIncident();
     renderAt("/recovery/plan-b");
     expect(heading()).toBe("Plan B — Internal Recovery");
     expect(screen.getByRole("tab", { name: "Stock Allocation" })).toBeTruthy();
@@ -56,6 +69,7 @@ describe("pages", () => {
   });
 
   it("recalculates stock across tabs and resets to the canonical demo", async () => {
+    verifyAndAssessSharedIncident();
     renderAt("/recovery/plan-b");
     fireEvent.click(screen.getByRole("button", { name: "8.00 kg" }));
     expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
