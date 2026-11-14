@@ -13,7 +13,11 @@ export function P5DevControls() {
   const { adapter, store } = runtime;
   const presentation = useP5Ui((s) => s.presentationMode);
   const [status, setStatus] = useState('');
-  if (presentation || !adapter.wired) return null;
+  // Hidden in the demo product; only shown under tests or with ?dev in the URL.
+  const devEnabled =
+    import.meta.env.MODE === 'test' ||
+    (typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('dev'));
+  if (!devEnabled || presentation || !adapter.wired) return null;
   const world = adapter.mockWorld;
 
   return (

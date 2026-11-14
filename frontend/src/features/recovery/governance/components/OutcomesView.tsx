@@ -169,25 +169,30 @@ export function OutcomesView() {
             data-testid="p5-outcome-hero"
             data-tone={heroTone}
           >
-            <p className="p5-hero__status">
-              <span data-testid="p5-outcome-badge" title={OUTCOME_STATUS_LABELS[heroStatus].explain}>
-                Simulated Outcome: {OUTCOME_STATUS_LABELS[heroStatus].label}
-              </span>
-            </p>
-            <p className="p5-hero__why" data-testid="p5-outcome-why">
-              {heroWhy}
-            </p>
-            {heroStatus === 'SUCCESS' && (
-              <p className="p5-hero__note" data-testid="p5-success-subtext">
-                Demo evidence only — not real Happy Potato operations
-              </p>
-            )}
-            {freshness === 'OUT_OF_DATE' && (
-              <p className="p5-hero__note" data-testid="p5-freshness-badge">
-                Evidence changed since the last check — verify again.
-              </p>
-            )}
-            <div className="p5-row" style={{ marginTop: '10px', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+            <div className="p5-hero__main">
+              <span className="p5-hero__icon" aria-hidden="true">{heroTone === 'success' ? '✓' : heroTone === 'danger' ? '✕' : '!'}</span>
+              <div className="p5-hero__body">
+                <p className="p5-hero__status">
+                  <span data-testid="p5-outcome-badge" title={OUTCOME_STATUS_LABELS[heroStatus].explain}>
+                    Simulated Outcome: {OUTCOME_STATUS_LABELS[heroStatus].label}
+                  </span>
+                </p>
+                <p className="p5-hero__why" data-testid="p5-outcome-why">
+                  {heroWhy}
+                </p>
+                {heroStatus === 'SUCCESS' && (
+                  <p className="p5-hero__note" data-testid="p5-success-subtext">
+                    Demo evidence only — not real Happy Potato operations
+                  </p>
+                )}
+                {freshness === 'OUT_OF_DATE' && (
+                  <p className="p5-hero__note" data-testid="p5-freshness-badge">
+                    Evidence changed since the last check — verify again.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="p5-row p5-hero__actions">
               <Button variant="primary" onClick={handleVerify} data-testid="p5-verify-btn">
                 Verify simulated outcome
               </Button>
@@ -207,7 +212,7 @@ export function OutcomesView() {
                 </Link>
               )}
             </div>
-            <p className="p5-muted" style={{ fontSize: '12px', marginTop: '8px' }}>
+            <p className="p5-hero__foot">
               A supplier message is not evidence. Only recorded demo evidence counts.
             </p>
           </header>
