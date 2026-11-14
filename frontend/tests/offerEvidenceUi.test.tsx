@@ -12,6 +12,7 @@ function renderAt(path: string) { const r = createMemoryRouter(routes, { initial
 
 it("shows the offer in Inbox and reviews it in Message Intelligence with evidence preserved across navigation", async () => {
   const router = renderAt("/inbox");
+  fireEvent.click(screen.getByRole("button", { name: "Next page" })); // 6 messages, 5 per page
   fireEvent.click(screen.getByRole("button", { name: /Demo Poultry Supply B/ }));
   expect(screen.getByTestId("inbox-offer-note").textContent).toMatch(/UNREVIEWED.*not goods received/);
   await act(async () => { await router.navigate("/message-intelligence?message=HP-MSG-OL-OFFER"); });

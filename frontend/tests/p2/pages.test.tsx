@@ -187,6 +187,7 @@ describe("Supply Incidents", () => {
     expect(within(rows[0]!).getByText("3 messages · simulated")).toBeTruthy();
     fireEvent.click(within(rows[0]!).getByRole("button", { name: "View details" }));
     const dialog = screen.getByRole("dialog", { name: "HP-INC-001" });
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^Messages/ }));
     expect(within(dialog).getByText("Linked supplier messages (3)")).toBeTruthy();
     expect(within(dialog).getByText(/counted once/)).toBeTruthy();
   });
@@ -195,8 +196,10 @@ describe("Supply Incidents", () => {
     verifiedAssessed();
     renderAt("/incidents?incident=HP-INC-001");
     const dialog = screen.getByRole("dialog", { name: "HP-INC-001" });
+    fireEvent.click(within(dialog).getByRole("tab", { name: "Supplier & PO" }));
     expect(within(dialog).getAllByText("HP-PO-1042").length).toBeGreaterThan(0);
     expect(within(dialog).getByText("Supplier").nextElementSibling?.textContent).toBe("Demo Poultry Supply A HP-SUP-001");
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^Impact/ }));
     const cell = (label: string) => within(dialog).getByText(label).nextElementSibling?.textContent;
     expect(cell("Supplier PO change")).toBe("20kg");
     expect(cell("Forecast ingredient gap")).toBe("12kg");
@@ -212,6 +215,7 @@ describe("Supply Incidents", () => {
     act(() => void simulateSupplierReport("OUTLOOK", "PENDING"));
     renderAt("/incidents?incident=HP-INC-001");
     const dialog = screen.getByRole("dialog", { name: "HP-INC-001" });
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^Impact/ }));
     expect(within(dialog).getByText("Impact withheld — incident not verified")).toBeTruthy();
     expect(within(dialog).queryByText("Forecast ingredient gap")).toBeNull();
     act(() => simulateVerification("HP-INC-001"));
@@ -222,6 +226,7 @@ describe("Supply Incidents", () => {
     verifiedAssessed();
     act(() => simulateChickenRecount(8000));
     renderAt("/incidents?incident=HP-INC-001");
+    fireEvent.click(screen.getByRole("tab", { name: /^Impact/ }));
     expect(screen.getByText("Impact is stale")).toBeTruthy();
     expect(screen.getByText("Stale")).toBeTruthy();
   });
@@ -272,8 +277,8 @@ describe("Supply Incidents", () => {
   it("lifecycle reflects actual shared state", () => {
     act(() => void simulateSupplierReport("WHATSAPP", "PENDING"));
     renderAt("/incidents?incident=HP-INC-001");
-    const steps = screen.getByRole("list", { name: "Incident lifecycle" });
-    expect(within(steps).getByText("Pending verification").closest("li")?.getAttribute("aria-current")).toBe("step");
+    const steps = screen.getByLabelText(/Incident lifecycle: step .*Pending verification/);
+    expect(within(steps).getByText("Pending verification")).toBeTruthy();
   });
 });
 

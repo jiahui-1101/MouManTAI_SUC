@@ -20,9 +20,12 @@ const versions = (id = "HP-MSG-WA-001") => selectExtractionVersions(demoStore.ge
 
 describe("Message Intelligence page", () => {
   it("shows empty, missing, loading and error states", () => {
-    renderAt("/message-intelligence");
-    expect(screen.getByText("No message selected")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /HP-MSG-WA-001/ })).toBeTruthy();
+    const router = renderAt("/message-intelligence");
+    // No ?message: the full review queue is shown first; the review panel opens only after a choice.
+    expect(router.state.location.search).toBe("");
+    expect(screen.queryByTestId("raw-text")).toBeNull();
+    expect(screen.queryByRole("separator")).toBeNull();
+    expect(screen.getByRole("link", { name: /Open review HP-MSG-OL-001/ })).toBeTruthy();
     cleanup();
     open("HP-MSG-NOPE");
     expect(screen.getByRole("alert").textContent).toContain("HP-MSG-NOPE");
@@ -32,7 +35,7 @@ describe("Message Intelligence page", () => {
     expect(screen.getByRole("status").getAttribute("aria-busy")).toBe("true");
     act(() => demoStore.setMockLoadStatus("ERROR"));
     fireEvent.click(screen.getByRole("button", { name: /retry local fixture/i }));
-    expect(screen.getByText("Rule-based extraction — no AI model used.")).toBeTruthy();
+    expect(screen.getByText("Rule-based · no AI")).toBeTruthy();
   });
 
   it("renders immutable raw text with exact evidence offsets and extracted fields", () => {
@@ -47,10 +50,10 @@ describe("Message Intelligence page", () => {
       expect(CANONICAL_MESSAGE.slice(start, end)).toBe(mark.textContent);
     });
     expect(raw.querySelector('[data-field="claimedDeliveryKgMilli"]')?.textContent).toBe("0kg");
-    const fields = screen.getByRole("region", { name: /structured extraction/i });
+    const fields = screen.getByRole("form", { name: /Check the extracted values/i });
     for (const text of ["HP-SUP-001 · Demo Poultry Supply A", "HP-PO-1042", "MATCHED", "UNAVAILABLE", "20.000 kg", "0.000 kg"]) expect(within(fields).getAllByText(new RegExp(text)).length).toBeGreaterThan(0);
     expect(within(fields).getByText(/UNKNOWN \(update promise/)).toBeTruthy();
-    expect(within(fields).getByText("Rule extraction is pending explicit human confirmation.")).toBeTruthy();
+    expect(screen.getByText("Rule extraction is pending explicit human confirmation.")).toBeTruthy(); // Evidence & handoff tab
   });
 
   it("validates quantities, units, PO/supplier relationship and contradictions without saving", () => {
@@ -100,6 +103,7 @@ describe("Message Intelligence page", () => {
   it("allows viewing previous versions and keyboard navigation through history", () => {
     act(() => { demoStore.decideExtractionReview("HP-MSG-WA-001", "MARKED_UNRESOLVED", "Need call-back", "2026-11-21T09:30:00+08:00"); });
     open();
+    fireEvent.click(screen.getByRole("tab", { name: /^History/ }));
     const history = screen.getByRole("list", { name: "Extraction versions" });
     const buttons = within(history).getAllByRole("button");
     expect(buttons).toHaveLength(2);
@@ -171,7 +175,60 @@ describe("Message Intelligence page", () => {
     await act(async () => { await router.navigate("/inbox"); });
     expect(screen.queryByText(/Review history/)).toBeNull();
     await act(async () => { await router.navigate("/message-intelligence?message=HP-MSG-WA-001"); });
+    fireEvent.click(screen.getByRole("tab", { name: /^History/ }));
     expect(within(screen.getByRole("list", { name: "Extraction versions" })).getAllByRole("button")).toHaveLength(2);
     expect(screen.getByText(/v2 · RULE_EXTRACTION · UNRESOLVED/)).toBeTruthy();
+  });
+});
+
+describe("Review queue", () => {
+  it("lists active reviews, searches, opens items and moves confirmed ones to history", () => {
+    const router = renderAt("/message-intelligence");
+    const queue = () => within(screen.getByRole("list", { name: "Review queue items" }));
+    expect(screen.getByText("5 active")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search review queue"), { target: { value: "not allowlisted" } });
+    expect(queue().getAllByRole("listitem")).toHaveLength(1);
+    fireEvent.click(queue().getByRole("link", { name: /Open review HP-MSG-SPOOF/ }));
+    expect(router.state.location.search).toBe("?message=HP-MSG-SPOOF");
+    fireEvent.change(screen.getByLabelText("Search review queue"), { target: { value: "" } });
+    fireEvent.click(queue().getByRole("link", { name: /Open review HP-MSG-WA-001/ }));
+    fireEvent.click(screen.getByRole("button", { name: /confirm & verify incident/i }));
+    expect(screen.getByText("4 active")).toBeTruthy();
+    expect(queue().queryByRole("link", { name: /HP-MSG-WA-001/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    expect(queue().getByText("In incident HP-INC-001")).toBeTruthy();
+    expect(queue().getByRole("link", { name: /Open review HP-MSG-WA-001/ }).getAttribute("aria-current")).toBe("page");
+  });
+});
+
+describe("Review layout", () => {
+  it("resizes the queue with the keyboard and keeps decisions visible above the tabs", () => {
+    renderAt("/message-intelligence?message=HP-MSG-WA-001");
+    const handle = screen.getByRole("separator", { name: "Resize review queue" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("55"); // queue opens wider than the detail
+    fireEvent.keyDown(handle, { key: "ArrowRight", shiftKey: true });
+    expect(handle.getAttribute("aria-valuenow")).toBe("65");
+    fireEvent.keyDown(handle, { key: "Home" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("55");
+    expect(screen.queryByText(/Rule-based extraction — no AI model used/)).toBeNull();
+    for (const tab of ["Check & correct", "History (1)", "Evidence & handoff"]) {
+      fireEvent.click(screen.getByRole("tab", { name: tab }));
+      expect(screen.getByRole("button", { name: /confirm & verify incident/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Reject" })).toBeTruthy();
+    }
+  });
+});
+
+describe("Review queue pagination", () => {
+  it("shows five messages per page with Previous/Next and keeps the selected page", () => {
+    demoStore.loadFixture("SUPPLIER_OFFER");
+    renderAt("/message-intelligence");
+    expect(screen.getByText("Showing 1–5 of 6")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Previous page" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("Showing 6–6 of 6")).toBeTruthy();
+    fireEvent.click(screen.getByRole("link", { name: /Open review HP-MSG-OL-OFFER/ }));
+    expect(screen.getByText("Showing 6–6 of 6")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Page 2" }).getAttribute("aria-current")).toBe("page");
   });
 });

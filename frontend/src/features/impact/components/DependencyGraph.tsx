@@ -9,7 +9,6 @@ import {
   Minus,
   Plus,
   RotateCcw,
-  Search,
   ShoppingBag,
   Truck,
   UtensilsCrossed,
@@ -70,8 +69,14 @@ function layout(graph: ImpactGraph) {
 function edgePath(a: Placed, b: Placed) {
   const x1 = a.x + R;
   const x2 = b.x - R - 6;
-  const mx = (x1 + x2) / 2;
-  return `M ${x1} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${x2} ${b.y}`;
+  // Orthogonal "elbow" route with rounded corners: edges from one node share the
+  // same trunk, so fan-outs read as one tidy bus instead of crossing curves.
+  const mx = x1 + Math.min(24, (x2 - x1) / 2);
+  const dy = b.y - a.y;
+  if (Math.abs(dy) < 1) return `M ${x1} ${a.y} H ${x2}`;
+  const r = Math.min(10, Math.abs(dy) / 2, (x2 - x1) / 4);
+  const s = Math.sign(dy);
+  return `M ${x1} ${a.y} H ${mx - r} Q ${mx} ${a.y} ${mx} ${a.y + s * r} V ${b.y - s * r} Q ${mx} ${b.y} ${mx + r} ${b.y} H ${x2}`;
 }
 
 /* component ----------------------------------------------------------------- */
@@ -85,9 +90,8 @@ interface Props {
   onFilter: (f: GraphFilter) => void;
 }
 
-export function DependencyGraph({ graph, snapshot, selectedId, onSelect, filter, onFilter }: Props) {
+export function DependencyGraph({ graph, snapshot, selectedId, onSelect, filter, onFilter, query = "" }: Props & { query?: string }) {
   const [showTable, setShowTable] = useState(false);
-  const [query, setQuery] = useState("");
   const [zoom, setZoom] = useState(1);
   const viewportRef = useRef<HTMLDivElement>(null);
   const { placed, width, height } = useMemo(() => layout(graph), [graph]);
@@ -123,22 +127,6 @@ export function DependencyGraph({ graph, snapshot, selectedId, onSelect, filter,
   return (
     <div className="p2-graph">
       <div className="p2-graph__toolbar">
-        <label className="p2-graph__search">
-          <Search size={15} aria-hidden="true" />
-          <span className="p2-sr">Search graph nodes</span>
-          <input
-            type="search"
-            placeholder="Search supplier, menu, lot…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const hit = placed.find(matchesQuery);
-                if (hit) onSelect(hit.id);
-              }
-            }}
-          />
-        </label>
         <div className="p2-seg" role="group" aria-label="Filter dependency graph">
           {(["ALL", "AFFECTED", "UNAFFECTED"] as GraphFilter[]).map((f) => (
             <button key={f} type="button" className="p2-seg__btn" aria-pressed={filter === f} onClick={() => onFilter(f)}>
@@ -172,6 +160,10 @@ export function DependencyGraph({ graph, snapshot, selectedId, onSelect, filter,
                     <path d="M0,0 L10,5 L0,10 z" className="p2-map__arrow p2-map__arrow--active" />
                   </marker>
                 </defs>
+                {COLUMNS.slice(0, -1).map((c, i) => {
+                  const x = PAD_X + (i + 0.5) * COL_GAP;
+                  return <line key={`div-${c.kind}`} x1={x} x2={x} y1={4} y2={height - 4} className="p2-map__divider" />;
+                })}
                 {graph.edges.map((e) => {
                   const a = byId.get(e.from);
                   const b = byId.get(e.to);

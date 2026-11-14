@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { X } from "lucide-react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { Activity, ClipboardList, History, MessageSquare, Truck, X, type LucideIcon } from "lucide-react";
 import type { Incident } from "../../../types/restaurant";
 import { useRestaurantStore } from "../../../services/mock/restaurantStore";
 import { selectCurrentImpact } from "../../../services/mock/restaurantState";
@@ -22,6 +22,8 @@ import { Badge, Qty, SeverityBadge, SimulatedTag, StatusBadge, SyntheticTag } fr
 
 const CHANNEL_LABEL = { WHATSAPP: "WhatsApp", OUTLOOK: "Outlook", TELEGRAM: "Telegram" } as const;
 
+type DrawerTab = "summary" | "supplier" | "impact" | "messages" | "history";
+
 export function IncidentDetail({ incident, onClose }: { incident: Incident; onClose: () => void }) {
   const store = useRestaurantStore();
   const { restaurant } = store;
@@ -34,6 +36,24 @@ export function IncidentDetail({ incident, onClose }: { incident: Incident; onCl
   const events = store.activity.filter((e) => e.incidentId === incident.id);
   const menus = menuSummary(restaurant, incident.ingredientId);
   const quality = dataQualityWarnings(restaurant.snapshot);
+  const [tab, setTab] = useState<DrawerTab>("summary");
+  useEffect(() => setTab("summary"), [incident.id]);
+  const TABS: Array<[DrawerTab, string, LucideIcon, number | null]> = [
+    ["summary", "Summary", ClipboardList, null],
+    ["supplier", "Supplier & PO", Truck, null],
+    ["impact", "Impact", Activity, menus.filter((m) => m.dependency === "AFFECTED").length],
+    ["messages", "Messages", MessageSquare, messages.length],
+    ["history", "History", History, events.length],
+  ];
+  const onTabKey = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const i = TABS.findIndex(([id]) => id === tab);
+    const next = e.key === "ArrowRight" ? (i + 1) % TABS.length : e.key === "ArrowLeft" ? (i - 1 + TABS.length) % TABS.length : -1;
+    const nextTab = TABS[next];
+    if (!nextTab) return;
+    e.preventDefault();
+    setTab(nextTab[0]);
+    document.getElementById(`incident-tab-${nextTab[0]}`)?.focus();
+  };
 
   useEffect(() => {
     // Return focus to whatever opened the drawer when it closes.
@@ -69,7 +89,19 @@ export function IncidentDetail({ incident, onClose }: { incident: Incident; onCl
         </button>
       </header>
 
-      <div className="p2-drawer__body">
+      <nav className="p2-drawer__tabs" role="tablist" aria-label="Incident details sections">
+        {TABS.map(([id, label, Icon, count]) => (
+          <button key={id} id={`incident-tab-${id}`} type="button" role="tab" aria-selected={tab === id} aria-controls={`incident-panel-${id}`}
+            tabIndex={tab === id ? 0 : -1} className="p2-drawer__tab" onClick={() => setTab(id)} onKeyDown={onTabKey}>
+            <Icon size={14} aria-hidden="true" />
+            <span>{label}</span>
+            {count !== null && <span className="p2-drawer__count">{count}</span>}
+          </button>
+        ))}
+      </nav>
+
+      <div className="p2-drawer__body" role="tabpanel" id={`incident-panel-${tab}`} aria-labelledby={`incident-tab-${tab}`}>
+{tab === "summary" && (<>
         <section className="p2-section">
           <h3 className="p2-section__title">Lifecycle</h3>
           <LifecycleStepper status={incident.status} />
@@ -77,9 +109,11 @@ export function IncidentDetail({ incident, onClose }: { incident: Incident; onCl
 
         <section className="p2-section">
           <h3 className="p2-section__title">Next action</h3>
-          <NextActions actions={nextActions(restaurant, incident)} />
+          <NextActions variant="queue" actions={nextActions(restaurant, incident)} />
         </section>
+        </>)}
 
+{tab === "supplier" && (<>
         <section className="p2-section">
           <h3 className="p2-section__title">Supplier and purchase order</h3>
           <dl className="p2-facts">
@@ -99,7 +133,9 @@ export function IncidentDetail({ incident, onClose }: { incident: Incident; onCl
           </dl>
           <p className="p2-fineprint">A supplier message is evidence of a statement, not a goods receipt. Physical stock is unchanged.</p>
         </section>
+        </>)}
 
+{tab === "impact" && (<>
         <section className="p2-section">
           <h3 className="p2-section__title">Impact preview</h3>
           <ImpactPreview impact={impact} impactState={impactState} />
@@ -129,7 +165,9 @@ export function IncidentDetail({ incident, onClose }: { incident: Incident; onCl
           </div>
           <p className="p2-fineprint">Confirmed portions are part of forecast, not added to it.</p>
         </section>
+        </>)}
 
+{tab === "messages" && (<>
         <section className="p2-section">
           <h3 className="p2-section__title">Linked supplier messages ({messages.length})</h3>
           {messages.length === 0 ? (
@@ -152,7 +190,9 @@ export function IncidentDetail({ incident, onClose }: { incident: Incident; onCl
           )}
           {messages.length > 1 && <p className="p2-fineprint">{messages.length} reports linked to one incident — the 20 kg shortage is counted once.</p>}
         </section>
+        </>)}
 
+{tab === "history" && (<>
         <section className="p2-section">
           <h3 className="p2-section__title">Evidence and snapshot</h3>
           <dl className="p2-facts">
@@ -173,8 +213,9 @@ export function IncidentDetail({ incident, onClose }: { incident: Incident; onCl
 
         <section className="p2-section">
           <h3 className="p2-section__title">Event history</h3>
-          <ActivityList events={events} emptyText="No events recorded for this incident." />
+          <ActivityList muted events={events} emptyText="No events recorded for this incident." />
         </section>
+        </>)}
       </div>
     </div>
   );

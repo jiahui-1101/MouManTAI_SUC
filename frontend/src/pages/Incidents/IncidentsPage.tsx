@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
 import type { Channel } from "../../types/common";
@@ -21,7 +21,7 @@ import {
 import { DemoControls } from "../../features/incidents/components/DemoControls";
 import { IncidentDetail } from "../../features/incidents/components/IncidentDetail";
 import { P2ErrorBoundary } from "../../features/incidents/components/P2ErrorBoundary";
-import { Badge, EmptyState, Qty, SeverityBadge, StatusBadge, SyntheticTag } from "../../features/incidents/components/ui";
+import { Badge, EmptyState, Qty, SeverityBadge, StatusBadge } from "../../features/incidents/components/ui";
 import "../../features/incidents/p2.css";
 
 const CHANNEL_LABEL: Record<Channel, string> = { WHATSAPP: "WhatsApp", OUTLOOK: "Outlook", TELEGRAM: "Telegram" };
@@ -71,6 +71,7 @@ function IncidentsContent() {
   const store = useRestaurantStore();
   const [params, setParams] = useSearchParams();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
   const rows = useMemo(() => buildRows(store), [store]);
   const selectedId = params.get("incident");
   const selected = store.restaurant.incidents.find((i) => i.id === selectedId);
@@ -96,20 +97,17 @@ function IncidentsContent() {
 
   return (
     <div className="p2">
-      <div className="p2-meta">
-        <div className="p2-meta__item"><span className="p2-meta__label">Snapshot</span><span className="p2-mono">{store.restaurant.snapshot.id} · r{store.restaurant.snapshot.revision}</span></div>
-        <div className="p2-meta__item"><span className="p2-meta__label">Data</span><SyntheticTag /></div>
-        <div className="p2-meta__item"><span className="p2-meta__label">Incidents</span><span>{rows.length}</span></div>
-      </div>
-
       <div className={`p2-workspace ${selected ? "p2-workspace--with-detail" : ""}`}>
         <section className="p2-card p2-list" aria-label="Incident list">
-          <div className="p2-filters" role="search">
+          <div className={`p2-filters${showFilters ? " p2-filters--open" : ""}`} role="search">
             <label className="p2-field p2-field--search">
               <span className="p2-sr">Search by incident or PO ID</span>
               <Search size={16} aria-hidden="true" />
               <input type="search" placeholder="Search incident or PO ID" value={filters.query} onChange={set("query")} />
             </label>
+            <button type="button" className="p2-btn p2-filters__toggle" aria-expanded={showFilters} onClick={() => setShowFilters((v) => !v)}>
+              <SlidersHorizontal size={15} aria-hidden="true" /> Filters{filtersActive ? " •" : ""}
+            </button>
             <Select label="Status" value={filters.status} onChange={set("status")} options={LIFECYCLE.map((s) => [s, STATUS_LABEL[s as IncidentStatus]])} />
             <Select label="Severity" value={filters.severity} onChange={set("severity")} options={(["CRITICAL", "HIGH", "MEDIUM", "UNASSESSED"] as Severity[]).map((s) => [s, s.charAt(0) + s.slice(1).toLowerCase()])} />
             <Select label="Ingredient" value={filters.ingredient} onChange={set("ingredient")} options={unique(rows.map((r) => r.incident.ingredientId)).map((id) => [id, ingredientName(id)])} />
