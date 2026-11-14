@@ -219,7 +219,7 @@ export function DecisionMemoryView() {
                       </span>
                     </td>
                     <td>
-                      <span className="p5-mono">{entry.savedAtIso.slice(11, 16)}</span>
+                      <span className="p5-mono">{(entry.savedAtIso ?? '').slice(11, 16) || '—'}</span>
                     </td>
                     <td>
                       <button

@@ -26,4 +26,6 @@ export interface P5Deps {
   /** Audit timestamps only. */
   nowIso(): string;
   emit(event: P5Event): void;
+  /** Maps menu ID to display name from snapshot.menuItems with fallback to menuId. */
+  resolveMenuDisplayName?(menuId: string): string;
 }

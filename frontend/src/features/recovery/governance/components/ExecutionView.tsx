@@ -265,7 +265,7 @@ function TaskCard({
 
       {task.actionType === 'MENU_LIMIT_TASK' && (
         <div className="p5-row p5-muted">
-          <span>Item: <strong>{MENU_NAMES[task.targetId ?? ''] ?? task.targetId}</strong></span>
+          <span>Item: <strong>{adapter.deps.resolveMenuDisplayName?.(task.targetId ?? '') ?? MENU_NAMES[task.targetId ?? ''] ?? task.targetId}</strong></span>
           <span>Menu ID: <strong className="p5-mono">{task.targetId ?? '—'}</strong></span>
         </div>
       )}

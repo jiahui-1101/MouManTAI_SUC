@@ -45,7 +45,7 @@ export function expiresAtFor(strategy: 'A' | 'B', demoBusinessDate: string): str
 
 /** Expired when the demo clock ('HH:mm', MYT) is past the expiry's local time. Never real time. */
 export function isApprovalExpired(approval: Pick<ApprovalRecord, 'expiresAtIso'>, demoClockLocal: string): boolean {
-  if (approval.expiresAtIso === null) return false;
+  if (!approval.expiresAtIso) return false;
   const expiryLocal = approval.expiresAtIso.slice(11, 16);
   return isLocalTimeAfter(demoClockLocal, expiryLocal);
 }

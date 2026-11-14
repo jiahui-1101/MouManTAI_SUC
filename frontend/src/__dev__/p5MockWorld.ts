@@ -257,6 +257,15 @@ export function createMockWorld(): MockWorld {
       emit: (e) => {
         state.events = [...state.events, e];
       },
+      resolveMenuDisplayName: (id: string) => {
+        const map: Record<string, string> = {
+          'HP-MENU-CP': 'Chicken Popcorn',
+          'HP-MENU-CT': 'Chicken Tenders',
+          'HP-MENU-HC': 'Happy Combo — Chicken Popcorn',
+          'HP-MENU-FR': 'Potato Fries',
+        };
+        return map[id] ?? id;
+      },
     },
     subscribe(cb) {
       listeners.add(cb);
