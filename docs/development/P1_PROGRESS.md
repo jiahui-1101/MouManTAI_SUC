@@ -2,7 +2,7 @@
 
 ## Status
 
-**Milestone:** Mock messaging inbox, channels and settings complete
+**Milestone:** Final QA — P1 incomplete; review and team handoff pending
 
 **Branch:** `feature/p1-mock-messaging` (created from `main`)
 
@@ -106,8 +106,22 @@ The user's scope override takes precedence where the documents discuss real or r
 
 ## Latest verification
 
-- `npm test`: 40 tests passed across 5 test files.
+- `npm test`: 41 tests passed across 5 test files.
 - `npm run typecheck`: passed.
 - `npm run build`: passed with Vite 8.3.8.
 - No dependencies or external services were added.
 - Parser and inbox scope is deterministic and offline; no AI model or API call exists.
+
+## Final QA audit (2026-11-14)
+
+- Inbox, Channels and Settings render and their covered interactions pass. Fixed the empty-fixture Inbox crash with a regression test and a link back to scenario loading.
+- Message Intelligence remains an empty route: navigation works, but extraction review, human edits, evidence version history and confirmation are NOT implemented. P1 is not complete.
+- Parser tests verify 20,000 milli-kg expected, zero claimed, 20,000 shortfall and UNKNOWN ETA, preserving original text and evidence spans.
+- The three canonical channel messages remain separate records. Their incident correlation is presentation metadata only: no actual shared Incident entity or reducer exists. The seeded linked status is not evidence of human verification.
+- Duplicate suppression is a seeded counter, not a tested event-ingestion deduplication implementation.
+- Messaging uses one module store and fixture array, but the full integrator-owned shared business fixture/store is absent. Rule-summary quantities and Inbox display quantities are still independently repeated; the single-source requirement is not fully satisfied.
+- No runtime HP-SNAP-001 snapshot exists in this branch. No snapshot or canonical business quantities were changed by this QA fix; snapshot preservation cannot be tested until the shared interface exists.
+- INCIDENT_VERIFIED dispatch, shared incident state, review history and P2 selector are absent. Impact Explorer is an empty page. A P1 → shared incident → P2 integration test cannot honestly be added against an existing interface.
+- Team integration must provide the canonical shared snapshot/PO/inventory/incident types, reducer and P2 selector. P1 then needs reviewed extraction versions, explicit correlation/verification and the typed event handoff before the cross-part acceptance test can pass. Do not create another P1 incident or inventory store to substitute for that interface.
+- Source inspection found no provider network calls, OAuth implementation, live channel mode or connection setup. Credential-related words occur only in explanatory mock-boundary text.
+- Git diff against main contains no changes to P2–P5 page implementations, shared layout, navigation, router or design tokens. QA changed only the P1 Inbox, its tests and this progress document.
