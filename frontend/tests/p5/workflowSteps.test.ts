@@ -97,7 +97,7 @@ describe('selectWorkflowSteps', () => {
     expect(steps.approvals.status).toBe('Stale/Expired');
   });
 
-  it('role forbidden on approval: Blocked: DEMO_FORBIDDEN', () => {
+  it('role forbidden on approval: Blocked: Not allowed for this role', () => {
     const h = makeHarness();
     h.p5().chooseRecoveryScenario('B');
     h.env.role = 'ViewerAuditor';
@@ -109,7 +109,8 @@ describe('selectWorkflowSteps', () => {
       getCurrentRole: () => ({ role: h.env.role, actorId: h.env.actorId }),
       getActiveIncidentId: () => h.env.incidentId,
     });
-    expect(steps.approvals.status).toContain('Blocked: DEMO_FORBIDDEN');
+    expect(steps.approvals.status).toContain('Blocked: Not allowed for this role');
+    expect(steps.approvals.status).not.toContain('DEMO_FORBIDDEN');
     expect(steps.approvals.tone).toBe('danger');
   });
 

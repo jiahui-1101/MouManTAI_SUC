@@ -53,8 +53,8 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
     const ctx = setup();
     show(ctx, <ComparisonView />);
 
-    const cardA = screen.getByTestId('plan-A');
-    const cardB = screen.getByTestId('plan-B');
+    const cardA = screen.getByTestId('plan-A-details');
+    const cardB = screen.getByTestId('plan-B-details');
 
     // Both scenarios share the same snapshot fingerprint in the context header
     const fp = ctx.world.state.snapshot.fingerprint;
@@ -64,12 +64,16 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
     // Plan A canonical values: RM255.00, 150 conditional portions
     expect(cardA.textContent).toContain('RM255.00 projected additional landed cost');
     expect(cardA.textContent).toContain('150 (conditional)');
-    expect(cardA.textContent).toContain('CONDITIONAL');
+    expect(cardA.textContent).toContain('Conditional — depends on supplier delivery');
+    expect(screen.getByTestId('strip-A-spend').textContent).toContain('RM255.00 (projected)');
+    expect(screen.getByTestId('strip-A-coverage').textContent).toContain('150 of 150 portions (conditional)');
 
     // Plan B canonical values: RM0.00, 72 planned portions
     expect(cardB.textContent).toContain('RM0.00 new purchase');
     expect(cardB.textContent).toContain('72 planned');
-    expect(cardB.textContent).toContain('FEASIBLE');
+    expect(cardB.textContent).toContain('Feasible with current stock');
+    expect(screen.getByTestId('strip-B-coverage').textContent).toContain('72 of 150 portions');
+    expect(screen.getByTestId('strip-B-confirmed').textContent).toContain('60 protected');
   });
 
   // P5-T02: Forecast vs confirmed figures (78 is forecast unmet only; 0 order breaches)
@@ -77,7 +81,10 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
     const ctx = setup();
     show(ctx, <ComparisonView />);
 
-    const cardB = screen.getByTestId('plan-B');
+    const cardB = screen.getByTestId('plan-B-details');
+    expect(screen.getByTestId('strip-B-giveup').textContent).toContain(
+      "78 forecast portions can't be offered today (forecast, not customer orders)",
+    );
     // 78 must be labelled as forecast unmet
     expect(cardB.textContent).toContain('78 — forecast only, not confirmed-order breaches');
     // 60 confirmed portions protected
@@ -155,7 +162,7 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
 
     const approveBtn = btn(/^Approve$/);
     expect(approveBtn.disabled).toBe(true);
-    expect(screen.getByText(/ViewerAuditor is read-only/i)).toBeDefined();
+    expect(screen.getByTestId('approval-blocker').textContent).toContain('The viewer role is read-only.');
     unmount();
 
     // 2. OperationsManager on Plan A (requires Owner authority due to purchase cost)
@@ -166,8 +173,9 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
 
     const approveBtnA = btn(/^Approve$/);
     expect(approveBtnA.disabled).toBe(true);
-    expect(screen.getByTestId('approval-blocker').textContent).toContain('DEMO_FORBIDDEN');
-    expect(screen.getByTestId('approval-blocker').textContent).toContain('OperationsManager cannot approve');
+    expect(screen.getByTestId('approval-blocker').textContent).toContain('Only the Owner can approve this plan');
+    expect(screen.getByTestId('approval-blocker').textContent).toContain('it commits new spend with a supplier');
+    expect(within(screen.getByTestId('approval-blocker')).getByTestId('p5-blocker-details').textContent).toContain('DEMO_FORBIDDEN');
   });
 
   // P5-T07: Snapshot changed after proposal/approval → stale scenario/approval cannot execute
@@ -185,7 +193,8 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
     show(ctx, <ExecutionView />);
 
     // Stale banner is rendered
-    expect(screen.getByTestId('p5-execution-blocked-banner').textContent).toContain('Snapshot changed since approval');
+    expect(screen.getByTestId('p5-execution-blocked-banner').textContent).toContain('The numbers changed');
+    expect(screen.getByTestId('p5-execution-blocked-banner').textContent).toContain('data is now at version 2');
 
     // All simulate buttons are disabled
     const simulateButtons = screen.queryAllByRole('button', { name: /Simulate next step/i });
@@ -243,7 +252,7 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
     // Verification without receipt evidence stays UNVERIFIED with MISSING_RECEIPT
     fireEvent.click(btn(/Verify simulated outcome/i));
     expect(screen.getByTestId('p5-outcome-badge').textContent).toContain('UNVERIFIED');
-    expect(screen.getAllByText(/MISSING_RECEIPT/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Delivery receipt not recorded yet/i).length).toBeGreaterThan(0);
   });
 
   // P5-T10: Plan B four batches not all completed → Not SUCCESS (PARTIAL)
@@ -263,7 +272,7 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
     expect(screen.getByTestId('p5-outcome-badge').textContent).not.toContain('SUCCESS');
 
     // Grouped reasons include MISSING_PREP for B-04
-    expect(screen.getByText(/MISSING_PREP: HP-BATCH-B-04/i)).toBeDefined();
+    expect(screen.getAllByText(/Prep batch 4 of 4: not confirmed yet/i).length).toBeGreaterThan(0);
   });
 
   // P5-T11: Complete required simulated evidence → SUCCESS with Demo evidence only subtext
@@ -323,7 +332,7 @@ describe('P5 Acceptance Matrix: P5-T01 through P5-T18', () => {
 
     // Row for food waste should contain UNKNOWN
     const wasteCell = screen.getByTestId('p5-actual-waste');
-    expect(wasteCell.textContent).toContain('UNKNOWN');
+    expect(wasteCell.textContent).toMatch(/unknown/i);
     expect(wasteCell.textContent).not.toContain('0kg');
     expect(wasteCell.textContent).not.toContain('RM0');
   });

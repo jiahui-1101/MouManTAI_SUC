@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { assessImpactAction } from "../src/services/mock/restaurantStore";
 import { routes } from "../src/app/router";
+import { openInboxRow } from "./helpers.p1";
 import { demoStore, incidentLinkBlockers, selectActiveIncident, selectExtractionVersions, selectMessagesForIncident, selectOperationalSnapshot } from "../src/store/demoStore";
 
 beforeEach(() => demoStore.dispatch({ type: "DEMO_RESET" }));
@@ -46,6 +47,7 @@ describe("incident verification and cross-channel correlation", () => {
     expect(selectOperationalSnapshot(s()).ingredientLots.find((l) => l.ingredientId === "HP-ING-CHICKEN")!.onHandMilli).toBe(10000);
 
     await act(async () => { await router.navigate("/inbox"); });
+    openInboxRow("Demo Poultry Supply A", "09:01");
     expect(screen.getByTestId("inbox-incident-status").textContent).toMatch(/verified with 3 linked messages; the 20\.000 kg/);
 
     act(() => demoStore.dispatch({ type: "DEMO_RESET" }));

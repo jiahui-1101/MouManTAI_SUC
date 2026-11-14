@@ -1,11 +1,14 @@
 import { useId, useState } from 'react';
 import { Button, DataPanel } from '../../../../components/ui';
 import { formatKgMilli, formatSenAsRM, shortFingerprint } from '../format';
-import type { DecisionMemoryEntry, OutcomeStatus, ScenarioStrategy, VerificationLevel } from '../p5Contracts';
+import { EVIDENCE_QUALITY_LABELS, LESSON_KIND_LABELS, VERIFICATION_LEVEL_LABELS, demoTime } from '../labels';
+import type { ApprovalRecord, DecisionMemoryEntry, OutcomeStatus, ScenarioStrategy, VerificationLevel } from '../p5Contracts';
 import { useP5Store, useP5World } from '../p5Store';
 import { selectDecisionMemory, selectSuccessfulCaseCount } from '../selectors';
 import { Dialog } from './Dialog';
-import { NotWiredNotice, P5ContextHeader } from './common';
+import { NotWiredNotice } from './common';
+import { P5Details } from './P5Details';
+import { P5ContextBar } from './RecoveryWorkflowHeader';
 import { P5DevControls } from './P5DevControls';
 import './p5.css';
 
@@ -46,7 +49,15 @@ export function DecisionMemoryView() {
     <div className="p5" data-testid="p5-decision-memory-view">
       <P5DevControls />
       {!w.wired && <NotWiredNotice />}
-      <P5ContextHeader />
+      <P5ContextBar />
+
+      {p5.decisionMemory.length > 0 && (
+        <section className="p5-stack" aria-label="Case cards" data-testid="p5-case-cards">
+          {[...p5.decisionMemory].reverse().map((entry) => (
+            <CaseCard key={entry.id} entry={entry} approvals={p5.approvals} onOpen={() => setSelectedEntry(entry)} />
+          ))}
+        </section>
+      )}
 
       {/* Header counts */}
       <DataPanel className="p5-card p5-stack" aria-label="Decision memory summary">
@@ -73,16 +84,15 @@ export function DecisionMemoryView() {
           </div>
         </div>
         <p className="p5-muted" style={{ fontSize: '12px' }}>
-          Reference library of simulated recoveries. Success count strictly includes verified SUCCESS cases.
+          Reference library of demo recoveries. The success count only includes cases with Simulated Outcome: SUCCESS.
         </p>
       </DataPanel>
 
       {/* Filter Toolbar */}
-      <DataPanel className="p5-card p5-stack" aria-label="Filters and search">
-        <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-          <h3>Filter and search cases</h3>
-          <span className="p5-muted">{entries.length} matching case{entries.length === 1 ? '' : 's'}</span>
-        </div>
+      <details className="p5-card p5-filters" open={totalCount >= 5} aria-label="Filters and search">
+        <summary>
+          Filter and search cases <span className="p5-muted">({entries.length} matching)</span>
+        </summary>
         <div className="p5-row" style={{ alignItems: 'flex-end' }}>
           <label htmlFor={idSearch} style={{ flex: '1 1 220px', minWidth: '180px' }}>
             Search (incident, scenario, lessons):
@@ -107,7 +117,7 @@ export function DecisionMemoryView() {
               <option value="">All strategies</option>
               <option value="A">Plan A</option>
               <option value="B">Plan B</option>
-              <option value="ESCALATED">ESCALATED</option>
+              <option value="ESCALATED">Escalated</option>
             </select>
           </label>
 
@@ -120,7 +130,7 @@ export function DecisionMemoryView() {
               data-testid="p5-filter-incident-type"
             >
               <option value="">All types</option>
-              <option value="UNAVAILABLE">UNAVAILABLE</option>
+              <option value="UNAVAILABLE">Supplier unavailable</option>
             </select>
           </label>
 
@@ -133,7 +143,7 @@ export function DecisionMemoryView() {
               data-testid="p5-filter-ingredient"
             >
               <option value="">All ingredients</option>
-              <option value="HP-ING-CHICKEN">HP-ING-CHICKEN</option>
+              <option value="HP-ING-CHICKEN">Chicken</option>
             </select>
           </label>
 
@@ -162,20 +172,19 @@ export function DecisionMemoryView() {
               data-testid="p5-filter-verification"
             >
               <option value="">All levels</option>
-              <option value="SIMULATED_VERIFIED">SIMULATED_VERIFIED</option>
-              <option value="PARTIAL_EVIDENCE">PARTIAL_EVIDENCE</option>
-              <option value="NO_EVIDENCE">NO_EVIDENCE</option>
-              <option value="ESCALATED">ESCALATED</option>
+              <option value="SIMULATED_VERIFIED">{VERIFICATION_LEVEL_LABELS.SIMULATED_VERIFIED.label}</option>
+              <option value="PARTIAL_EVIDENCE">{VERIFICATION_LEVEL_LABELS.PARTIAL_EVIDENCE.label}</option>
+              <option value="NO_EVIDENCE">{VERIFICATION_LEVEL_LABELS.NO_EVIDENCE.label}</option>
+              <option value="ESCALATED">{VERIFICATION_LEVEL_LABELS.ESCALATED.label}</option>
             </select>
           </label>
         </div>
-      </DataPanel>
+      </details>
 
       {/* Case List */}
       <DataPanel className="p5-card p5-stack" aria-label="Decision memory entries">
         <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-          <h3>Saved Recovery Cases ({entries.length})</h3>
-          <span className="p5-badge fm-badge">Historical Snapshots</span>
+          <h3>All cases ({entries.length})</h3>
         </div>
 
         {entries.length === 0 ? (
@@ -188,12 +197,12 @@ export function DecisionMemoryView() {
               <caption className="p2-sr sr-only">Decision memory cases table</caption>
               <thead>
                 <tr>
-                  <th scope="col">Incident ID</th>
-                  <th scope="col">Strategy</th>
-                  <th scope="col">Scenario ID & Version</th>
-                  <th scope="col">Outcome Status</th>
-                  <th scope="col">Verification Level</th>
-                  <th scope="col">Saved At</th>
+                  <th scope="col">Incident</th>
+                  <th scope="col">Decision</th>
+                  <th scope="col">Plan version</th>
+                  <th scope="col">Outcome</th>
+                  <th scope="col">Proof</th>
+                  <th scope="col">Added at</th>
                   <th scope="col">Action</th>
                 </tr>
               </thead>
@@ -203,7 +212,7 @@ export function DecisionMemoryView() {
                     <th scope="row">
                       <strong className="p5-mono">{entry.incidentId}</strong>
                     </th>
-                    <td>
+                    <td data-label="Decision">
                       <span
                         className={`p5-badge fm-badge ${
                           entry.strategy === 'A'
@@ -213,15 +222,13 @@ export function DecisionMemoryView() {
                             : 'p5-badge--warn'
                         }`}
                       >
-                        {entry.strategy === 'ESCALATED' ? 'ESCALATED' : `Plan ${entry.strategy}`}
+                        {entry.strategy === 'ESCALATED' ? 'Escalated' : `Plan ${entry.strategy}`}
                       </span>
                     </td>
-                    <td>
-                      <span className="p5-mono">
-                        {entry.scenarioId} v{entry.version}
-                      </span>
+                    <td data-label="Plan version">
+                      <span title={entry.scenarioId}>Version {entry.version}</span>
                     </td>
-                    <td>
+                    <td data-label="Outcome">
                       <span
                         className={`p5-badge fm-badge ${
                           entry.outcomeStatus === 'SUCCESS'
@@ -235,15 +242,15 @@ export function DecisionMemoryView() {
                         Simulated Outcome: {entry.outcomeStatus}
                       </span>
                     </td>
-                    <td>
-                      <span className="p5-mono" data-testid={`p5-memory-level-${entry.id}`}>
-                        {entry.verificationLevel}
+                    <td data-label="Proof">
+                      <span data-testid={`p5-memory-level-${entry.id}`} title={entry.verificationLevel}>
+                        {VERIFICATION_LEVEL_LABELS[entry.verificationLevel].label}
                       </span>
                     </td>
-                    <td>
-                      <span className="p5-mono">{(entry.savedAtIso ?? '').slice(11, 16) || '—'}</span>
+                    <td data-label="Added at">
+                      <span>{entry.savedAtIso ? demoTime(entry.savedAtIso) : '—'}</span>
                     </td>
-                    <td>
+                    <td data-label="Action">
                       <Button
                         variant="secondary"
                         size="sm"
@@ -264,20 +271,20 @@ export function DecisionMemoryView() {
       {/* Detail Dialog */}
       {selectedEntry && (
         <Dialog
-          title={`Decision Memory Detail — ${selectedEntry.incidentId} (${selectedEntry.strategy})`}
+          title={`Case detail — ${selectedEntry.strategy === 'ESCALATED' ? 'Escalated' : `Plan ${selectedEntry.strategy}`}`}
           onClose={() => setSelectedEntry(null)}
         >
           <div className="p5-stack" data-testid="p5-memory-detail">
-            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-              <span>
-                Snapshot fingerprint:{' '}
-                <abbr className="p5-mono" title={selectedEntry.fingerprint}>
-                  {shortFingerprint(selectedEntry.fingerprint)}
-                </abbr>
-              </span>
-              <span>
-                Saved at: <strong className="p5-mono">{selectedEntry.savedAtIso}</strong>
-              </span>
+            <div className="p5-row p5-dialog-top-actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <p className="p5-muted" style={{ margin: 0 }}>Added at {demoTime(selectedEntry.savedAtIso)}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p5-btn--mobile-close"
+                onClick={() => setSelectedEntry(null)}
+              >
+                Close ✕
+              </Button>
             </div>
 
             <div className="p5-row">
@@ -292,8 +299,12 @@ export function DecisionMemoryView() {
               >
                 Simulated Outcome: {selectedEntry.outcomeStatus}
               </span>
-              <span className="p5-badge">Level: {selectedEntry.verificationLevel}</span>
-              <span className="p5-badge">Evidence: {selectedEntry.evidenceQuality}</span>
+              <span className="p5-badge" title={selectedEntry.verificationLevel}>
+                {VERIFICATION_LEVEL_LABELS[selectedEntry.verificationLevel].label}
+              </span>
+              <span className="p5-badge" title={selectedEntry.evidenceQuality}>
+                {EVIDENCE_QUALITY_LABELS[selectedEntry.evidenceQuality].label}
+              </span>
             </div>
 
             {/* Predicted vs Actual Summary */}
@@ -334,45 +345,38 @@ export function DecisionMemoryView() {
             </div>
 
             {/* Evidence IDs */}
-            <div className="p5-stack">
-              <h4>Evidence IDs ({selectedEntry.evidenceIds?.length ?? 0})</h4>
-              {selectedEntry.evidenceIds && selectedEntry.evidenceIds.length > 0 ? (
-                <div className="p5-row">
-                  {selectedEntry.evidenceIds.map((eid) => (
-                    <span key={eid} className="p5-badge p5-mono">
-                      {eid}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="p5-muted">No evidence records.</p>
-              )}
-            </div>
+            <P5Details summary={`Audit details (${selectedEntry.evidenceIds?.length ?? 0} evidence records)`}>
+              {selectedEntry.incidentId} · {selectedEntry.scenarioId} v{selectedEntry.version} ·{' '}
+              <abbr title={selectedEntry.fingerprint}>{shortFingerprint(selectedEntry.fingerprint)}</abbr>
+              {(selectedEntry.evidenceIds ?? []).map((eid) => (
+                <div key={eid}>{eid}</div>
+              ))}
+            </P5Details>
 
             {/* Lessons Split by Kind */}
             <div className="p5-stack" data-testid="p5-detail-lessons">
-              <h4>Deterministic Facts</h4>
+              <h4>Facts</h4>
               <ul className="p5-list" data-testid="p5-deterministic-facts">
                 {selectedEntry.lessons
                   .filter((l) => l.kind === 'DETERMINISTIC_FACT')
                   .map((l, i) => (
                     <li key={i}>
-                      <span className="p5-badge p5-badge--brand" style={{ marginRight: '6px' }}>
-                        DETERMINISTIC_FACT
+                      <span className="p5-badge p5-badge--brand" style={{ marginRight: '6px' }} title="DETERMINISTIC_FACT">
+                        {LESSON_KIND_LABELS.DETERMINISTIC_FACT.label}
                       </span>
                       <span>{l.text}</span>
                     </li>
                   ))}
               </ul>
 
-              <h4 style={{ marginTop: '8px' }}>Demo Interpretations</h4>
+              <h4 style={{ marginTop: '8px' }}>Demo interpretations</h4>
               <ul className="p5-list" data-testid="p5-demo-interpretations">
                 {selectedEntry.lessons
                   .filter((l) => l.kind === 'DEMO_INTERPRETATION')
                   .map((l, i) => (
                     <li key={i}>
-                      <span className="p5-badge p5-badge--warn" style={{ marginRight: '6px' }}>
-                        DEMO_INTERPRETATION
+                      <span className="p5-badge p5-badge--warn" style={{ marginRight: '6px' }} title="DEMO_INTERPRETATION">
+                        {LESSON_KIND_LABELS.DEMO_INTERPRETATION.label}
                       </span>
                       <span>{l.text}</span>
                     </li>
@@ -380,7 +384,7 @@ export function DecisionMemoryView() {
               </ul>
             </div>
 
-            <div style={{ textAlign: 'right', marginTop: '8px' }}>
+            <div className="p5-dialog-footer" style={{ textAlign: 'right', marginTop: '8px' }}>
               <Button
                 variant="primary"
                 onClick={() => setSelectedEntry(null)}
@@ -392,5 +396,59 @@ export function DecisionMemoryView() {
         </Dialog>
       )}
     </div>
+  );
+}
+
+/** Closing-frame case card: what we chose, what we gave up, the owner's reason, and the lesson. */
+function CaseCard({ entry, approvals, onOpen }: { entry: DecisionMemoryEntry; approvals: ApprovalRecord[]; onOpen: () => void }) {
+  const approval = approvals.find(
+    (a) => a.state === 'APPROVED' && a.scenarioId === entry.scenarioId && a.scenarioVersion === entry.version,
+  );
+  const pred = entry.predicted;
+  const tone = entry.outcomeStatus === 'SUCCESS' ? 'success' : entry.outcomeStatus === 'FAILED' ? 'danger' : entry.outcomeStatus === 'PARTIAL' ? 'warn' : 'neutral';
+  const lesson = entry.lessons.find((l) => l.kind === 'DEMO_INTERPRETATION' && !/reference case|no outcome evidence/i.test(l.text)) ??
+    entry.lessons.find((l) => l.kind === 'DEMO_INTERPRETATION');
+  const decision = entry.strategy === 'ESCALATED' ? 'Both plans rejected → Escalated' : `Plan ${entry.strategy}`;
+  return (
+    <article className={`fm-panel p5-card p5-case-card p5-case-card--${tone}`} data-testid={`p5-case-card-${entry.id}`}>
+      <h3>
+        Chicken delivery cancelled → {decision} → <span data-testid="p5-case-outcome">Simulated Outcome: {entry.outcomeStatus}</span>
+      </h3>
+      {pred && (
+        <dl className="p5-decision-lines">
+          <div>
+            <dt>Chose</dt>
+            <dd>
+              {formatSenAsRM(pred.additionalCostSen)} new spend · {pred.confirmedChickenPortionsProtected} confirmed portions protected
+            </dd>
+          </div>
+          <div className="p5-decision-lines__giveup">
+            <dt>Gave up</dt>
+            <dd>
+              {entry.strategy === 'A'
+                ? `${formatSenAsRM(pred.additionalCostSen)} and reliance on a ${formatKgMilli(pred.newPurchaseKgMilli)} delivery arriving on time`
+                : pred.forecastChickenPortionsUnmet > 0
+                ? `${pred.forecastChickenPortionsUnmet} forecast portions (forecast, not customer orders)`
+                : 'No forecast portions'}
+            </dd>
+          </div>
+        </dl>
+      )}
+      {approval && (
+        <p>
+          <strong>Owner&apos;s reason:</strong> “{approval.reason}”
+        </p>
+      )}
+      {lesson && (
+        <p className="p5-muted">
+          <strong>Lesson ({LESSON_KIND_LABELS[lesson.kind].label.toLowerCase()}):</strong> {lesson.text.replace(/^Demo interpretation:\s*/i, '')}
+        </p>
+      )}
+      <div>
+        <Button variant="secondary" size="sm" onClick={onOpen}>
+          Open case
+        </Button>
+      </div>
+    </article>
   );
 }

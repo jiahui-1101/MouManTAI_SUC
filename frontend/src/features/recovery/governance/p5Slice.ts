@@ -11,6 +11,7 @@ import { evaluateOutcome } from '../../outcomes/verifyOutcome';
 import { buildEscalation } from './escalation';
 import {
   fail,
+  isScenarioInfeasible,
   ok,
   type ApprovalRecord,
   type ApprovalRequest,
@@ -108,6 +109,9 @@ export function createP5Slice<T extends P5State = P5State>(deps: P5Deps): StateC
         if (role === 'ViewerAuditor') return fail('DEMO_FORBIDDEN', 'ViewerAuditor is read-only.');
         const scenario = deps.getScenario(strategy);
         if (!scenario) return fail('SCENARIO_NOT_READY', `Plan ${strategy} has not been published.`);
+        if (isScenarioInfeasible(scenario.feasibility)) {
+          return fail('SCENARIO_INFEASIBLE', `Plan ${strategy} is not feasible with the current numbers (${scenario.feasibility}).`);
+        }
         const snapshot = deps.getSnapshot();
         if (isScenarioStale(scenario, snapshot)) return fail('STALE_SCENARIO', `Plan ${strategy} is stale.`);
         const a = deps.getScenario('A');

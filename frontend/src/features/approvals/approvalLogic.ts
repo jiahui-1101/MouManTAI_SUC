@@ -1,6 +1,7 @@
 import {
   PLAN_A_DEADLINE_LOCAL,
   fail,
+  isScenarioInfeasible,
   ok,
   type ActionType,
   type P5ErrorCode,
@@ -80,6 +81,9 @@ export function buildApproval(input: ApproveInput): Result<ApprovalRecord> {
     isScenarioStale(scenario, snapshot)
   ) {
     return fail('STALE_SCENARIO', 'Scenario version or fingerprint no longer matches the current snapshot.');
+  }
+  if (isScenarioInfeasible(scenario.feasibility)) {
+    return fail('SCENARIO_INFEASIBLE', `Scenario is not feasible (${scenario.feasibility}).`);
   }
   if (hasPlanBPurchase(scenario)) {
     return fail('PLAN_B_PURCHASE_FORBIDDEN', 'Plan B must not contain a purchase (PO_DRAFT).');

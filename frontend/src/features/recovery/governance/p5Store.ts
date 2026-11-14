@@ -4,7 +4,7 @@ import { createMockWorld, type MockWorld } from '../../../__dev__/p5MockWorld';
 import type { DemoRole, ImpactSummaryLike, RecoveryScenarioWithActions, SnapshotRef } from './p5Contracts';
 import type { P5Deps } from './p5Deps';
 import { createRestaurantStoreAdapter, createRootStoreAdapter, type RootStoreContract } from './p5RootAdapter';
-import { createP5Slice, type P5State } from './p5Slice';
+import { createP5Slice, type P5Data, type P5State } from './p5Slice';
 
 /**
  * Phase 2 wiring until the Integrator's root demoStore exists.
@@ -99,24 +99,92 @@ export function devMockDeps(world: MockWorld = createMockWorld()): P5DepsAdapter
   };
 }
 
+/** In-memory presentation state. Lives on the runtime, so it survives in-app navigation between P5 pages. */
+export interface P5UiState {
+  presentationMode: boolean;
+  shortcutsOpen: boolean;
+  setPresentationMode(on: boolean): void;
+  togglePresentationMode(): void;
+  setShortcutsOpen(open: boolean): void;
+}
+
+export function createP5UiStore(initial: { presentationMode?: boolean } = {}): StoreApi<P5UiState> {
+  return createStore<P5UiState>()((set) => ({
+    presentationMode: initial.presentationMode ?? false,
+    shortcutsOpen: false,
+    setPresentationMode: (on) => set({ presentationMode: on }),
+    togglePresentationMode: () => set((s) => ({ presentationMode: !s.presentationMode, shortcutsOpen: false })),
+    setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
+  }));
+}
+
 export interface P5Runtime {
   adapter: P5DepsAdapter;
   store: StoreApi<P5State>;
+  ui: StoreApi<P5UiState>;
 }
 
-export function createP5Runtime(adapter: P5DepsAdapter): P5Runtime {
-  return { adapter, store: createStore<P5State>()(createP5Slice(adapter.deps)) };
+export function createP5Runtime(adapter: P5DepsAdapter, ui: StoreApi<P5UiState> = createP5UiStore()): P5Runtime {
+  return { adapter, store: createStore<P5State>()(createP5Slice(adapter.deps)), ui };
 }
 
 let defaultRuntime: P5Runtime | null = null;
+
+const SESSION_KEY = 'moumantai_p5_demo_state';
+
+function saveToSession(state: P5State): void {
+  try {
+    if (typeof window !== 'undefined' && !import.meta.env.VITEST && window.sessionStorage) {
+      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(state.p5));
+    }
+  } catch {
+    // ignore
+  }
+}
+
+function loadFromSession(): Partial<P5Data> | null {
+  try {
+    if (typeof window !== 'undefined' && !import.meta.env.VITEST && window.sessionStorage) {
+      const raw = window.sessionStorage.getItem(SESSION_KEY);
+      if (raw) return JSON.parse(raw);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 /** Adapter chosen at startup: defaults to createRestaurantStoreAdapter() for live upstream workflow. */
 export function getDefaultP5Runtime(): P5Runtime {
-  defaultRuntime ??= createP5Runtime(createRestaurantStoreAdapter());
+  if (!defaultRuntime) {
+    const runtime = createP5Runtime(createRestaurantStoreAdapter());
+    const saved = loadFromSession();
+    if (saved) {
+      try {
+        runtime.store.setState((s) => ({ ...s, p5: { ...s.p5, ...saved } }));
+      } catch {
+        // ignore
+      }
+    }
+    if (typeof window !== 'undefined' && !import.meta.env.VITEST) {
+      runtime.store.subscribe((state) => {
+        saveToSession(state);
+      });
+    }
+    defaultRuntime = runtime;
+  }
   return defaultRuntime;
 }
 
 export function resetDefaultP5Runtime(): void {
   defaultRuntime = null;
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.removeItem(SESSION_KEY);
+    }
+  } catch {
+    // ignore
+  }
 }
 
 const P5RuntimeContext = createContext<P5Runtime | null>(null);
@@ -176,6 +244,11 @@ export function useP5Runtime(): P5Runtime {
 /** Zustand hook over the P5 slice of the active runtime. */
 export function useP5Store<T>(selector: (s: P5State) => T): T {
   return useStore(useP5Runtime().store, selector);
+}
+
+/** Presentation-mode flag and toggles (default OFF). */
+export function useP5Ui<T>(selector: (s: P5UiState) => T): T {
+  return useStore(useP5Runtime().ui, selector);
 }
 
 /** Re-renders when the outside world (snapshot, scenarios, clock, role) changes. */

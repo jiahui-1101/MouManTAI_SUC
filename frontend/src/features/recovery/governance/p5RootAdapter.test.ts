@@ -327,6 +327,21 @@ describe('p5RootAdapter', () => {
     expect(adapter.deps.getScenario('B')).toBeNull();
   });
 
+  it('preserves distinct PO shortfall (20kg) and forecast demand gap (12kg) without swapping', () => {
+    simulateSupplierReport('WHATSAPP', 'PENDING');
+    simulateVerification('HP-INC-001');
+    assessImpactAction('HP-INC-001');
+
+    const adapter = createRestaurantStoreAdapter();
+    const impact = adapter.deps.getImpact();
+    expect(impact).not.toBeNull();
+    // Supplier PO shortfall is 20kg (20000 milli), forecast chicken demand gap is 12kg (12000 milli)
+    expect(impact?.poShortfallKgMilli).toBe(20000);
+    expect(impact?.forecastGapKgMilli).toBe(12000);
+    // Explicit regression check: fails if they are swapped
+    expect(impact?.poShortfallKgMilli).not.toBe(impact?.forecastGapKgMilli);
+  });
+
   it('createRestaurantStoreAdapter dynamically resolves scenarios and supports publication', async () => {
     simulateSupplierReport('WHATSAPP', 'PENDING');
     simulateVerification('HP-INC-001');
