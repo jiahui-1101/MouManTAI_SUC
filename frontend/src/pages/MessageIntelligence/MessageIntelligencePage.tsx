@@ -1,6 +1,6 @@
 import "../p1.css";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
 import { CANONICAL_PO_REGISTRY, CANONICAL_SUPPLIER_REGISTRY } from "../../features/messaging/mockMessageRegistry";
@@ -39,25 +39,21 @@ export { segmentRawText } from "../../features/messaging/segmentRawText";
 export function MessageIntelligencePage() {
   const state = useDemoState();
   const [params] = useSearchParams();
-  const navigate = useNavigate();
-  const requested = params.get("message");
-  // Without ?message, open the current shared selection (or the first queue item) instead of an empty picker.
-  const fallback = state.messages.find((m) => m.id === state.selectedId)?.id ?? state.messages[0]?.id ?? null;
-  useEffect(() => {
-    if (!requested && fallback && !state.loadStatus) navigate(`/message-intelligence?message=${fallback}`, { replace: true });
-  }, [requested, fallback, navigate, state.loadStatus]);
+  const messageId = params.get("message");
 
   if (state.loadStatus === "LOADING") return <PageContainer title={TITLE}><div className="fm-panel p1-state"><p role="status" aria-busy="true">Loading local mock fixture…</p><button type="button" className="fm-btn fm-btn--primary" onClick={() => demoStore.setMockLoadStatus()}>Finish mock loading</button></div></PageContainer>;
   if (state.loadStatus === "ERROR") return <PageContainer title={TITLE}><div className="fm-panel p1-state"><p role="alert">Mock fixture loading failed. No provider was contacted.</p><button type="button" className="fm-btn fm-btn--primary" onClick={() => demoStore.setMockLoadStatus()}>Retry local fixture</button></div></PageContainer>;
   if (state.messages.length === 0) {
     return <PageContainer title={TITLE}><div className="fm-empty mi-empty"><strong>No messages to review</strong><p>The active demo scenario has no supplier messages.</p><Link to="/channels">Load a demo scenario</Link></div></PageContainer>;
   }
-  const messageId = requested ?? fallback;
+  // First visit: the full message queue only. The review panel opens after a message is chosen.
+  if (!messageId) return <PageContainer title={TITLE}><div className="mi-layout mi-layout--queue"><ReviewQueue state={state} selectedId={null} /></div></PageContainer>;
   const message = state.messages.find((m) => m.id === messageId);
   return <PageContainer title={TITLE}>
     <ResizableLayout>
       <ReviewQueue state={state} selectedId={message?.id ?? null} />
       <div className="mi-layout__detail">
+        <Link className="mi-close" to="/message-intelligence" aria-label="Close review panel">×</Link>
         {!message
           ? <div role="alert" className="fm-empty mi-empty"><strong>Message not found</strong><p>{messageId} is not in the active offline fixture.</p><Link to="/inbox">Back to inbox</Link></div>
           : message.kind === "SUPPLIER_OFFER" ? <OfferReview key={message.id} message={message} /> : <Workspace key={message.id} message={message} />}
@@ -66,35 +62,34 @@ export function MessageIntelligencePage() {
   </PageContainer>;
 }
 
-const QUEUE_MIN = 320;
-const DETAIL_MIN = 480;
-/** Queue | drag handle | detail. Drag, or focus the handle and use ←/→ (Home resets). */
+const DEFAULT_QUEUE_PCT = 55;
+const MIN_PCT = 30;
+const MAX_PCT = 70;
+/** Queue | drag handle | detail. Width is a % of the layout. Drag, ←/→ (Shift = larger), Home or double-click resets. */
 function ResizableLayout({ children }: { children: [ReactNode, ReactNode] }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(480);
-  const clamp = (w: number) => {
-    const total = ref.current?.getBoundingClientRect().width || Number.POSITIVE_INFINITY; // unmeasured (e.g. tests): no upper bound
-    return Math.round(Math.max(QUEUE_MIN, Math.min(w, Math.max(QUEUE_MIN, total - DETAIL_MIN))));
-  };
+  const [pct, setPct] = useState(DEFAULT_QUEUE_PCT);
+  const clamp = (v: number) => Math.round(Math.max(MIN_PCT, Math.min(MAX_PCT, v)));
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
-    const left = ref.current?.getBoundingClientRect().left ?? 0;
-    const move = (e: PointerEvent) => setWidth(clamp(e.clientX - left));
+    const box = ref.current?.getBoundingClientRect();
+    if (!box || box.width === 0) return;
+    const move = (e: PointerEvent) => setPct(clamp(((e.clientX - box.left) / box.width) * 100));
     const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.classList.remove("is-resizing"); };
     document.body.classList.add("is-resizing");
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? 80 : 24;
-    const next = event.key === "ArrowLeft" ? width - step : event.key === "ArrowRight" ? width + step : event.key === "Home" ? 480 : null;
+    const step = event.shiftKey ? 10 : 2;
+    const next = event.key === "ArrowLeft" ? pct - step : event.key === "ArrowRight" ? pct + step : event.key === "Home" ? DEFAULT_QUEUE_PCT : null;
     if (next === null) return;
     event.preventDefault();
-    setWidth(clamp(next));
+    setPct(clamp(next));
   };
-  return <div className="mi-layout" ref={ref} style={{ "--rq-width": `${width}px` } as CSSProperties}>
+  return <div className="mi-layout" ref={ref} style={{ "--rq-pct": `${pct}fr`, "--detail-pct": `${100 - pct}fr` } as CSSProperties}>
     {children[0]}
-    <div className="mi-resizer" role="separator" aria-orientation="vertical" aria-label="Resize review queue" aria-valuenow={width} aria-valuemin={QUEUE_MIN} tabIndex={0} onPointerDown={onPointerDown} onKeyDown={onKeyDown} onDoubleClick={() => setWidth(480)} title="Drag to resize · double-click to reset"><span /></div>
+    <div className="mi-resizer" role="separator" aria-orientation="vertical" aria-label="Resize review queue" aria-valuenow={pct} aria-valuemin={MIN_PCT} aria-valuemax={MAX_PCT} aria-valuetext={`Queue ${pct}% of width`} tabIndex={0} onPointerDown={onPointerDown} onKeyDown={onKeyDown} onDoubleClick={() => setPct(DEFAULT_QUEUE_PCT)} title="Drag to resize · double-click to reset"><span /></div>
     {children[1]}
   </div>;
 }
@@ -158,46 +153,36 @@ function Workspace({ message }: { message: InboxMessage }) {
   const supplierName = view.values.supplierId ? CANONICAL_SUPPLIER_REGISTRY[view.values.supplierId as keyof typeof CANONICAL_SUPPLIER_REGISTRY]?.displayName : undefined;
 
   const title = message.subject ?? (message.poId ? `${message.poId} delivery disruption` : "Unmatched supplier message");
-  const nextStep = linked ? "Done — this message is evidence for the incident." : blockers.length ? "Resolve the items below before confirming." : linkMode ? "Values look right? Link this channel to the existing incident." : "Values look right? Confirm to verify the incident.";
+  const issue = linked
+    ? { tone: "success", title: `Linked to ${state.incident.id}`, text: `Already linked to ${state.incident.id} — confirming again has no effect. This message is now evidence for the incident.` }
+    : blockers.length
+      ? { tone: "warning", title: "Check before confirming", text: "Confirm stays disabled until these are resolved:" }
+      : { tone: "success", title: linkMode ? "Ready to link" : "Ready to confirm", text: linkMode ? "Values match the verified incident. Link this channel as extra evidence — the 20 kg shortfall is not added again." : "Sender and PO are verified and every value has supplier evidence. Check the values, then confirm." };
+  const evidenceCell = (spanField: string | null, field: CandidateField | null) => evidence(spanField, field);
   const tabs = [
-    { id: "review" as const, label: "Review & correct", panel: <div className="mi-steps">
-      <section className="mi-step" aria-labelledby="mi-original">
-        <h3 className="mi-step__title" id="mi-original"><span className="mi-step__num">1</span>Read the supplier message</h3>
-        <div className="message-detail__original mi__original">
-          <p data-testid="raw-text">{segmentRawText(message.rawText, view.evidenceSpans).map((seg, i) => seg.span ? <mark key={i} className="mi-mark" data-field={seg.span.field} data-start={seg.span.start} data-end={seg.span.end} title={`${FIELD_LABELS[seg.span.field] ?? seg.span.field} · chars ${seg.span.start}–${seg.span.end}`}>{seg.text}</mark> : <span key={i}>{seg.text}</span>)}</p>
-          <small>Highlighted words are the evidence behind each value (version {view.version}). The original text is never edited.</small>
+    { id: "review" as const, label: "Check & correct", panel: <div className="mi-steps">
+      <div className="mi-quote">
+        <p className="mi-quote__label">Supplier message · original, never edited</p>
+        <p data-testid="raw-text">{segmentRawText(message.rawText, view.evidenceSpans).map((seg, i) => seg.span ? <mark key={i} className="mi-mark" data-field={seg.span.field} data-start={seg.span.start} data-end={seg.span.end} title={`${FIELD_LABELS[seg.span.field] ?? seg.span.field} · chars ${seg.span.start}–${seg.span.end}`}>{seg.text}</mark> : <span key={i}>{seg.text}</span>)}</p>
+      </div>
+      <form className="mi-form" aria-label="Check the extracted values and correct if needed" noValidate onSubmit={(e) => { e.preventDefault(); save(); }} onKeyDown={(e) => { if (e.key === "Escape" && dirty) { e.preventDefault(); discard(); } }}>
+        <div className="mi-compare" role="table" aria-label="Extracted values">
+          <div className="mi-compare__row mi-compare__row--head" role="row"><span role="columnheader">Field · extracted (v{view.version})</span><span role="columnheader">Your value {locked ? "(locked after confirmation)" : "— change only if wrong"}</span></div>
+          <div className="mi-compare__row" role="row"><div role="cell"><b>Supplier</b><span>{view.values.supplierId ? `${view.values.supplierId} · ${supplierName ?? "unknown"}` : "None"}</span>{evidenceCell(null, "supplierId")}</div><fieldset role="cell" disabled={locked}><Field id="supplierId" label="Candidate supplier" error={errors.supplierId}><select id="supplierId" value={draft.supplierId} onChange={(e) => update("supplierId", e.target.value)}><option value="">None</option>{Object.values(CANONICAL_SUPPLIER_REGISTRY).map((s) => <option key={s.id} value={s.id}>{s.id} · {s.displayName}</option>)}</select></Field></fieldset></div>
+          <div className="mi-compare__row" role="row"><div role="cell"><b>Purchase order</b><span>{view.values.poId ?? "No matched PO"} <span className={`mi-chip mi-po-${poStatus.toLowerCase()}`}>{poStatus}</span></span>{evidenceCell("poId", "poId")}</div><fieldset role="cell" disabled={locked}><Field id="poId" label="Purchase order" error={errors.poId}><input id="poId" value={draft.poId} onChange={(e) => update("poId", e.target.value)} /></Field></fieldset></div>
+          <div className="mi-compare__row" role="row"><div role="cell"><b>Incident type</b><span>{view.values.incidentType ?? "Unresolved"}</span>{evidenceCell("incidentType", "incidentType")}</div><fieldset role="cell" disabled={locked}><Field id="incidentType" label="Incident type" error={errors.incidentType}><select id="incidentType" value={draft.incidentType} onChange={(e) => update("incidentType", e.target.value)}><option value="">Unresolved</option>{REVIEW_INCIDENT_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field></fieldset></div>
+          <div className="mi-compare__row" role="row"><div role="cell"><b>Expected quantity</b><span>{kg(view.values.expectedKgMilli)}</span>{evidenceCell("expectedKgMilli", "expectedKgMilli")}</div><fieldset role="cell" disabled={locked}><Quantity id="expected" label="Expected quantity" qty={draft.expectedQty} unit={draft.expectedUnit} error={errors.expectedQty ?? errors.expectedUnit} onQty={(v) => update("expectedQty", v)} onUnit={(v) => update("expectedUnit", v)} /></fieldset></div>
+          <div className="mi-compare__row" role="row"><div role="cell"><b>Delivered claim</b><span>{kg(view.values.claimedDeliveryKgMilli)}</span>{evidenceCell("claimedDeliveryKgMilli", "claimedDeliveryKgMilli")}</div><fieldset role="cell" disabled={locked}><Quantity id="claimed" label="Delivered claim" qty={draft.claimedQty} unit={draft.claimedUnit} error={errors.claimedQty ?? errors.claimedUnit} onQty={(v) => update("claimedQty", v)} onUnit={(v) => update("claimedUnit", v)} /></fieldset></div>
+          <div className="mi-compare__row" role="row"><div role="cell"><b>ETA</b><span>{view.values.etaStatus === "KNOWN" ? `${view.values.etaLocal} MYT` : "UNKNOWN (update promise is not an ETA)"}</span>{evidenceCell("etaStatus", view.values.etaStatus === "KNOWN" ? "etaLocal" : "etaStatus")}</div><fieldset role="cell" disabled={locked}><Field id="etaStatus" label="ETA status" error={undefined}><select id="etaStatus" value={draft.etaStatus} onChange={(e) => update("etaStatus", e.target.value as ReviewDraft["etaStatus"])}><option value="UNKNOWN">UNKNOWN</option><option value="KNOWN">KNOWN</option></select></Field>
+            {draft.etaStatus === "KNOWN" && <Field id="etaLocal" label="ETA (MYT)" error={errors.etaLocal}><input id="etaLocal" type="datetime-local" value={draft.etaLocal} onChange={(e) => update("etaLocal", e.target.value)} /></Field>}</fieldset></div>
+          <div className="mi-compare__row mi-compare__row--total" role="row"><div role="cell"><b>PO shortfall</b><span>{kg(view.shortfallKgMilli)}</span></div><div role="cell" className="mi-hint">Calculated: expected − delivered claim</div></div>
         </div>
-      </section>
-      <section className="mi-step" aria-labelledby="mi-extraction">
-        <h3 className="mi-step__title" id="mi-extraction"><span className="mi-step__num">2</span>Check the extracted values <span className={`mi-chip mi-method-${view.method.toLowerCase()}`}>{view.method}</span><span className="mi-chip">v{view.version} · {view.reviewStatus}</span></h3>
-        <dl className="mi-fields">
-          <div><dt>Matched supplier</dt><dd>{view.values.supplierId ? `${view.values.supplierId} · ${supplierName ?? "unknown"}` : "None"}</dd><dd>{evidence(null, "supplierId")}</dd></div>
-          <div><dt>Purchase order</dt><dd>{view.values.poId ?? "No matched PO"} <span className={`mi-chip mi-po-${poStatus.toLowerCase()}`}>{poStatus}</span></dd><dd>{evidence("poId", "poId")}</dd></div>
-          <div><dt>Incident type</dt><dd>{view.values.incidentType ?? "Unresolved"}</dd><dd>{evidence("incidentType", "incidentType")}</dd></div>
-          <div><dt>Expected quantity</dt><dd>{kg(view.values.expectedKgMilli)}</dd><dd>{evidence("expectedKgMilli", "expectedKgMilli")}</dd></div>
-          <div><dt>Delivered claim</dt><dd>{kg(view.values.claimedDeliveryKgMilli)}</dd><dd>{evidence("claimedDeliveryKgMilli", "claimedDeliveryKgMilli")}</dd></div>
-          <div><dt>PO shortfall</dt><dd>{kg(view.shortfallKgMilli)}</dd><dd><span className="mi-chip mi-chip--none">Derived: expected − delivered claim</span></dd></div>
-          <div><dt>ETA</dt><dd>{view.values.etaStatus === "KNOWN" ? `${view.values.etaLocal} MYT` : "UNKNOWN (update promise is not an ETA)"}</dd><dd>{evidence("etaStatus", view.values.etaStatus === "KNOWN" ? "etaLocal" : "etaStatus")}</dd></div>
-        </dl>
-      </section>
-      <form className="mi-step mi-form" aria-labelledby="mi-review" noValidate onSubmit={(e) => { e.preventDefault(); save(); }} onKeyDown={(e) => { if (e.key === "Escape" && dirty) { e.preventDefault(); discard(); } }}>
-        <h3 className="mi-step__title" id="mi-review"><span className="mi-step__num">3</span>Correct a value only if it is wrong</h3>
-        <p className="mi-hint">Saving creates version {latest.version + 1}. Changed values are recorded as your assertion, not as supplier evidence. Press Esc to discard.</p>
-        <fieldset disabled={locked}>
-          <legend className="sr-only">Candidate values</legend>
-          <Field id="supplierId" label="Candidate supplier" error={errors.supplierId}><select id="supplierId" value={draft.supplierId} onChange={(e) => update("supplierId", e.target.value)}><option value="">None</option>{Object.values(CANONICAL_SUPPLIER_REGISTRY).map((s) => <option key={s.id} value={s.id}>{s.id} · {s.displayName}</option>)}</select></Field>
-          <Field id="poId" label="Purchase order" error={errors.poId}><input id="poId" value={draft.poId} onChange={(e) => update("poId", e.target.value)} /></Field>
-          <Field id="incidentType" label="Incident type" error={errors.incidentType}><select id="incidentType" value={draft.incidentType} onChange={(e) => update("incidentType", e.target.value)}><option value="">Unresolved</option>{REVIEW_INCIDENT_TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
-          <Quantity id="expected" label="Expected quantity" qty={draft.expectedQty} unit={draft.expectedUnit} error={errors.expectedQty ?? errors.expectedUnit} onQty={(v) => update("expectedQty", v)} onUnit={(v) => update("expectedUnit", v)} />
-          <Quantity id="claimed" label="Delivered claim" qty={draft.claimedQty} unit={draft.claimedUnit} error={errors.claimedQty ?? errors.claimedUnit} onQty={(v) => update("claimedQty", v)} onUnit={(v) => update("claimedUnit", v)} />
-          <Field id="etaStatus" label="ETA status" error={undefined}><select id="etaStatus" value={draft.etaStatus} onChange={(e) => update("etaStatus", e.target.value as ReviewDraft["etaStatus"])}><option value="UNKNOWN">UNKNOWN</option><option value="KNOWN">KNOWN</option></select></Field>
-          {draft.etaStatus === "KNOWN" && <Field id="etaLocal" label="ETA (MYT)" error={errors.etaLocal}><input id="etaLocal" type="datetime-local" value={draft.etaLocal} onChange={(e) => update("etaLocal", e.target.value)} /></Field>}
-        </fieldset>
         {errors.form && <p role="alert" className="mi-error">{errors.form}</p>}
         {Object.entries(errors).some(([k, v]) => k !== "form" && v) && <p role="alert" className="mi-error">Validation failed. Nothing was saved.</p>}
         <div className="mi-actions">
           <button type="submit" className="fm-btn fm-btn--primary" disabled={locked}>Save correction</button>
           <button type="button" className="fm-btn fm-btn--ghost" disabled={!dirty} onClick={discard}>Discard edits</button>
+          <span className="mi-hint">Saving creates v{latest.version + 1}. Changed values are marked as your assertion, not supplier evidence. Esc discards.</span>
         </div>
       </form>
     </div> },
@@ -208,7 +193,7 @@ function Workspace({ message }: { message: InboxMessage }) {
           {v.changedFields.length > 0 && <span>Changed: {v.changedFields.map((c) => `${FIELD_LABELS[c.field]} ${fmtChange(c.from, c.field)} → ${fmtChange(c.to, c.field)}`).join("; ")}</span>}
           {v.note && <span>Note: {v.note}</span>}
         </button></li>)}</ol>
-      <p className="mi-hint">Select a version to view it on the Review tab. Use ↑/↓, Home and End to move between versions.</p>
+      <p className="mi-hint">Select a version to view it on the Check &amp; correct tab. ↑/↓, Home and End move between versions.</p>
     </section> },
     { id: "evidence" as const, label: "Evidence & handoff", panel: <section className="mi-tabpanel" aria-label="Evidence and handoff">
       <h3 className="mi-step__title">Why this needs review</h3>
@@ -223,26 +208,26 @@ function Workspace({ message }: { message: InboxMessage }) {
       <div className="mi-detail__titles">
         <p className="rq__eyebrow">Supplier disruption review <span className="mi-detail__id">{message.id}</span></p>
         <h2 className="mi-detail__title">{title}</h2>
-        <p className="mi-detail__meta">{message.senderDisplay} · {message.verification === "VERIFIED_DEMO_CONTACT" ? "Verified demo contact" : "Unverified sender"} · {message.channel === "OUTLOOK" ? "Outlook" : message.channel[0] + message.channel.slice(1).toLowerCase()} · <time dateTime={message.receivedAtIso}>{fmtTime(message.receivedAtIso)}</time></p>
+        <p className="mi-detail__meta">{message.senderDisplay} · {message.verification === "VERIFIED_DEMO_CONTACT" ? "Verified demo contact" : "Unverified sender"} · <time dateTime={message.receivedAtIso}>{fmtTime(message.receivedAtIso)}</time></p>
       </div>
       <div className="mi-detail__badges">{linked ? <StatusBadge tone="success">Confirmed · {state.incident.id}</StatusBadge> : latest.reviewStatus === "REJECTED" ? <StatusBadge tone="neutral">Rejected</StatusBadge> : latest.reviewStatus === "UNRESOLVED" ? <StatusBadge tone="warning">On hold</StatusBadge> : <StatusBadge tone="warning">Needs review</StatusBadge>}<StatusBadge tone="info">Rule-based · no AI</StatusBadge><StatusBadge tone="simulated">Simulated</StatusBadge></div>
     </header>
     <div className="mi-actionbar">
-      <div className="mi-actionbar__reviewer"><span className="mi-avatar" aria-hidden="true">DO</span><span className="mi-actionbar__label">Reviewer</span><strong>Demo operator</strong></div>
-      <label className="mi-actionbar__note"><span className="sr-only">Review reason / note</span><textarea id="reviewNote" placeholder="Reason / note (needed to reject or hold)" rows={1} value={note} onChange={(e) => { setNote(e.target.value); setErrors((x) => ({ ...x, form: undefined })); }} /></label>
-      <div className="mi-actionbar__buttons">
-        <button type="button" className="fm-btn fm-btn--ghost" disabled={locked} onClick={() => decide("REJECTED")}>Reject</button>
-        <button type="button" className="fm-btn fm-btn--ghost" disabled={locked} onClick={() => decide("MARKED_UNRESOLVED")}>Mark unresolved</button>
+      <span className="mi-avatar" aria-hidden="true">DO</span><span className="mi-actionbar__label">Reviewer</span><strong className="mi-actionbar__name">Demo operator</strong>
+      <label className="mi-actionbar__note"><span className="sr-only">Review reason / note</span><input id="reviewNote" placeholder="Reason (needed to reject or hold)" value={note} onChange={(e) => { setNote(e.target.value); setErrors((x) => ({ ...x, form: undefined })); }} /></label>
+      <button type="button" className="fm-btn fm-btn--ghost" disabled={locked} onClick={() => decide("REJECTED")}>Reject</button>
+      <button type="button" className="fm-btn fm-btn--ghost" disabled={locked} onClick={() => decide("MARKED_UNRESOLVED")}>Mark unresolved</button>
           {linkMode
             ? <button type="button" className="fm-btn fm-btn--primary" disabled={blockers.length > 0 || pendingLink} aria-describedby="mi-blockers" onClick={() => setPendingLink(true)}>Link to existing incident {state.incident.id}</button>
             : <button type="button" className="fm-btn fm-btn--primary" disabled={blockers.length > 0} aria-describedby="mi-blockers" onClick={confirm}>Confirm &amp; verify incident</button>}
-      </div>
     </div>
     <p className={status ? "mi__status" : "sr-only"} role="status" aria-live="polite">{status}</p>
-    <div className="mi-next"><p className="mi-next__title">Next step</p><p>{nextStep}</p>
-      <div id="mi-blockers" className="mi-blockers">{blockers.length ? <><strong>Confirmation disabled:</strong><ul>{blockers.map((b) => <li key={b}>{b}</li>)}</ul></> : <span>Safe to {linkMode ? "link" : "confirm"}: verified sender, matched {state.incident.poId}, compatible incident type, source evidence present.</span>}</div>
-      {linked && <p className="fm-banner fm-banner--info p1-banner">Linked to <strong>{state.incident.id}</strong> ({state.incident.status}). <Link to="/inbox">Back to inbox</Link></p>}
-    </div>
+    <section className={`mi-issue mi-issue--${issue.tone}`} aria-label="Review status" id="mi-blockers">
+      <p className="mi-issue__title">{issue.title}</p>
+      <p>{issue.text}</p>
+      {!linked && blockers.length > 0 && <><strong className="sr-only">Confirmation disabled:</strong><ul>{blockers.map((b) => <li key={b}>{b}</li>)}</ul></>}
+      {linked && <p><Link to="/inbox">Back to inbox</Link></p>}
+    </section>
         {pendingLink && blockers.length === 0 && <div role="group" aria-label="Confirm incident link" className="mi-blockers mi-confirm">
           <p>Link <strong>{message.id}</strong> ({message.channel}) as additional evidence for <strong>{state.incident.id}</strong>? The same {kg(state.incident.claimedShortfallKgMilli)} supplier claim is not added again.</p>
           <button type="button" className="fm-btn fm-btn--primary" onClick={link}>Confirm link</button> <button type="button" className="fm-btn fm-btn--ghost" onClick={() => setPendingLink(false)}>Cancel</button>

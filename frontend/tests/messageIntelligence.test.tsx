@@ -21,9 +21,10 @@ const versions = (id = "HP-MSG-WA-001") => selectExtractionVersions(demoStore.ge
 describe("Message Intelligence page", () => {
   it("shows empty, missing, loading and error states", () => {
     const router = renderAt("/message-intelligence");
-    // No ?message: the review queue opens the shared selection instead of an empty picker.
-    expect(router.state.location.search).toBe("?message=HP-MSG-WA-001");
-    expect(screen.getByTestId("raw-text")).toBeTruthy();
+    // No ?message: the full review queue is shown first; the review panel opens only after a choice.
+    expect(router.state.location.search).toBe("");
+    expect(screen.queryByTestId("raw-text")).toBeNull();
+    expect(screen.queryByRole("separator")).toBeNull();
     expect(screen.getByRole("link", { name: /Open review HP-MSG-OL-001/ })).toBeTruthy();
     cleanup();
     open("HP-MSG-NOPE");
@@ -49,7 +50,7 @@ describe("Message Intelligence page", () => {
       expect(CANONICAL_MESSAGE.slice(start, end)).toBe(mark.textContent);
     });
     expect(raw.querySelector('[data-field="claimedDeliveryKgMilli"]')?.textContent).toBe("0kg");
-    const fields = screen.getByRole("region", { name: /Check the extracted values/i });
+    const fields = screen.getByRole("form", { name: /Check the extracted values/i });
     for (const text of ["HP-SUP-001 · Demo Poultry Supply A", "HP-PO-1042", "MATCHED", "UNAVAILABLE", "20.000 kg", "0.000 kg"]) expect(within(fields).getAllByText(new RegExp(text)).length).toBeGreaterThan(0);
     expect(within(fields).getByText(/UNKNOWN \(update promise/)).toBeTruthy();
     expect(screen.getByText("Rule extraction is pending explicit human confirmation.")).toBeTruthy(); // Evidence & handoff tab
@@ -204,13 +205,13 @@ describe("Review layout", () => {
   it("resizes the queue with the keyboard and keeps decisions visible above the tabs", () => {
     renderAt("/message-intelligence?message=HP-MSG-WA-001");
     const handle = screen.getByRole("separator", { name: "Resize review queue" });
-    expect(handle.getAttribute("aria-valuenow")).toBe("480");
-    fireEvent.keyDown(handle, { key: "ArrowRight" });
-    expect(Number(handle.getAttribute("aria-valuenow"))).toBeGreaterThan(480);
+    expect(handle.getAttribute("aria-valuenow")).toBe("55"); // queue opens wider than the detail
+    fireEvent.keyDown(handle, { key: "ArrowRight", shiftKey: true });
+    expect(handle.getAttribute("aria-valuenow")).toBe("65");
     fireEvent.keyDown(handle, { key: "Home" });
-    expect(handle.getAttribute("aria-valuenow")).toBe("480");
+    expect(handle.getAttribute("aria-valuenow")).toBe("55");
     expect(screen.queryByText(/Rule-based extraction — no AI model used/)).toBeNull();
-    for (const tab of ["Review & correct", "History (1)", "Evidence & handoff"]) {
+    for (const tab of ["Check & correct", "History (1)", "Evidence & handoff"]) {
       fireEvent.click(screen.getByRole("tab", { name: tab }));
       expect(screen.getByRole("button", { name: /confirm & verify incident/i })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Reject" })).toBeTruthy();
