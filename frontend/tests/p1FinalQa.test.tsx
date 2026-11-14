@@ -6,6 +6,7 @@ import { HP_SUPPLIER_OFFERS } from "../src/data/fixtures/happyPotato";
 import { routes } from "../src/app/router";
 import { demoStore, selectActiveIncident, selectExtractionVersions, selectMessagesForIncident, selectOperationalSnapshot, selectPublishedEvents, CANONICAL_MOCK_ENVELOPES } from "../src/store/demoStore";
 import { inboxStore } from "../src/features/messaging/inboxStore";
+import { chooseInboxChannel, openInboxRow } from "./helpers.p1";
 import { selectIncidentEvidence, selectMessageEvidence, selectSupplierOfferEvidence } from "../src/features/messaging/evidenceSelectors";
 
 const s = () => demoStore.getSnapshot();
@@ -19,7 +20,7 @@ describe("P1 final QA — end-to-end offline flow", () => {
     const ids = ["HP-MSG-WA-001", "HP-MSG-OL-001", "HP-MSG-TG-001"];
     for (const [i, id] of ids.entries()) {
       await act(async () => { await router.navigate("/inbox"); });
-      act(() => inboxStore.select(id));
+      openInboxRow("Demo Poultry Supply A", { "HP-MSG-WA-001": "09:01", "HP-MSG-OL-001": "09:03", "HP-MSG-TG-001": "09:05" }[id]!);
       fireEvent.click(screen.getByRole("link", { name: "Open in Message Intelligence" }));
       expect(router.state.location.search).toBe(`?message=${id}`);
       if (i === 0) {
@@ -39,6 +40,7 @@ describe("P1 final QA — end-to-end offline flow", () => {
     expect(selectOperationalSnapshot(s()).ingredientLots.find((l) => l.ingredientId === "HP-ING-CHICKEN")!.onHandMilli).toBe(10000);
     expect(selectIncidentEvidence(s(), "HP-INC-001")!.messages).toHaveLength(3);
     await act(async () => { await router.navigate("/inbox"); });
+    openInboxRow("Demo Poultry Supply A", "09:01");
     expect(screen.getByTestId("inbox-incident-status").textContent).toMatch(/3 linked messages; the 20\.000 kg/);
   });
 
@@ -68,7 +70,7 @@ describe("P1 final QA — end-to-end offline flow", () => {
     expect(screen.getByText("1 duplicate suppressed")).toBeTruthy();
     act(() => { demoStore.loadFixture("SUPPLIER_OFFER"); });
     expect(s().messages).toHaveLength(6);
-    fireEvent.click(screen.getByRole("button", { name: /^Outlook/ }));
+    chooseInboxChannel("Outlook");
     expect(within(screen.getByRole("region", { name: "Messages" })).getAllByRole("button")).toHaveLength(2);
     act(() => { demoStore.dispatch({ type: "DEMO_RESET" }); });
     expect(s()).toMatchObject({ activeFixture: "REVIEW_STATES", suppressedDuplicateCount: 0, extractionHistory: [], offerReviews: [], publishedEvents: [] });
