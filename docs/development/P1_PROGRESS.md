@@ -160,3 +160,14 @@ The user's scope override takes precedence where the documents discuss real or r
 - Tests: `tests/messageIntelligence.test.tsx` (9 tests). Navigation test now excludes the implemented page from the empty-page check.
 - Verification: `vitest` 59/59 passed, `tsc -b --noEmit` passed, `vite build` passed (run in a Linux copy because local `node_modules` are Windows binaries).
 - Push: not completed from this session — no GitHub credentials available; push `feature/p1-mock-messaging` manually.
+
+## Prompt 4 milestone — Incident verification & cross-channel correlation (2026-11-14)
+
+- Incident `HP-INC-001` in shared DemoState now carries `supplierId HP-SUP-001`, `type UNAVAILABLE`, `snapshotId HP-SNAP-001` rev 1, `verifiedAtIso` and `handoff {target /impact, status}`.
+- `confirmExtractionReview` (first safe message) and `linkMessageToIncident` (later channels) share one atomic commit: CONFIRMED version + review record + `incident.messageIds` + derived `linkedIncidentId`/stage, single emit. `INCIDENT_VERIFIED` reducer is idempotent; repeated confirm/link return `ALREADY_LINKED` without changing state.
+- Linking requires a verified incident, explicit "Link to existing incident" → "Confirm link", and passes `incidentLinkBlockers` (sender identity, PO, supplier, incident type, shortfall, evidence, unresolved/rejected review).
+- `claimedShortfallKgMilli` stays 20000 for 1–3 linked messages; accepted chicken stock stays 10.000 kg from the shared snapshot; P1 performs no inventory/impact calculation.
+- Handoff: `NOT_PUBLISHED` → `AWAITING_P2_CONSUMER` on verification; only `acknowledgeIncidentHandoff()` (for the P2 consumer) sets `ACKNOWLEDGED_BY_P2`. UI never claims impact was calculated before that. Link to `/impact` shown once verified.
+- Inbox and Message Intelligence status/timeline read the real incident (`IncidentHandoff` panel, inbox correlation line).
+- Tests: `tests/incidentCorrelation.test.tsx` (mandatory reset → WA confirm → OL/TG link → 3 messages/1 incident/20000 → reset pending; idempotency; incompatible links; handoff ack). 63/63 tests, typecheck and build pass.
+- Push: blocked from this session (GitHub push not permitted); push `feature/p1-mock-messaging` from a local terminal.
