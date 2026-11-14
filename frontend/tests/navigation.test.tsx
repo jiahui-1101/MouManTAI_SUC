@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { PAGE_ROUTES, routes } from "../src/app/router";
 import { NAV_ITEMS } from "../src/constants/navigation";
@@ -22,12 +22,19 @@ describe("route configuration", () => {
   });
 });
 
+/** Routes whose pages have been implemented; all others must still be empty shells. */
+const IMPLEMENTED = new Set(["/overview", "/incidents", "/impact"]);
+
 describe("pages", () => {
-  it.each(NAV_ITEMS.map((item) => [item.path, item.title]))(
-    "%s shows heading %s and an empty body",
-    (path, title) => {
+  it.each(NAV_ITEMS.map((item) => [item.path, item.title]))("%s shows heading %s", (path, title) => {
+    renderAt(path);
+    expect(heading()).toBe(title);
+  });
+
+  it.each(NAV_ITEMS.filter((item) => !IMPLEMENTED.has(item.path)).map((item) => [item.path]))(
+    "%s is still an empty page shell",
+    (path) => {
       renderAt(path);
-      expect(heading()).toBe(title);
       const body = screen.getByTestId("page-body");
       expect(body.childElementCount).toBe(0);
       expect(body.textContent).toBe("");
@@ -36,7 +43,11 @@ describe("pages", () => {
 
   it("shows the product name", () => {
     renderAt("/overview");
-    expect(screen.getByText("MouManTAI Recovery+")).toBeTruthy();
+    const header = within(screen.getByRole("banner", { name: "Recovery+ portal" }));
+    for (const label of ["FeedMe Portal", "Recovery+", "Powered by MouManTAI", "Concept integration", "Synthetic data"]) {
+      expect(header.getByText(label, { exact: true })).toBeTruthy();
+    }
+    expect(header.getByText(/Happy Potato — Demo Outlet/)).toBeTruthy();
   });
 
   it("redirects / to /overview", () => {
@@ -52,6 +63,35 @@ describe("pages", () => {
 });
 
 describe("navigation", () => {
+  it("hides a collapsed group and restores its named links on expansion", () => {
+    renderAt("/overview");
+    const nav = within(screen.getByRole("navigation", { name: "Main navigation" }));
+    const disclosure = nav.getByRole("button", { name: "System" });
+    const list = document.getElementById(disclosure.getAttribute("aria-controls") ?? "");
+    expect(nav.getByRole("link", { name: "Channel Connections" })).toBeTruthy();
+    fireEvent.click(disclosure);
+    expect(disclosure.getAttribute("aria-expanded")).toBe("false");
+    expect(list?.hasAttribute("hidden")).toBe(true);
+    expect(nav.queryByRole("link", { name: "Channel Connections" })).toBeNull();
+    fireEvent.click(disclosure);
+    expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+    expect(nav.getByRole("link", { name: "Channel Connections" })).toBeTruthy();
+  });
+
+  it("can collapse the active group and opens it again when navigation returns", async () => {
+    const router = renderAt("/settings");
+    const nav = within(screen.getByRole("navigation", { name: "Main navigation" }));
+    const disclosure = nav.getByRole("button", { name: "System" });
+    const settings = nav.getByRole("link", { name: "Settings" });
+    expect(settings.getAttribute("aria-current")).toBe("page");
+    fireEvent.click(disclosure);
+    expect(nav.queryByRole("link", { name: "Settings" })).toBeNull();
+    await act(() => router.navigate("/overview"));
+    await act(() => router.navigate(-1));
+    expect(disclosure.getAttribute("aria-expanded")).toBe("true");
+    expect(nav.getByRole("link", { name: "Settings" }).getAttribute("aria-current")).toBe("page");
+  });
+
   it("links every navigation item to its route", () => {
     renderAt("/overview");
     const nav = screen.getByRole("navigation", { name: "Main navigation" });
