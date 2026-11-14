@@ -34,3 +34,5 @@
 .pa label { display:grid; gap:8px; margin-top:16px; }
 @media(max-width:850px) { .pa-offers,.pa-columns { grid-template-columns:1fr; } .pa-panel { padding:18px; } }
 @media(max-width:480px) { .pa-offer-values { grid-template-columns:1fr; } .pa-metrics { grid-template-columns:1fr; } .pa-actions { align-items:stretch; flex-direction:column; } }
+
+.pa-panel > svg { display:block; margin-bottom:14px; color:var(--brand); }

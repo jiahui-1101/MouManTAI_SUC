@@ -27,7 +27,11 @@ describe("pages", () => {
     "%s shows heading %s and an empty body",
     (path, title) => {
       renderAt(path);
-      expect(heading()).toBe(title);
+      expect(heading()).toBe(path === "/recovery/plan-a" ? "External Supply Recovery" : title);
+      if (path === "/recovery/plan-a") {
+        expect(screen.getByText("External supply workspace is waiting")).toBeTruthy();
+        return;
+      }
       const body = screen.getByTestId("page-body");
       expect(body.childElementCount).toBe(0);
       expect(body.textContent).toBe("");
@@ -64,7 +68,7 @@ describe("navigation", () => {
     const nav = screen.getByRole("navigation", { name: "Main navigation" });
 
     fireEvent.click(nav.querySelector('a[href="/recovery/plan-a"]')!);
-    expect(await screen.findByRole("heading", { name: "Plan A — Supplier Recovery" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "External Supply Recovery" })).toBeTruthy();
     const active = nav.querySelector('a[aria-current="page"]');
     expect(active?.getAttribute("href")).toBe("/recovery/plan-a");
     expect(active?.className).toContain("nav__link--active");
@@ -75,6 +79,6 @@ describe("navigation", () => {
     expect(nav.querySelector('a[aria-current="page"]')?.getAttribute("href")).toBe("/overview");
 
     await router.navigate(1);
-    expect(await screen.findByRole("heading", { name: "Plan A — Supplier Recovery" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "External Supply Recovery" })).toBeTruthy();
   });
 });
