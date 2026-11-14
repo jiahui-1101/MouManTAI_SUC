@@ -285,10 +285,15 @@ function DecisionCard(props: {
 
   if (!scenario) {
     return (
-      <section className={cls} aria-label={title} data-testid={`plan-${strategy}`}>
-        <h2>{title} not ready</h2>
-        <p className="p5-muted">The plan owner has not published this plan yet.</p>
-        <div className="p5-row" style={{ gap: '8px', flexWrap: 'wrap' }}>
+      <section className={`${cls} p5-decision-card--empty`} aria-label={title} data-testid={`plan-${strategy}`}>
+        <div className="p5-decision-card__head">
+          <h2>{title} not ready</h2>
+          <span className="p5-pill">Not published</span>
+        </div>
+        <div className="p5-decision-card__empty">
+          <p className="p5-muted">The plan owner has not published this plan yet.</p>
+        </div>
+        <div className="p5-row p5-decision-card__actions">
           <Link to={PLAN_ROUTE[strategy]} className="fm-btn fm-btn--secondary p5-btn p5-btn--secondary">
             Go to {title}
           </Link>
@@ -321,7 +326,7 @@ function DecisionCard(props: {
           </span>
         )}
       </div>
-      <dl className="p5-decision-lines">
+      <dl className="p5-plan-lines">
         <div>
           <dt>New spend</dt>
           <dd data-testid={`strip-${strategy}-spend`}>
@@ -343,7 +348,7 @@ function DecisionCard(props: {
             <strong>{scenario.confirmedChickenPortionsProtected}</strong> protected{cond ? ' (conditional)' : ''}
           </dd>
         </div>
-        <div className="p5-decision-lines__giveup">
+        <div className="p5-plan-lines__giveup">
           <dt>What you give up</dt>
           <dd data-testid={`strip-${strategy}-giveup`}>{giveUpLine(scenario)}</dd>
         </div>

@@ -415,14 +415,14 @@ function CaseCard({ entry, approvals, onOpen }: { entry: DecisionMemoryEntry; ap
         Chicken delivery cancelled → {decision} → <span data-testid="p5-case-outcome">Simulated Outcome: {entry.outcomeStatus}</span>
       </h3>
       {pred && (
-        <dl className="p5-decision-lines">
+        <dl className="p5-plan-lines p5-plan-lines--case">
           <div>
             <dt>Chose</dt>
             <dd>
               {formatSenAsRM(pred.additionalCostSen)} new spend · {pred.confirmedChickenPortionsProtected} confirmed portions protected
             </dd>
           </div>
-          <div className="p5-decision-lines__giveup">
+          <div className="p5-plan-lines__giveup">
             <dt>Gave up</dt>
             <dd>
               {entry.strategy === 'A'
