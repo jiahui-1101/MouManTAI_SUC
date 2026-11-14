@@ -23,7 +23,7 @@ describe("route configuration", () => {
 });
 
 /** Routes whose pages have been implemented; all others must still be empty shells. */
-const IMPLEMENTED = new Set(["/overview", "/incidents", "/impact"]);
+const IMPLEMENTED = new Set(["/overview", "/incidents", "/impact", "/recovery/plan-a", "/recovery/plan-b", "/prep-planning"]);
 
 describe("pages", () => {
   it.each(NAV_ITEMS.map((item) => [item.path, item.title]))("%s shows heading %s", (path, title) => {
@@ -40,6 +40,44 @@ describe("pages", () => {
       expect(body.textContent).toBe("");
     },
   );
+
+  it("shows the Plan A waiting workspace rather than an empty shell", () => {
+    renderAt("/recovery/plan-a");
+    expect(screen.getByText("External supply workspace is waiting")).toBeTruthy();
+  });
+
+  it("shows the Plan B allocation and menu proposal", () => {
+    renderAt("/recovery/plan-b");
+    expect(heading()).toBe("Plan B — Internal Recovery");
+    expect(screen.getByRole("tab", { name: "Stock Allocation" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Order Protection" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Menu Recovery" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /View Prep Planning/ }).getAttribute("href")).toBe("/prep-planning");
+  });
+
+  it("recalculates stock across tabs and resets to the canonical demo", async () => {
+    renderAt("/recovery/plan-b");
+    fireEvent.click(screen.getByRole("button", { name: "8.00 kg" }));
+    expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
+    expect(screen.getByText(/0.75 kg shortfall/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Order Protection" }));
+    expect(within(screen.getByRole("tabpanel", { name: "Order Protection" })).getAllByText("At risk · review").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Menu Recovery" }));
+    expect(screen.getAllByText("At risk").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Stock Allocation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset Demo" }));
+    expect(within(screen.getByRole("region", { name: "Plan B summary" })).getByText("10.00 kg", { selector: "strong" })).toBeTruthy();
+    expect(screen.getByText("Plan Feasible*")).toBeTruthy();
+  });
+
+  it("shows prep and lets the manager inspect the tenders batch", () => {
+    renderAt("/prep-planning");
+    expect(heading()).toBe("Prep Planning");
+    const batch = screen.getByRole("button", { name: /Chicken Tenders, 15 Confirmed/ });
+    fireEvent.click(batch);
+    expect(batch.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("heading", { name: "HP-BATCH-B-03 · Chicken Tenders" })).toBeTruthy();
+  });
 
   it("shows the product name", () => {
     renderAt("/overview");
