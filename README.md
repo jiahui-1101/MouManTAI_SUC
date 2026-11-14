@@ -20,6 +20,7 @@
 <p align="center">
   <a href="https://frontend-blue-pi-70ejij1ipo.vercel.app">🌐 Live Demo</a> ·
   <a href="https://htmlpreview.github.io/?https://github.com/jiahui-1101/MouManTAI_SUC/blob/main/presentation/moumantai-presentation.html">🖥️ HTML Presentation</a> ·
+  <a href="presentation/moumantai-presentation.pdf">📄 PDF Slides</a> ·
   <a href="presentation/assets/interview.mp4">🎥 Merchant Interview</a>
 </p>
 
@@ -107,6 +108,7 @@ The prototype runs the full loop in the browser for a demo outlet, **Happy Potat
 |---|---|---|
 | Web App | [frontend-blue-pi-70ejij1ipo.vercel.app](https://frontend-blue-pi-70ejij1ipo.vercel.app) | Static Vite build on Vercel. Open **Overview → Supplier disruption demo** to start the scenario. |
 | HTML Presentation | [moumantai-presentation.html](https://htmlpreview.github.io/?https://github.com/jiahui-1101/MouManTAI_SUC/blob/main/presentation/moumantai-presentation.html) | 16 slides. ← → to navigate, Space to autoplay, F for fullscreen. |
+| PDF Slides | [moumantai-presentation.pdf](presentation/moumantai-presentation.pdf) | Same 16 slides as a 16:9 PDF; QR codes are clickable links. |
 | Backend API | Not deployed | The Live Message Bridge is designed but not built. See [backend/README.md](backend/README.md). |
 
 <p align="center">
@@ -526,6 +528,7 @@ Each ringgit of the Pro fee returns more than 2.5× in recovered contribution af
 |---|---|---|
 | Live demo | [frontend-blue-pi-70ejij1ipo.vercel.app](https://frontend-blue-pi-70ejij1ipo.vercel.app) | Ready |
 | HTML presentation | [`presentation/moumantai-presentation.html`](presentation/moumantai-presentation.html) ([view online](https://htmlpreview.github.io/?https://github.com/jiahui-1101/MouManTAI_SUC/blob/main/presentation/moumantai-presentation.html)) | Ready |
+| PDF slides | [`presentation/moumantai-presentation.pdf`](presentation/moumantai-presentation.pdf) | Ready |
 | Merchant interview | [`presentation/assets/interview.mp4`](presentation/assets/interview.mp4) | Ready |
 | Demo runbook | [`docs/P5_Demo_Runbook.md`](docs/P5_Demo_Runbook.md) | Ready |
 | Design guide | [`docs/design/FEEDME_PORTAL_ALIGNMENT.md`](docs/design/FEEDME_PORTAL_ALIGNMENT.md) | Ready |
