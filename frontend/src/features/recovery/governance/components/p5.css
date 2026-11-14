@@ -1446,3 +1446,689 @@ body[data-p5-presenting='true'] .p5-stepper__status { padding: 2px 6px; }
 
 .p5-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .p5-context-bar__status { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+
+/* ==========================================================================
+   P5 Mobile Responsive Layout (Phones <= 640px & Tablets <= 900px)
+   Strictly scoped to protect desktop / projector layout above 900px.
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  /* Intermediate adjustments for tablets & landscape viewports */
+  .p5-dialog {
+    max-height: calc(100vh - 32px);
+  }
+}
+
+@media (max-width: 640px) {
+  /* ------------------------------------------------------------------------
+     1. Foundation & Global Flow
+     ------------------------------------------------------------------------ */
+  .p5 {
+    padding: 12px 14px max(14px, env(safe-area-inset-bottom)) !important;
+    gap: 12px !important;
+    font-size: 14px !important;
+    max-width: 100vw !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  .p5-card {
+    padding: 14px 12px !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Text & numbers formatting */
+  .p5-mono,
+  .p5-kpi-val,
+  .p5-pill,
+  .p5-badge {
+    white-space: nowrap;
+  }
+
+  .p5-details__body,
+  .p5-details summary,
+  .p5-mono,
+  .p5 abbr {
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     2. Tap Targets & Form Inputs (min-height 44px, font-size 16px)
+     ------------------------------------------------------------------------ */
+  .p5 input:not([type="radio"]):not([type="checkbox"]),
+  .p5 select,
+  .p5 textarea,
+  .p5 .fm-select {
+    font-size: 16px !important;
+    min-height: 44px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .p5 label:has(input[type="radio"]),
+  .p5 label:has(input[type="checkbox"]) {
+    min-height: 44px !important;
+    display: inline-flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    cursor: pointer !important;
+  }
+
+  .p5 input[type="radio"],
+  .p5 input[type="checkbox"] {
+    width: 20px !important;
+    height: 20px !important;
+    min-height: 20px !important;
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Buttons & link buttons */
+  .p5 button,
+  .p5 .p5-btn,
+  .p5 .fm-btn,
+  .p5 a.p5-btn,
+  .p5 a.fm-btn {
+    min-height: 44px !important;
+    box-sizing: border-box !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     3. Tables: Stacked Card Rows with data-label
+     ------------------------------------------------------------------------ */
+  .p5 .p5-table-wrap,
+  .p5 .fm-table-wrap,
+  .p5 .p5-compare-table-wrap {
+    overflow-x: visible !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .p5 table.p5-table,
+  .p5 table.fm-table,
+  .p5 table.p5-compare-table {
+    display: block !important;
+    width: 100% !important;
+    background: transparent !important;
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+  }
+
+  .p5 table.p5-table thead,
+  .p5 table.fm-table thead,
+  .p5 table.p5-compare-table thead {
+    display: none !important;
+  }
+
+  .p5 table.p5-table tbody,
+  .p5 table.fm-table tbody,
+  .p5 table.p5-compare-table tbody {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .p5 table.p5-table tbody tr,
+  .p5 table.fm-table tbody tr,
+  .p5 table.p5-compare-table tbody tr {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    padding: 10px 12px !important;
+    background: var(--surface-primary) !important;
+    border: 1px solid var(--border-default) !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.05) !important;
+    box-sizing: border-box !important;
+    min-height: unset !important;
+  }
+
+  /* 2-column key/value tables (Comparison details, Approval details) */
+  .p5 .p5-compare-table th,
+  .p5 .p5-table:not([data-testid="p5-predicted-actual-table"]):not([data-testid="p5-memory-table"]) th {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 0 4px 0 !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-secondary) !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+  }
+
+  .p5 .p5-compare-table td,
+  .p5 .p5-table:not([data-testid="p5-predicted-actual-table"]):not([data-testid="p5-memory-table"]) td {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 !important;
+    border: none !important;
+    color: var(--text-primary) !important;
+    font-size: 13.5px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Multi-column tables (Outcomes predicted vs actual, Decision Memory cases) */
+  .p5 table[data-testid="p5-predicted-actual-table"] th[scope="row"],
+  .p5 table[data-testid="p5-memory-table"] th[scope="row"] {
+    display: block !important;
+    width: 100% !important;
+    padding: 0 0 6px 0 !important;
+    border: none !important;
+    border-bottom: 1px solid var(--border-default) !important;
+    margin-bottom: 6px !important;
+    background: transparent !important;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+  }
+
+  .p5 table[data-testid="p5-predicted-actual-table"] td,
+  .p5 table[data-testid="p5-memory-table"] td {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: baseline !important;
+    width: 100% !important;
+    padding: 5px 0 !important;
+    border: none !important;
+    border-bottom: 1px dashed rgba(0, 0, 0, 0.08) !important;
+    font-size: 13px !important;
+    box-sizing: border-box !important;
+  }
+
+  .p5 table[data-testid="p5-predicted-actual-table"] td:last-child,
+  .p5 table[data-testid="p5-memory-table"] td:last-child {
+    border-bottom: none !important;
+  }
+
+  .p5 table[data-testid="p5-predicted-actual-table"] td::before,
+  .p5 table[data-testid="p5-memory-table"] td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 11.5px;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+
+  .p5 table[data-testid="p5-memory-table"] td[data-label="Action"] {
+    margin-top: 6px !important;
+    padding-top: 8px !important;
+    border-top: 1px solid var(--border-default) !important;
+    border-bottom: none !important;
+    display: block !important;
+  }
+
+  .p5 table[data-testid="p5-memory-table"] td[data-label="Action"]::before {
+    display: none !important;
+  }
+
+  .p5 table[data-testid="p5-memory-table"] td[data-label="Action"] button {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     4. RecoveryWorkflowHeader & Context Bar
+     ------------------------------------------------------------------------ */
+  .p5-context-bar {
+    padding: 12px !important;
+    gap: 8px !important;
+  }
+
+  .p5-context-bar__row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .p5-context-bar__headline {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+
+  .p5-context-bar__controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  .p5-context-bar__role {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    gap: 4px !important;
+  }
+
+  .p5-context-bar__role select {
+    width: 100% !important;
+    min-height: 44px !important;
+    font-size: 16px !important;
+  }
+
+  .p5-context-bar__truth {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .p5-present-toggle {
+    min-height: 44px !important;
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+
+  .p5-context-bar__foot {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+
+  .p5-stepper--mobile {
+    padding: 10px 12px !important;
+  }
+
+  .p5-stepper-mobile__summary {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .p5-stepper-mobile__list {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 8px !important;
+    padding: 2px 2px 6px !important;
+    margin: 0 !important;
+    scrollbar-width: thin !important;
+  }
+
+  .p5-stepper-mobile__item {
+    flex: 0 0 auto !important;
+    scroll-snap-align: start !important;
+  }
+
+  .p5-stepper-mobile__link {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 8px 12px !important;
+    min-height: 44px !important;
+    white-space: nowrap !important;
+    font-size: 12.5px !important;
+    border-radius: var(--radius-md) !important;
+  }
+
+  .p5-stepper-mobile__link--current {
+    border-color: var(--action-primary) !important;
+    border-left: 3px solid var(--action-primary) !important;
+    font-weight: 600 !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     5. Area 2: Recovery Comparison (/recovery/compare)
+     ------------------------------------------------------------------------ */
+  .p5-grid2 {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .p5-impact-card {
+    padding: 12px 14px !important;
+  }
+
+  .p5-impact-card h3 {
+    font-size: 15px !important;
+  }
+
+  .p5-decision-strip {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .p5-decision-card {
+    padding: 14px 12px !important;
+    gap: 12px !important;
+  }
+
+  .p5-decision-lines,
+  body[data-p5-presenting='true'] .p5-decision-lines {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    grid-template-areas: none !important;
+    gap: 8px !important;
+  }
+
+  .p5-decision-lines > div,
+  body[data-p5-presenting='true'] .p5-decision-lines > div {
+    grid-area: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+  }
+
+  .p5-decision-lines dt,
+  body[data-p5-presenting='true'] .p5-decision-lines dt {
+    white-space: normal !important;
+    font-size: 12px !important;
+  }
+
+  .p5-decision-lines dd,
+  body[data-p5-presenting='true'] .p5-decision-lines dd {
+    font-size: 13.5px !important;
+    line-height: 1.4 !important;
+  }
+
+  .p5-decision-card__actions {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+    align-items: stretch !important;
+    margin-top: 10px !important;
+  }
+
+  .p5-decision-card__actions button,
+  .p5-decision-card__actions .fm-btn,
+  .p5-decision-card__actions .p5-btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  .p5-waiting-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .p5-waiting-actions .p5-btn,
+  .p5-waiting-actions .fm-btn,
+  .p5-waiting-actions a.p5-waiting-btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     6. Area 3: Approvals (/approvals)
+     ------------------------------------------------------------------------ */
+  .p5-blocker {
+    flex-direction: column !important;
+    gap: 10px !important;
+    padding: 14px !important;
+  }
+
+  .p5-blocker__headline {
+    font-size: 16px !important;
+  }
+
+  .p5-blocker .p5-row {
+    width: 100% !important;
+  }
+
+  .p5-blocker a.p5-btn,
+  .p5-blocker a.fm-btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .p5-approval-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+    align-items: stretch !important;
+  }
+
+  .p5-approval-actions button,
+  .p5-approval-actions .fm-btn,
+  .p5-approval-actions .p5-btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  .p5-history-item {
+    padding: 12px 14px !important;
+  }
+
+  .p5-history-plans-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .p5-history-meta-grid {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     7. Area 4: Execution (/execution)
+     ------------------------------------------------------------------------ */
+  .p5-kpi-grid--3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .p5-kpi-grid--3 > .p5-kpi-card:nth-child(3) {
+    grid-column: 1 / -1 !important;
+  }
+
+  [data-testid="p5-advance-all-btn"] {
+    width: 100% !important;
+    min-height: 44px !important;
+    text-align: center !important;
+    white-space: normal !important;
+    margin-top: 6px !important;
+  }
+
+  .p5-task-card {
+    padding: 14px 12px !important;
+  }
+
+  .p5-task-card .p5-row:last-child {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+    align-items: stretch !important;
+  }
+
+  .p5-task-card .p5-row:last-child button,
+  .p5-task-card .p5-row:last-child .fm-btn,
+  .p5-task-card .p5-row:last-child .p5-btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     8. Area 5: Outcomes (/outcomes)
+     ------------------------------------------------------------------------ */
+  .p5-hero {
+    padding: 14px 16px !important;
+  }
+
+  .p5-hero__status {
+    font-size: 20px !important;
+    line-height: 1.3 !important;
+  }
+
+  .p5-hero .p5-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .p5-hero button,
+  .p5-hero a.fm-btn,
+  .p5-hero a.p5-btn {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .p5-checklist__item {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 8px 0 !important;
+    border-bottom: 1px dashed var(--border-default) !important;
+  }
+
+  .p5-checklist__item button {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  #p5-evidence-entry-section .p5-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    width: 100% !important;
+  }
+
+  #p5-evidence-entry-section button[type="submit"] {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     9. Area 6: Decision Memory (/decision-memory)
+     ------------------------------------------------------------------------ */
+  .p5-kpi-grid {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .p5-filters .p5-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .p5-filters label {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .p5-case-card {
+    padding: 14px 12px !important;
+  }
+
+  .p5-case-card button {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  .p5-btn--mobile-close {
+    display: inline-flex !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     10. Area 7: Dialogs & Bottom Sheet
+     ------------------------------------------------------------------------ */
+  .p5-dialog-backdrop {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+
+  .p5-dialog,
+  .fm-dialog {
+    width: 100% !important;
+    max-width: 100vw !important;
+    max-height: 90vh !important;
+    margin: 0 !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: 16px !important;
+    border-top-right-radius: 16px !important;
+    padding: 18px 16px max(18px, env(safe-area-inset-bottom)) !important;
+    box-sizing: border-box !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+  }
+
+  .p5-dialog .fm-dialog__actions,
+  .p5-dialog .p5-dialog-footer {
+    position: sticky !important;
+    bottom: 0 !important;
+    background: var(--surface-primary) !important;
+    padding-top: 10px !important;
+    margin-top: auto !important;
+    border-top: 1px solid var(--border-default) !important;
+    z-index: 10 !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .p5-dialog .fm-dialog__actions button,
+  .p5-dialog .p5-dialog-footer button {
+    width: 100% !important;
+    min-height: 44px !important;
+    justify-content: center !important;
+  }
+
+  /* ------------------------------------------------------------------------
+     11. Area 8: Dev Controls
+     ------------------------------------------------------------------------ */
+  .p5-dev {
+    padding: 8px 10px !important;
+  }
+
+  .p5-dev .p5-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .p5-dev button.p5-btn {
+    flex: 1 1 calc(50% - 6px) !important;
+    min-height: 40px !important;
+    font-size: 12px !important;
+    padding: 6px 8px !important;
+    white-space: normal !important;
+    text-align: center !important;
+    justify-content: center !important;
+  }
+}
+
+@media (min-width: 641px) {
+  .p5-btn--mobile-close {
+    display: none !important;
+  }
+}

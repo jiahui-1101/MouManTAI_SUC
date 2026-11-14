@@ -120,13 +120,13 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
             <th scope="row">
               <RowHeader label="Strategy" tooltip="Recovery strategy name and operational approach" />
             </th>
-            <td>{STRATEGY_TITLE[s.strategy]}</td>
+            <td data-label="Strategy">{STRATEGY_TITLE[s.strategy]}</td>
           </tr>
           <tr>
             <th scope="row">
               <RowHeader label="Feasibility" tooltip="Feasibility status under current synthetic operational constraints" />
             </th>
-            <td>
+            <td data-label="Feasibility">
               <strong title={s.feasibility}>{FEASIBILITY_LABELS[s.feasibility].label}</strong> — {feasibilityReason(s)}
             </td>
           </tr>
@@ -134,13 +134,13 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
             <th scope="row">
               <RowHeader label="New purchase" tooltip="New purchase quantity required for recovery" />
             </th>
-            <td>{a ? `${formatKgMilli(s.newPurchaseKgMilli)} chilled chicken` : formatKgMilli(s.newPurchaseKgMilli)}</td>
+            <td data-label="New purchase">{a ? `${formatKgMilli(s.newPurchaseKgMilli)} chilled chicken` : formatKgMilli(s.newPurchaseKgMilli)}</td>
           </tr>
           <tr>
             <th scope="row">
               <RowHeader label="Additional cost" tooltip="Projected additional landed cost for this recovery strategy" />
             </th>
-            <td>
+            <td data-label="Additional cost">
               {a
                 ? `${formatSenAsRM(s.additionalCostSen)} projected additional landed cost`
                 : `${formatSenAsRM(s.additionalCostSen)} new purchase (not total operating cost)`}
@@ -150,7 +150,7 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
             <th scope="row">
               <RowHeader label="Forecast served" tooltip="Chicken forecast portions served under this plan" />
             </th>
-            <td>{a ? `${s.forecastChickenPortionsServed}${cond}` : `${s.forecastChickenPortionsServed} planned`}</td>
+            <td data-label="Forecast served">{a ? `${s.forecastChickenPortionsServed}${cond}` : `${s.forecastChickenPortionsServed} planned`}</td>
           </tr>
           <tr>
             <th scope="row">
@@ -159,7 +159,7 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
                 tooltip="Chicken forecast portions unmet (forecast demand gap only, not order breaches)"
               />
             </th>
-            <td>
+            <td data-label="Forecast unmet">
               {a
                 ? `${s.forecastChickenPortionsUnmet}${cond}`
                 : `${s.forecastChickenPortionsUnmet} — forecast only, not confirmed-order breaches`}
@@ -172,13 +172,13 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
                 tooltip="Confirmed chicken portions protected for existing orders"
               />
             </th>
-            <td>{a ? `${s.confirmedChickenPortionsProtected}${cond}` : `${s.confirmedChickenPortionsProtected} planned`}</td>
+            <td data-label="Confirmed protected">{a ? `${s.confirmedChickenPortionsProtected}${cond}` : `${s.confirmedChickenPortionsProtected} planned`}</td>
           </tr>
           <tr>
             <th scope="row">
               <RowHeader label="Assumptions" tooltip="Key operational conditions and assumptions set by the plan owner" />
             </th>
-            <td>
+            <td data-label="Assumptions">
               {s.assumptions.length ? (
                 <ul className="p5-list">
                   {s.assumptions.map((x) => (
@@ -194,7 +194,7 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
             <th scope="row">
               <RowHeader label="Scenario / version" tooltip="Scenario identifier, version, and referenced evidence" />
             </th>
-            <td className="p5-mono" title={`${s.id} · v${s.version}`}>
+            <td className="p5-mono" data-label="Scenario / version" title={`${s.id} · v${s.version}`}>
               Version {s.version}
               {s.evidenceRefs.length > 0 && ` · refs ${s.evidenceRefs.join(', ')}`}
             </td>

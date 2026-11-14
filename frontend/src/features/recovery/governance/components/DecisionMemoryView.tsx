@@ -212,7 +212,7 @@ export function DecisionMemoryView() {
                     <th scope="row">
                       <strong className="p5-mono">{entry.incidentId}</strong>
                     </th>
-                    <td>
+                    <td data-label="Decision">
                       <span
                         className={`p5-badge fm-badge ${
                           entry.strategy === 'A'
@@ -225,10 +225,10 @@ export function DecisionMemoryView() {
                         {entry.strategy === 'ESCALATED' ? 'Escalated' : `Plan ${entry.strategy}`}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Plan version">
                       <span title={entry.scenarioId}>Version {entry.version}</span>
                     </td>
-                    <td>
+                    <td data-label="Outcome">
                       <span
                         className={`p5-badge fm-badge ${
                           entry.outcomeStatus === 'SUCCESS'
@@ -242,15 +242,15 @@ export function DecisionMemoryView() {
                         Simulated Outcome: {entry.outcomeStatus}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Proof">
                       <span data-testid={`p5-memory-level-${entry.id}`} title={entry.verificationLevel}>
                         {VERIFICATION_LEVEL_LABELS[entry.verificationLevel].label}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Added at">
                       <span>{entry.savedAtIso ? demoTime(entry.savedAtIso) : '—'}</span>
                     </td>
-                    <td>
+                    <td data-label="Action">
                       <Button
                         variant="secondary"
                         size="sm"
@@ -275,7 +275,17 @@ export function DecisionMemoryView() {
           onClose={() => setSelectedEntry(null)}
         >
           <div className="p5-stack" data-testid="p5-memory-detail">
-            <p className="p5-muted">Added at {demoTime(selectedEntry.savedAtIso)}</p>
+            <div className="p5-row p5-dialog-top-actions" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <p className="p5-muted" style={{ margin: 0 }}>Added at {demoTime(selectedEntry.savedAtIso)}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="p5-btn--mobile-close"
+                onClick={() => setSelectedEntry(null)}
+              >
+                Close ✕
+              </Button>
+            </div>
 
             <div className="p5-row">
               <span
@@ -374,7 +384,7 @@ export function DecisionMemoryView() {
               </ul>
             </div>
 
-            <div style={{ textAlign: 'right', marginTop: '8px' }}>
+            <div className="p5-dialog-footer" style={{ textAlign: 'right', marginTop: '8px' }}>
               <Button
                 variant="primary"
                 onClick={() => setSelectedEntry(null)}

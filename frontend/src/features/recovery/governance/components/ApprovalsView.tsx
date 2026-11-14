@@ -459,19 +459,19 @@ export function ApprovalsView() {
                 <>
                   <tr>
                     <th scope="row">New purchase</th>
-                    <td>{formatKgMilli(scenario.newPurchaseKgMilli)}</td>
+                    <td data-label="New purchase">{formatKgMilli(scenario.newPurchaseKgMilli)}</td>
                   </tr>
                   <tr>
                     <th scope="row">Additional cost</th>
-                    <td>{formatSenAsRM(scenario.additionalCostSen)}</td>
+                    <td data-label="Additional cost">{formatSenAsRM(scenario.additionalCostSen)}</td>
                   </tr>
                   <tr>
                     <th scope="row">Confirmed chicken portions protected</th>
-                    <td>{scenario.confirmedChickenPortionsProtected}</td>
+                    <td data-label="Confirmed chicken portions protected">{scenario.confirmedChickenPortionsProtected}</td>
                   </tr>
                   <tr>
                     <th scope="row">Chicken forecast portions unmet</th>
-                    <td>{scenario.forecastChickenPortionsUnmet} (forecast only)</td>
+                    <td data-label="Chicken forecast portions unmet">{scenario.forecastChickenPortionsUnmet} (forecast only)</td>
                   </tr>
                 </>
               )}
@@ -514,7 +514,7 @@ export function ApprovalsView() {
           </p>
         )}
 
-        <div className="p5-row">
+        <div className="p5-row p5-approval-actions">
           <Button variant="primary" disabled={approveDisabled} onClick={() => setDialog('confirm')}>
             Approve
           </Button>

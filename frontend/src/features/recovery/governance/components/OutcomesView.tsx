@@ -293,7 +293,7 @@ export function OutcomesView() {
                   )}
                   <tr>
                     <th scope="row">External acknowledgment</th>
-                    <td colSpan={3} title="NOT_APPLICABLE_SIMULATION · SIMULATED_LOCAL_ONLY">
+                    <td colSpan={3} data-label="Status" title="NOT_APPLICABLE_SIMULATION · SIMULATED_LOCAL_ONLY">
                       Not applicable — nothing was sent outside the demo
                     </td>
                   </tr>
@@ -402,49 +402,49 @@ function PlanATableRows({ approval, evidence, deadline }: { approval: ApprovalRe
     <>
       <tr>
         <th scope="row">Received chilled chicken</th>
-        <td>{formatKgMilli(approval.predicted.newPurchaseKgMilli)}</td>
-        <td data-testid="p5-actual-received-kg">
+        <td data-label="Predicted">{formatKgMilli(approval.predicted.newPurchaseKgMilli)}</td>
+        <td data-label="Simulated Actual" data-testid="p5-actual-received-kg">
           {rEv ? formatKgMilli(rEv.payload.receivedKgMilli) : 'Not recorded yet'}
         </td>
-        <td><EvidenceSourceBadge ev={rEv} /></td>
+        <td data-label="Source"><EvidenceSourceBadge ev={rEv} /></td>
       </tr>
       <tr>
         <th scope="row">Acceptance</th>
-        <td>Accepted (quality check)</td>
-        <td data-testid="p5-actual-acceptance">
+        <td data-label="Predicted">Accepted (quality check)</td>
+        <td data-label="Simulated Actual" data-testid="p5-actual-acceptance">
           {rEv ? (rEv.payload.accepted ? 'Accepted' : 'Rejected') : 'Not recorded yet'}
         </td>
-        <td><EvidenceSourceBadge ev={rEv} /></td>
+        <td data-label="Source"><EvidenceSourceBadge ev={rEv} /></td>
       </tr>
       <tr>
         <th scope="row">Arrival</th>
-        <td>{deadline ? `By ${deadline}` : 'Before the prep cutoff'}</td>
-        <td data-testid="p5-actual-arrival">
+        <td data-label="Predicted">{deadline ? `By ${deadline}` : 'Before the prep cutoff'}</td>
+        <td data-label="Simulated Actual" data-testid="p5-actual-arrival">
           {rEv ? rEv.payload.arrivalLocal : 'Not recorded yet'}
         </td>
-        <td><EvidenceSourceBadge ev={rEv} /></td>
+        <td data-label="Source"><EvidenceSourceBadge ev={rEv} /></td>
       </tr>
       <tr>
         <th scope="row">Landed cost</th>
-        <td>{formatSenAsRM(approval.predicted.additionalCostSen)}</td>
-        <td data-testid="p5-actual-landed-cost">
+        <td data-label="Predicted">{formatSenAsRM(approval.predicted.additionalCostSen)}</td>
+        <td data-label="Simulated Actual" data-testid="p5-actual-landed-cost">
           {rEv ? formatSenAsRM(rEv.payload.landedCostSen) : 'Not recorded yet'}
         </td>
-        <td><EvidenceSourceBadge ev={rEv} /></td>
+        <td data-label="Source"><EvidenceSourceBadge ev={rEv} /></td>
       </tr>
       <tr>
         <th scope="row">Confirmed portions fulfilled</th>
-        <td>{approval.predicted.confirmedChickenPortionsProtected}</td>
-        <td data-testid="p5-actual-confirmed-portions">
+        <td data-label="Predicted">{approval.predicted.confirmedChickenPortionsProtected}</td>
+        <td data-label="Simulated Actual" data-testid="p5-actual-confirmed-portions">
           {fEv ? fEv.payload.confirmedFulfilled : 'Not recorded yet'}
         </td>
-        <td><EvidenceSourceBadge ev={fEv} /></td>
+        <td data-label="Source"><EvidenceSourceBadge ev={fEv} /></td>
       </tr>
       <tr>
         <th scope="row">Chicken forecast portions served</th>
-        <td>{approval.predicted.forecastChickenPortionsServed} (conditional)</td>
-        <td data-testid="p5-actual-forecast-served">Not measured in this demo</td>
-        <td><span className="p5-muted">—</span></td>
+        <td data-label="Predicted">{approval.predicted.forecastChickenPortionsServed} (conditional)</td>
+        <td data-label="Simulated Actual" data-testid="p5-actual-forecast-served">Not measured in this demo</td>
+        <td data-label="Source"><span className="p5-muted">—</span></td>
       </tr>
     </>
   );
@@ -487,24 +487,24 @@ function PlanBTableRows({
             <th scope="row" title={t.targetId}>
               {t.targetId ? ctx.batchLabel(t.targetId) : 'Prep batch'} produced
             </th>
-            <td>{planned !== undefined ? `${planned} portions` : 'Not provided by Plan B'}</td>
-            <td data-testid={`p5-actual-batch-${t.targetId}`}>
+            <td data-label="Predicted">{planned !== undefined ? `${planned} portions` : 'Not provided by Plan B'}</td>
+            <td data-label="Simulated Actual" data-testid={`p5-actual-batch-${t.targetId}`}>
               {pEv ? `${pEv.payload.producedPortions} portions` : 'Not recorded yet'}
             </td>
-            <td><EvidenceSourceBadge ev={pEv} /></td>
+            <td data-label="Source"><EvidenceSourceBadge ev={pEv} /></td>
           </tr>
         );
       })}
 
       <tr>
         <th scope="row">Menu limit tasks applied</th>
-        <td>
+        <td data-label="Predicted">
           {menuTasks.length} of {menuTasks.length} limits live
         </td>
-        <td data-testid="p5-actual-menus-applied">
+        <td data-label="Simulated Actual" data-testid="p5-actual-menus-applied">
           {allMenuEvs.length > 0 ? `${menusApplied} of ${menuTasks.length} confirmed live` : 'Not recorded yet'}
         </td>
-        <td>
+        <td data-label="Source">
           {allMenuEvs.length > 0 ? (
             <span className="p5-badge p5-badge--sim" title="SIMULATED_EVIDENCE">Demo evidence</span>
           ) : (
@@ -515,20 +515,20 @@ function PlanBTableRows({
 
       <tr>
         <th scope="row">Confirmed portions fulfilled</th>
-        <td>{approval.predicted.confirmedChickenPortionsProtected}</td>
-        <td data-testid="p5-actual-confirmed-portions">
+        <td data-label="Predicted">{approval.predicted.confirmedChickenPortionsProtected}</td>
+        <td data-label="Simulated Actual" data-testid="p5-actual-confirmed-portions">
           {fEv ? fEv.payload.confirmedFulfilled : 'Not recorded yet'}
         </td>
-        <td><EvidenceSourceBadge ev={fEv} /></td>
+        <td data-label="Source"><EvidenceSourceBadge ev={fEv} /></td>
       </tr>
 
       <tr>
         <th scope="row">Waste</th>
-        <td>No prediction</td>
-        <td data-testid="p5-actual-waste">
+        <td data-label="Predicted">No prediction</td>
+        <td data-label="Simulated Actual" data-testid="p5-actual-waste">
           {allPrepEvs.length > 0 ? formatWasteSummary(allPrepEvs) : 'Not recorded yet'}
         </td>
-        <td>
+        <td data-label="Source">
           {allPrepEvs.length > 0 ? (
             <span className="p5-badge p5-badge--sim" title="SIMULATED_EVIDENCE">Demo evidence</span>
           ) : (
@@ -539,11 +539,11 @@ function PlanBTableRows({
 
       <tr>
         <th scope="row">Chicken forecast portions planned</th>
-        <td>{approval.predicted.forecastChickenPortionsServed}</td>
-        <td data-testid="p5-actual-forecast-planned">
+        <td data-label="Predicted">{approval.predicted.forecastChickenPortionsServed}</td>
+        <td data-label="Simulated Actual" data-testid="p5-actual-forecast-planned">
           {totalProduced !== null ? `${totalProduced} produced` : 'Not recorded yet'}
         </td>
-        <td>
+        <td data-label="Source">
           {totalProduced !== null ? (
             <span className="p5-badge p5-badge--sim" title="SIMULATED_EVIDENCE">Demo evidence</span>
           ) : (
