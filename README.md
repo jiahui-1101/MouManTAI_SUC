@@ -108,7 +108,7 @@ The prototype runs the full loop in the browser for a demo outlet, **Happy Potat
 | Backend API | Not deployed | The Live Message Bridge is designed but not built. See [backend/README.md](backend/README.md). |
 
 <p align="center">
-  <img src="docs/images/app-overview.jpg" alt="MouManTAI Overview page for the Happy Potato outlet" width="900">
+  <img src="docs/images/app-overview.png" alt="MouManTAI Overview page for the Happy Potato outlet" width="900">
 </p>
 
 ---
