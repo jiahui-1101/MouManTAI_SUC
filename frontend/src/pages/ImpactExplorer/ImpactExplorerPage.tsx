@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { Search } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
 import { HP_IDS, HP_INGREDIENTS } from "../../data/fixtures/happyPotato";
@@ -20,7 +21,7 @@ import {
 import { impactStateOf, primaryIncident } from "../../features/incidents/model";
 import { DemoControls } from "../../features/incidents/components/DemoControls";
 import { P2ErrorBoundary } from "../../features/incidents/components/P2ErrorBoundary";
-import { Card, EmptyState, SyntheticTag } from "../../features/incidents/components/ui";
+import { Card, EmptyState } from "../../features/incidents/components/ui";
 import "../../features/incidents/p2.css";
 
 export function ImpactExplorerPage() {
@@ -38,6 +39,7 @@ function ImpactContent() {
   const { restaurant } = store;
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<GraphFilter>("ALL");
+  const [query, setQuery] = useState("");
 
   const incidentId = params.get("incident");
   const incident = restaurant.incidents.find((i) => i.id === incidentId) ?? primaryIncident(restaurant);
@@ -56,19 +58,42 @@ function ImpactContent() {
   };
 
   const header = (
-    <div className="p2-meta">
-      <div className="p2-meta__item"><span className="p2-meta__label">Snapshot</span><span className="p2-mono">{restaurant.snapshot.id} · r{restaurant.snapshot.revision}</span></div>
-      <div className="p2-meta__item"><span className="p2-meta__label">Data</span><SyntheticTag /></div>
-      <label className="p2-meta__item">
-        <span className="p2-meta__label">Incident</span>
-        <select className="p2-select" value={incident?.id ?? ""} onChange={(e) => update("incident", e.target.value || null)} disabled={!incident}>
+    <div className="p2-filters p2-filters--explorer" role="search">
+      <label className="p2-field p2-field--search p2-field--grow">
+        <span className="p2-sr">Find a node in the dependency map</span>
+        <Search size={16} aria-hidden="true" />
+        <input
+          type="search"
+          list="impact-node-options"
+          placeholder="Find supplier, PO, ingredient or menu item"
+          value={query}
+          onChange={(e) => {
+            const v = e.target.value;
+            setQuery(v);
+            const hit = graph.nodes.find((n) => n.label.toLowerCase() === v.trim().toLowerCase() || n.sublabel?.toLowerCase() === v.trim().toLowerCase());
+            if (hit) update("node", hit.id);
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            const q = query.trim().toLowerCase();
+            const hit = q && graph.nodes.find((n) => n.label.toLowerCase().includes(q) || n.sublabel?.toLowerCase().includes(q));
+            if (hit) update("node", hit.id);
+          }}
+        />
+        <datalist id="impact-node-options">
+          {graph.nodes.map((n) => <option key={n.id} value={n.label}>{n.sublabel}</option>)}
+        </datalist>
+      </label>
+      <label className="p2-field">
+        <span className="p2-field__label">Incident</span>
+        <select value={incident?.id ?? ""} onChange={(e) => update("incident", e.target.value || null)} disabled={!incident}>
           {restaurant.incidents.length === 0 && <option value="">None</option>}
           {restaurant.incidents.map((i) => <option key={i.id} value={i.id}>{i.id} · {i.poId}</option>)}
         </select>
       </label>
-      <label className="p2-meta__item">
-        <span className="p2-meta__label">Ingredient</span>
-        <select className="p2-select" value={selectedNode?.startsWith("ingredient:") ? selectedNode.slice(11) : ""} onChange={(e) => update("node", e.target.value ? `ingredient:${e.target.value}` : null)}>
+      <label className="p2-field">
+        <span className="p2-field__label">Ingredient</span>
+        <select value={selectedNode?.startsWith("ingredient:") ? selectedNode.slice(11) : ""} onChange={(e) => update("node", e.target.value ? `ingredient:${e.target.value}` : null)}>
           <option value="">Any</option>
           {HP_INGREDIENTS.filter((ing) => graph.nodes.some((n) => n.id === `ingredient:${ing.id}`)).map((ing) => (
             <option key={ing.id} value={ing.id}>{ing.name}</option>
@@ -86,7 +111,7 @@ function ImpactContent() {
           <EmptyState title="No supply incident to explore">
             <p>Impact appears after a supplier report about a purchase order is received and verified. The dependency structure below is from the synthetic snapshot.</p>
           </EmptyState>
-          <DependencyGraph graph={graph} snapshot={restaurant.snapshot} selectedId={selectedNode} onSelect={(id) => update("node", id)} filter={filter} onFilter={setFilter} />
+          <DependencyGraph graph={graph} snapshot={restaurant.snapshot} selectedId={selectedNode} onSelect={(id) => update("node", id)} filter={filter} onFilter={setFilter} query={query} />
         </Card>
       </div>
     );
@@ -109,17 +134,18 @@ function ImpactContent() {
         </div>
       )}
 
-      <ImpactContext incident={incident} snapshot={restaurant.snapshot} messages={messages} impactState={impactState} />
+      <ImpactContext incident={incident} snapshot={restaurant.snapshot} messages={messages} />
 
       {impactState === "CURRENT" && impact && <BeforeAfter impact={impact} />}
 
       <Card title="Supply-to-menu dependency graph" actions={<span className="p2-fineprint">Relationships from the synthetic fixture only</span>}>
-        <DependencyGraph graph={graph} snapshot={restaurant.snapshot} selectedId={selectedNode} onSelect={(id) => update("node", id)} filter={filter} onFilter={setFilter} />
+        <DependencyGraph graph={graph} snapshot={restaurant.snapshot} selectedId={selectedNode} onSelect={(id) => update("node", id)} filter={filter} onFilter={setFilter} query={query} />
       </Card>
 
       <div className="p2-two">
         {impactState === "CURRENT" && impact && <InventoryImpact impact={impact} snapshot={restaurant.snapshot} />}
-        <KitchenTime state={restaurant} incident={incident} />
+        <KitchenTime state={restaurant} incident={incident} selectedId={selectedNode}
+          onSelectStation={(id) => { update("node", id); requestAnimationFrame(() => document.querySelector(".p2-map")?.scrollIntoView({ behavior: "smooth", block: "start" })); }} />
       </div>
 
       <MenuImpact
