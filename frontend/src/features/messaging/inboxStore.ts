@@ -27,7 +27,10 @@ export interface InboxState {
   messages: readonly InboxMessage[];
   selectedId: InboxMessage["id"];
   suppressedDuplicateCount: number;
+  activeFixture: DemoFixtureId;
 }
+
+export type DemoFixtureId = "CORE_CHANNELS" | "REVIEW_STATES" | "EMPTY";
 
 const base = {
   provenance: "SIMULATED_CHANNEL",
@@ -47,7 +50,14 @@ export const SHARED_MOCK_INBOX: readonly InboxMessage[] = [
   { ...base, id: "HP-MSG-UNKNOWN", channel: "TELEGRAM", channelAccountId: "demo-telegram", providerMessageId: "sim:telegram:unknown", senderDisplay: "Unknown demo contact", senderRegistryId: null, receivedAtIso: "2026-11-21T09:09:00+08:00", rawText: "Hi, can you call me?", verification: "UNVERIFIED_SENDER", poId: null, extraction: "UNRESOLVED", stage: "UNMATCHED", read: false },
 ] as const;
 
-const initialState = (): InboxState => ({ messages: SHARED_MOCK_INBOX, selectedId: "HP-MSG-WA-001", suppressedDuplicateCount: 1 });
+export const DEMO_FIXTURES: Readonly<Record<DemoFixtureId, { label: string; description: string; messageIds: readonly InboxMessage["id"][] }>> = {
+  CORE_CHANNELS: { label: "Core three-channel scenario", description: "One canonical PO message per synthetic source.", messageIds: ["HP-MSG-WA-001", "HP-MSG-OL-001", "HP-MSG-TG-001"] },
+  REVIEW_STATES: { label: "Review-state scenario", description: "Core messages plus unverified and unmatched review cases.", messageIds: SHARED_MOCK_INBOX.map((message) => message.id) },
+  EMPTY: { label: "Empty inbox", description: "No fixture messages loaded.", messageIds: [] },
+} as const;
+
+const fixtureMessages = (fixture: DemoFixtureId) => DEMO_FIXTURES[fixture].messageIds.map((id) => SHARED_MOCK_INBOX.find((message) => message.id === id)!);
+const initialState = (): InboxState => ({ messages: fixtureMessages("REVIEW_STATES"), selectedId: "HP-MSG-WA-001", suppressedDuplicateCount: 1, activeFixture: "REVIEW_STATES" });
 let state: InboxState = initialState();
 const listeners = new Set<() => void>();
 
@@ -58,6 +68,11 @@ export const inboxStore = {
   getSnapshot: () => state,
   select(id: InboxMessage["id"]) {
     state = { ...state, selectedId: id, messages: state.messages.map((message) => message.id === id ? { ...message, read: true } : message) };
+    emit();
+  },
+  loadFixture(fixture: DemoFixtureId) {
+    const messages = fixtureMessages(fixture);
+    state = { messages, selectedId: messages[0]?.id ?? "HP-MSG-WA-001", suppressedDuplicateCount: fixture === "EMPTY" ? 0 : 1, activeFixture: fixture };
     emit();
   },
   reset() { state = initialState(); emit(); },
