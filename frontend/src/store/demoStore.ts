@@ -90,6 +90,10 @@ export interface DemoPreferences {
 
 export type IncidentHandoffStatus = "NOT_PUBLISHED" | "AWAITING_P2_CONSUMER" | "ACKNOWLEDGED_BY_P2";
 
+export type P1PublishedEvent =
+  | { type: "MESSAGE_EXTRACTION_REVIEWED"; sequence: number; messageId: string; extractionVersionId: string; atIso: string }
+  | { type: "INCIDENT_VERIFIED"; sequence: number; incidentId: "HP-INC-001"; poId: "HP-PO-1042"; ingredientId: "HP-ING-CHICKEN"; messageIds: readonly string[]; snapshotId: "HP-SNAP-001"; snapshotRevision: 1; claimedShortfallKgMilli: number; atIso: string };
+
 export type DemoFixtureId = "CORE_CHANNELS" | "REVIEW_STATES" | "SUPPLIER_OFFER" | "EMPTY";
 
 export const CANONICAL_MOCK_ENVELOPES: readonly MockMessageEnvelope[] = [
@@ -355,6 +359,8 @@ function createDemoState() {
     }[],
     /** Appended human review versions (v2+). Version 1 is derived from the rule extractor. */
     extractionHistory: [] as ExtractionVersion[],
+    /** Typed P1 events published to downstream consumers (append-only, offline). */
+    publishedEvents: [] as P1PublishedEvent[],
     /** Appended supplier-offer qualification decisions (v2+). */
     offerReviews: [] as OfferReviewVersion[],
   };
@@ -445,6 +451,7 @@ export const demoStore = {
       incident: freshIncident,
       extractionHistory: [],
       offerReviews: [],
+      publishedEvents: [],
     };
     emit();
   },
@@ -554,6 +561,7 @@ function commitIncidentLink(messageId: InboxMessage["id"], at: string) {
     { messageId, version: state.reviews.filter((r) => r.messageId === messageId).length + 1, extraction },
   ];
   const wasVerified = state.incident.status === "VERIFIED";
+  const confirmed = buildDecisionVersion(latest, "CONFIRMED", at, undefined, wasVerified ? `Linked to ${state.incident.id}` : `Verified ${state.incident.id}`);
   const incident = {
     ...state.incident,
     status: "VERIFIED" as const,
@@ -565,7 +573,12 @@ function commitIncidentLink(messageId: InboxMessage["id"], at: string) {
     ...state,
     reviews,
     incident,
-    extractionHistory: [...state.extractionHistory, buildDecisionVersion(latest, "CONFIRMED", at, undefined, wasVerified ? `Linked to ${incident.id}` : `Verified ${incident.id}`)],
+    extractionHistory: [...state.extractionHistory, confirmed],
+    publishedEvents: [
+      ...state.publishedEvents,
+      { type: "MESSAGE_EXTRACTION_REVIEWED", sequence: state.publishedEvents.length + 1, messageId, extractionVersionId: confirmed.id, atIso: at },
+      verifiedEvent(incident, state.publishedEvents.length + 2, at),
+    ],
     messages: state.messages.map((m) => buildMessageFromEnvelope(m, reviews, incident, m.read, state.offerReviews)),
   };
   emit();
@@ -607,6 +620,16 @@ export type DemoEvent =
   | { type: "MESSAGE_EXTRACTION_REVIEWED"; messageId: InboxMessage["id"] }
   | { type: "INCIDENT_VERIFIED"; messageIds: InboxMessage["id"][] };
 
+function verifiedEvent(incident: DemoState["incident"], sequence: number, atIso: string): P1PublishedEvent {
+  return {
+    type: "INCIDENT_VERIFIED", sequence, incidentId: incident.id, poId: incident.poId, ingredientId: incident.ingredientId,
+    messageIds: [...incident.messageIds], snapshotId: incident.snapshotId, snapshotRevision: incident.snapshotRevision,
+    claimedShortfallKgMilli: incident.claimedShortfallKgMilli, atIso,
+  };
+}
+
+export const selectPublishedEvents = (value: DemoState): readonly P1PublishedEvent[] => value.publishedEvents;
+
 function dispatch(event: DemoEvent) {
   if (event.type === "DEMO_RESET") {
     state = createDemoState();
@@ -635,6 +658,7 @@ function dispatch(event: DemoEvent) {
       ...state,
       reviews: newReviews,
       messages: newMessages,
+      publishedEvents: [...state.publishedEvents, { type: "MESSAGE_EXTRACTION_REVIEWED" as const, sequence: state.publishedEvents.length + 1, messageId: message.id, extractionVersionId: `${message.id}-EXT-v1`, atIso: new Date().toISOString() }],
     };
   } else {
     if (
@@ -659,6 +683,7 @@ function dispatch(event: DemoEvent) {
       ...state,
       incident: newIncident,
       messages: newMessages,
+      publishedEvents: [...state.publishedEvents, verifiedEvent(newIncident, state.publishedEvents.length + 1, newIncident.verifiedAtIso ?? new Date().toISOString())],
     };
   }
   emit();
