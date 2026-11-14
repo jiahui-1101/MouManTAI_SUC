@@ -257,6 +257,8 @@ export interface SafetyContext {
   senderRegistryId: string | null;
   canonicalIncidentShortfallKgMilli: number;
   incidentPoId: string;
+  incidentSupplierId?: string;
+  incidentType?: string;
 }
 
 /** Precise reasons why confirmation must stay disabled. Empty array means safe. */
@@ -274,6 +276,12 @@ export function confirmBlockers(version: ExtractionVersion, ctx: SafetyContext):
   }
   if (!po) reasons.push("Unmatched PO: no canonical purchase order is matched.");
   else if (po.id !== ctx.incidentPoId) reasons.push(`PO ${po.id} is not the PO for the active incident.`);
+  if (po && ctx.incidentSupplierId && po.supplierId !== ctx.incidentSupplierId) {
+    reasons.push(`Incompatible supplier: ${po.supplierId} is not the incident supplier ${ctx.incidentSupplierId}.`);
+  }
+  if (ctx.incidentType && version.values.incidentType && version.values.incidentType !== ctx.incidentType) {
+    reasons.push(`Incompatible incident type: ${version.values.incidentType} does not match incident type ${ctx.incidentType}.`);
+  }
   if (version.method === "UNRESOLVED" || version.evidenceSpans.length === 0) {
     reasons.push("Unresolved evidence: no raw-text evidence supports this extraction.");
   }

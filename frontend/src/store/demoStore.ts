@@ -75,6 +75,8 @@ export interface DemoPreferences {
   showProcessingTimeline: boolean;
 }
 
+export type IncidentHandoffStatus = "NOT_PUBLISHED" | "AWAITING_P2_CONSUMER" | "ACKNOWLEDGED_BY_P2";
+
 export type DemoFixtureId = "CORE_CHANNELS" | "REVIEW_STATES" | "EMPTY";
 
 export const CANONICAL_MOCK_ENVELOPES: readonly MockMessageEnvelope[] = [
@@ -261,9 +263,16 @@ function initialIncident() {
     id: "HP-INC-001" as const,
     poId: "HP-PO-1042" as const,
     ingredientId: "HP-ING-CHICKEN" as const,
+    supplierId: "HP-SUP-001" as const,
+    type: "UNAVAILABLE" as const,
+    snapshotId: "HP-SNAP-001" as const,
+    snapshotRevision: 1 as const,
     status: "PENDING_VERIFICATION" as "PENDING_VERIFICATION" | "VERIFIED",
     claimedShortfallKgMilli: 20000,
     messageIds: [] as InboxMessage["id"][],
+    verifiedAtIso: null as string | null,
+    /** P1 -> P2 handoff. P1 never computes impact; P2 acknowledges when its consumer has run. */
+    handoff: { target: "/impact" as const, status: "NOT_PUBLISHED" as IncidentHandoffStatus },
   };
 }
 
@@ -412,21 +421,71 @@ export const demoStore = {
     appendVersion(next);
     return next;
   },
+  /** First safe confirmation: verifies HP-INC-001. Idempotent for an already-linked message. */
   confirmExtractionReview(messageId: InboxMessage["id"], at?: string) {
-    const message = state.messages.find((item) => item.id === messageId);
-    if (!message) throw new Error("Unknown message");
-    const latest = latestVersionOrThrow(messageId);
-    const blockers = confirmBlockers(latest, {
-      senderRegistryId: message.senderRegistryId,
-      canonicalIncidentShortfallKgMilli: state.incident.claimedShortfallKgMilli,
-      incidentPoId: state.incident.poId,
-    });
-    if (blockers.length) throw new Error(blockers.join(" "));
-    appendVersion(buildDecisionVersion(latest, "CONFIRMED", at ?? new Date().toISOString()));
-    dispatch({ type: "MESSAGE_EXTRACTION_REVIEWED", messageId });
-    dispatch({ type: "INCIDENT_VERIFIED", messageIds: [messageId] });
+    if (state.incident.messageIds.includes(messageId)) return { status: "ALREADY_LINKED" as const };
+    if (state.incident.status === "VERIFIED") throw new Error(`${state.incident.id} is already verified; use Link to existing incident.`);
+    commitIncidentLink(messageId, at ?? new Date().toISOString());
+    return { status: "VERIFIED" as const };
+  },
+  /** Links a further safely reviewed message to the existing verified incident. Idempotent. */
+  linkMessageToIncident(messageId: InboxMessage["id"], at?: string) {
+    if (state.incident.messageIds.includes(messageId)) return { status: "ALREADY_LINKED" as const };
+    if (state.incident.status !== "VERIFIED") throw new Error("No verified incident to link to; confirm the first message instead.");
+    commitIncidentLink(messageId, at ?? new Date().toISOString());
+    return { status: "LINKED" as const };
+  },
+  /** Called by the P2 consumer once it has actually processed the verified incident. */
+  acknowledgeIncidentHandoff() {
+    if (state.incident.status !== "VERIFIED" || state.incident.handoff.status === "ACKNOWLEDGED_BY_P2") return;
+    state = { ...state, incident: { ...state.incident, handoff: { ...state.incident.handoff, status: "ACKNOWLEDGED_BY_P2" } } };
+    emit();
   },
 };
+
+export function incidentLinkBlockers(value: DemoState, messageId: InboxMessage["id"]): string[] {
+  const message = value.messages.find((item) => item.id === messageId);
+  if (!message) return ["Unknown message."];
+  const versions = selectExtractionVersions(value, messageId);
+  const latest = versions[versions.length - 1]!;
+  if (value.incident.messageIds.includes(messageId)) return [];
+  return confirmBlockers(latest, {
+    senderRegistryId: message.senderRegistryId,
+    canonicalIncidentShortfallKgMilli: value.incident.claimedShortfallKgMilli,
+    incidentPoId: value.incident.poId,
+    incidentSupplierId: value.incident.supplierId,
+    incidentType: value.incident.type,
+  });
+}
+
+/** Atomic: CONFIRMED version + review record + incident messageIds + derived message stages, one emit. */
+function commitIncidentLink(messageId: InboxMessage["id"], at: string) {
+  const blockers = incidentLinkBlockers(state, messageId);
+  if (blockers.length) throw new Error(blockers.join(" "));
+  const message = state.messages.find((item) => item.id === messageId)!;
+  const latest = latestVersionOrThrow(messageId);
+  const extraction = parseMockSupplierMessage(message);
+  const reviews = [
+    ...state.reviews,
+    { messageId, version: state.reviews.filter((r) => r.messageId === messageId).length + 1, extraction },
+  ];
+  const wasVerified = state.incident.status === "VERIFIED";
+  const incident = {
+    ...state.incident,
+    status: "VERIFIED" as const,
+    messageIds: [...state.incident.messageIds, messageId],
+    verifiedAtIso: state.incident.verifiedAtIso ?? at,
+    handoff: wasVerified ? state.incident.handoff : { ...state.incident.handoff, status: "AWAITING_P2_CONSUMER" as const },
+  };
+  state = {
+    ...state,
+    reviews,
+    incident,
+    extractionHistory: [...state.extractionHistory, buildDecisionVersion(latest, "CONFIRMED", at, undefined, wasVerified ? `Linked to ${incident.id}` : `Verified ${incident.id}`)],
+    messages: state.messages.map((m) => buildMessageFromEnvelope(m, reviews, incident, m.read)),
+  };
+  emit();
+}
 
 export function selectExtractionVersions(value: DemoState, messageId: InboxMessage["id"]): readonly ExtractionVersion[] {
   const message = value.messages.find((item) => item.id === messageId);
@@ -500,8 +559,15 @@ function dispatch(event: DemoEvent) {
     ) {
       throw new Error("Reviewed messages required");
     }
+    if (state.incident.status === "VERIFIED" && event.messageIds.every((id) => state.incident.messageIds.includes(id))) return;
     const messageIds = [...new Set([...state.incident.messageIds, ...event.messageIds])];
-    const newIncident = { ...state.incident, status: "VERIFIED" as const, messageIds };
+    const newIncident = {
+      ...state.incident,
+      status: "VERIFIED" as const,
+      messageIds,
+      verifiedAtIso: state.incident.verifiedAtIso ?? new Date().toISOString(),
+      handoff: { ...state.incident.handoff, status: state.incident.handoff.status === "NOT_PUBLISHED" ? ("AWAITING_P2_CONSUMER" as const) : state.incident.handoff.status },
+    };
     const newMessages = state.messages.map((m) =>
       buildMessageFromEnvelope(m, state.reviews, newIncident, m.read)
     );
