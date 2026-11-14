@@ -304,8 +304,10 @@ describe("cross-page consistency", () => {
 
     renderAt("/incidents?incident=HP-INC-001");
     const dialog = screen.getByRole("dialog", { name: "HP-INC-001" });
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^Impact/ }));
     expect(dd(dialog, "Supplier PO change")).toBe("20kg");
     expect(dd(dialog, "Forecast ingredient gap")).toBe("12kg");
+    fireEvent.click(within(dialog).getByRole("tab", { name: /^History/ }));
     expect(within(dialog).getByText(`${snapshot.id} · r${snapshot.revision}`)).toBeTruthy();
     cleanup();
 
