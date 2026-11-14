@@ -43,3 +43,6 @@ function AuditTrail() {
 - P2 `/impact`: call `acknowledgeIncidentHandoff()` and read `selectActiveIncident`.
 - P3 `/recovery/plan-a`: read `selectSupplierOfferEvidence`; keep `HP-OFFER-002` from business data.
 - P5 approvals/decision memory: read `selectIncidentEvidence` / `selectMessageEvidence` as audit references only.
+
+## Shared state (2026-11-14)
+`selectOperationalSnapshot` now returns the P2-owned snapshot; also see `selectBusinessIncident`, `selectActiveImpact`, `selectPublishedEvents`, and `src/integration/{planAShared,planBShared,p5Evidence}.ts`. Details: `SHARED_STATE_INTEGRATION.md`.

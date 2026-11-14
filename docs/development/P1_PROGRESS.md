@@ -265,3 +265,13 @@ Verification: `npm test` 85/85 (13 files), `npm run typecheck` pass, `npm run bu
 - Fixes found in browser QA: `.sr-only` missing from main (P1-scoped helper added); header badges overflowed on mobile; `fm-banner` flex layout made inbox banner intercept the "Open in Message Intelligence" click; raw-message text inherited the 11.5px caption size; review note/ETA fields now span full width.
 - Verification: `npm test` 286/286 (30 files, includes P2–P4 suites from main), `npm run typecheck` pass, `npm run build` pass. Chromium checks at iPhone 13, 820px and 1440px: zero horizontal overflow and zero runtime errors on all P1 routes; mouse and keyboard journeys (offer qualification, confirm, link) pass.
 - Commits: 2b83619 merge, f32f227 inbox, 90ffbac message intelligence, 3748690 channels, 1db96b5 settings, plus the follow-up responsive fix commit.
+
+## Shared-state integration P1 ↔ P2 → P3/P4/P5 (2026-11-14)
+
+See `docs/development/SHARED_STATE_INTEGRATION.md`.
+- P2 `RestaurantState` is the single business authority; `DemoState.restaurant` mirrors it by reference. P1's duplicate contract fixture was removed; supplier offers added once to `happyPotato.ts`.
+- P1 confirm/link → `applyVerifiedSupplierMessage` (P2 production reducer). Handoff ACK only after a current P2 impact.
+- Plan A and Plan B production pages consume shared state through `src/integration/` adapters; P5 read-only dossier adapter added.
+- Tests: `integrationP1P2`, `integrationPlanA`, `integrationPlanB`, `integrationP5Evidence` (journeys A–J). Contract-driven test updates: P1 snapshot test now asserts P2's claim revision and unchanged physical stock; Plan B navigation tests establish the shared verified/assessed incident first (assertions unchanged, pending test added).
+- Verification: 301 tests / 34 files, typecheck and build pass; Chromium mobile + desktop journey (confirm → link ×2 → assess → qualify offer → Plan A RM255 conditional preview → Plan B → reset) passes with zero overflow/errors.
+- Blockers: SCENARIO_A_READY root storage, P5 workflows, P4 prep schedule source.
