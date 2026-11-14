@@ -11,6 +11,7 @@ import type { PlanAPublisher } from "../integration";
 import { PlanAProposeAction } from "./PlanAProposeAction";
 import { PlanADraftActions } from "./PlanADraftActions";
 import { RecoveryProjection } from "./RecoveryProjection";
+import { DetailFacts } from "./DetailContent";
 import "../plan-a.css";
 
 export interface PlanAWorkspaceProps {
@@ -65,7 +66,10 @@ export function PlanAWorkspace(props: PlanAWorkspaceProps) {
     <header className="pa-recovery-header">
       <div className="pa-card-heading"><h2 className="pa-workspace-title">External Supply Recovery</h2><StatusBadge tone={selected ? "warning" : "neutral"}>{selected ? "Conditional supplier selected" : "Select a supplier"}</StatusBadge></div>
       <p className="pa-muted">{need.incidentId} · PO {need.poId} · {need.ingredientId} · Synthetic business data</p>
-      <details><summary>Snapshot and demo clock</summary><p className="pa-reference">Snapshot {source.snapshot.id} · Revision {need.snapshotRevision} · {need.snapshotFingerprint} · Demo clock {source.businessClock.nowLocal} MYT</p></details>
+      <details><summary>Snapshot and demo clock</summary><div className="pa-disclosure-body"><DetailFacts items={[
+        ["Snapshot", source.snapshot.id], ["Revision", need.snapshotRevision],
+        ["Demo time", `${source.businessClock.nowLocal} MYT`], ["Business date", source.businessClock.businessDate],
+      ]}/><div className="pa-detail-reference"><span>Fingerprint</span><code>{need.snapshotFingerprint}</code></div></div></details>
     </header>
     <SupplyNeedSummary need={need}/>
     <div className="pa-supplier-workspace">
@@ -84,6 +88,10 @@ export function PlanAWorkspace(props: PlanAWorkspaceProps) {
     {!stale && preview && (preview.result.ok ? <RecoveryProjection scenario={preview.result.value}/> : <section role="alert" className="pa-panel fm-panel"><h2 className="pa-heading">Proposal unavailable</h2><p>{preview.result.error.message}</p><p>{preview.result.error.code}</p></section>)}
     <PlanADraftActions source={source} candidate={selected?.candidate} supplierName={selected ? props.supplierNames?.[selected.candidate.supplier.id] : undefined} proposal={!stale && preview?.result.ok ? preview.result.value : undefined} scenarioMetadata={props.scenarioMetadata} contextKey={key}/>
     <PlanAProposeAction publisher={props.publisher} candidate={!stale && preview?.result.ok ? preview.result.value : undefined} contextKey={key} localSensitivityActive={etaPreview?.basis === basis} comparisonAvailable={props.comparisonAvailable}/>
-    <details className="pa-related"><summary>Affected menus and related workspaces</summary><p>{need.affectedMenuIds.map(id => source.snapshot.menuItems.find(menu => menu.id === id)?.name ?? id).join(" · ")}</p><p className="pa-muted">Fries-only demand is excluded from the chicken projection.</p><div className="pa-actions">{props.impactAvailable && <Link to={`/impact?incident=${encodeURIComponent(need.incidentId)}`}>View impact</Link>}{props.comparisonAvailable && <Link to={`/recovery/compare${context}`}>Open comparison workspace</Link>}</div></details>
+    <details className="pa-related"><summary>Affected menus and related workspaces</summary><div className="pa-disclosure-body">
+      <ul className="pa-menu-tags" aria-label="Affected menus">{need.affectedMenuIds.map(id => <li key={id}>{source.snapshot.menuItems.find(menu => menu.id === id)?.name ?? id}</li>)}</ul>
+      <span className="pa-muted">Fries-only demand excluded</span>
+      <nav className="pa-workspace-links" aria-label="Related workspaces">{props.impactAvailable && <Link to={`/impact?incident=${encodeURIComponent(need.incidentId)}`}>View impact <span aria-hidden="true">→</span></Link>}{props.comparisonAvailable && <Link to={`/recovery/compare${context}`}>Open comparison workspace <span aria-hidden="true">→</span></Link>}</nav>
+    </div></details>
   </div>;
 }
