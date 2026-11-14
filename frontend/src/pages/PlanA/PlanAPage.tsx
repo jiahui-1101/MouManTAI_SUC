@@ -19,7 +19,7 @@ export function PlanAPage() {
     {adapted.ok
       ? <PlanAWorkspace {...adapted.value} impactAvailable />
       : adapted.code === "INPUTS_PENDING"
-        ? <><p className="fm-banner fm-banner--info" role="note" data-testid="plan-a-pending">{adapted.message}</p><PlanAWorkspace source={read.source} /></>
+        ? <PlanAWorkspace source={read.source} />
         : <PlanAWorkspace error={`${adapted.code}: ${adapted.message}`} />}
   </PageContainer>;
 }
