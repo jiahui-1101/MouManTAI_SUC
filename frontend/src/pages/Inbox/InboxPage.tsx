@@ -25,7 +25,7 @@ function stageLabel(stage: InboxMessage["stage"]) {
 }
 
 const STAGE_TONE: Record<InboxMessage["stage"], StatusTone> = { LINKED: "success", REVIEW_PENDING: "info", PARSED: "neutral", UNMATCHED: "warning", UNVERIFIED: "danger" };
-const ACTIONS = <StatusBadge tone="simulated">Simulation only · no channels connected</StatusBadge>;
+const ACTIONS = <span className="p1-actions"><StatusBadge tone="simulated">Simulation only · no channels connected</StatusBadge></span>;
 
 function channelLabel(channel: InboxChannel) { return channel === "OUTLOOK" ? "Outlook" : channel[0] + channel.slice(1).toLowerCase(); }
 function exactTime(iso: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(iso)) + " MYT"; }

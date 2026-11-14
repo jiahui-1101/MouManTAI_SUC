@@ -8,7 +8,7 @@ import { CANONICAL_RULE_SUMMARY, CANONICAL_SUPPLIER_REGISTRY } from "../../featu
 
 export function SettingsPage() {
   const { activeFixture, messages, preferences } = useInboxState();
-  return <PageContainer title={titleFor("/settings")} actions={<StatusBadge tone="simulated">No credentials used or requested</StatusBadge>}>
+  return <PageContainer title={titleFor("/settings")} actions={<span className="p1-actions"><StatusBadge tone="simulated">No credentials used or requested</StatusBadge></span>}>
     <div className="settings__hero"><p className="p1-lead">Review offline demo contacts, deterministic rules and local display preferences for the synthetic Happy Potato scenario.</p></div>
     <div className="settings__grid">
       <section className="fm-panel settings-card" aria-labelledby="supplier-registry-title"><header><ShieldCheck aria-hidden="true" size={20} /><div><h2 id="supplier-registry-title">Synthetic supplier contact registry</h2><p>Fictional identities from the shared mock-data contract.</p></div></header><div className="registry-list">

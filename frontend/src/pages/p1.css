@@ -1,4 +1,8 @@
 /* ===== P1 shared helpers (FeedMe Portal tokens) ===== */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.page__header:has(.p1-actions) { flex-wrap: wrap; }
+.p1-actions .fm-badge { white-space: normal; }
+.fm-banner.p1-banner { display: block; }
 .p1-lead { margin: 0; color: var(--text-secondary); font-size: 13.5px; }
 .p1-banner { margin: 0; font-size: 13px; line-height: 1.5; display: block; }
 .p1-banner + .p1-banner { margin-top: 8px; }
@@ -43,7 +47,8 @@
 .message-detail__original { padding: 16px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--page-background); }
 .message-detail__original > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .message-detail__original h3, .message-detail__original h2 { margin: 0; font-size: 13.5px; font-weight: 700; }
-.message-detail__original span { color: var(--text-secondary); font-size: 11.5px; }
+.message-detail__original > div span { color: var(--text-secondary); font-size: 11.5px; }
+.mi-field:has(textarea), .mi-field:has(#etaLocal) { grid-column: 1 / -1; }
 .message-detail__original p { margin: 0; font-size: 14.5px; line-height: 1.7; }
 .message-detail__extraction { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .message-detail__extraction div { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-md); }

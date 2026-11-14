@@ -19,7 +19,7 @@ function fixtureTime(iso?: string) {
 
 export function ChannelsPage() {
   const { messages, activeFixture, loadStatus } = useInboxState();
-  return <PageContainer title={titleFor("/channels")} actions={<StatusBadge tone="simulated">SIMULATED_CHANNEL only</StatusBadge>}>
+  return <PageContainer title={titleFor("/channels")} actions={<span className="p1-actions"><StatusBadge tone="simulated">SIMULATED_CHANNEL only</StatusBadge></span>}>
     <div className="channels__hero"><p className="p1-lead">Explore predefined Happy Potato message fixtures without connecting provider accounts. No WhatsApp, Outlook or Telegram account is linked.</p></div>
     <div className="channels__grid">
       {sources.map(({ channel, name, icon: Icon, scenarios }) => {
