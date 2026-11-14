@@ -3,6 +3,16 @@ import { parseMockSupplierMessage } from "../features/messaging/mockMessageRuleE
 import { useSyncExternalStore } from "react";
 import { CANONICAL_MESSAGE } from "../features/messaging/mockMessageRegistry";
 import {
+  CANONICAL_OFFER_MESSAGE,
+  isOfferMessage,
+  offerQualificationBlockers,
+  parseMockSupplierOffer,
+  type OfferQualification,
+  type OfferReviewVersion,
+} from "../features/messaging/supplierOffer";
+import {
+  DEMO_REVIEW_ACTOR,
+  RULE_ENGINE_ACTOR,
   buildCorrectionVersion,
   buildDecisionVersion,
   confirmBlockers,
@@ -21,7 +31,7 @@ export interface InboxMessage {
   channelAccountId: string;
   providerMessageId: string;
   senderDisplay: string;
-  senderRegistryId: "HP-SUP-001" | null;
+  senderRegistryId: string | null;
   receivedAtIso: string;
   subject?: string;
   rawText: string;
@@ -31,6 +41,9 @@ export interface InboxMessage {
   poId: "HP-PO-1042" | null;
   extraction: "RULE_EXTRACTION" | "UNRESOLVED";
   linkedIncidentId?: "HP-INC-001";
+  /** Disruption reports can link to incidents; supplier offers are claims for P3 and never stock receipt. */
+  kind: "DISRUPTION_REPORT" | "SUPPLIER_OFFER";
+  offerQualification?: OfferQualification;
 }
 
 export interface MockMessageEnvelope {
@@ -40,7 +53,7 @@ export interface MockMessageEnvelope {
   channelAccountId: string;
   providerMessageId: string;
   senderDisplay: string;
-  senderRegistryId: "HP-SUP-001" | null;
+  senderRegistryId: string | null;
   receivedAtIso: string;
   subject?: string;
   rawText: string;
@@ -77,7 +90,7 @@ export interface DemoPreferences {
 
 export type IncidentHandoffStatus = "NOT_PUBLISHED" | "AWAITING_P2_CONSUMER" | "ACKNOWLEDGED_BY_P2";
 
-export type DemoFixtureId = "CORE_CHANNELS" | "REVIEW_STATES" | "EMPTY";
+export type DemoFixtureId = "CORE_CHANNELS" | "REVIEW_STATES" | "SUPPLIER_OFFER" | "EMPTY";
 
 export const CANONICAL_MOCK_ENVELOPES: readonly MockMessageEnvelope[] = [
   {
@@ -136,23 +149,51 @@ export const CANONICAL_MOCK_ENVELOPES: readonly MockMessageEnvelope[] = [
     receivedAtIso: "2026-11-21T09:09:00+08:00",
     rawText: "Hi, can you call me?",
   },
+  {
+    id: "HP-MSG-OL-OFFER",
+    channel: "OUTLOOK",
+    provenance: "SIMULATED_CHANNEL",
+    channelAccountId: "demo-outlook",
+    providerMessageId: "sim:outlook:offer",
+    senderDisplay: "Demo Poultry Supply B",
+    senderRegistryId: "HP-SUP-002",
+    receivedAtIso: "2026-11-21T09:12:00+08:00",
+    subject: "Re: HP-RFQ-1042",
+    rawText: CANONICAL_OFFER_MESSAGE,
+  },
 ] as const;
 
 export function deriveMessageState(
   message: {
     id: InboxMessage["id"];
     rawText: string;
-    senderRegistryId: "HP-SUP-001" | null;
+    senderRegistryId: string | null;
   },
   reviews: readonly { messageId: InboxMessage["id"] }[],
-  incident: { messageIds: readonly InboxMessage["id"][] }
+  incident: { messageIds: readonly InboxMessage["id"][] },
+  offerReviews: readonly OfferReviewVersion[] = []
 ): {
   verification: "VERIFIED_DEMO_CONTACT" | "UNVERIFIED_SENDER";
   poId: "HP-PO-1042" | null;
   extraction: "RULE_EXTRACTION" | "UNRESOLVED";
   stage: InboxStage;
   linkedIncidentId?: "HP-INC-001";
+  kind: InboxMessage["kind"];
+  offerQualification?: OfferQualification;
 } {
+  if (isOfferMessage(message.rawText)) {
+    const latest = offerReviews.filter((v) => v.messageId === message.id).at(-1);
+    const offerQualification = latest?.qualification ?? "UNREVIEWED";
+    const offer = parseMockSupplierOffer({ rawText: message.rawText, senderRegistryId: message.senderRegistryId });
+    return {
+      kind: "SUPPLIER_OFFER",
+      offerQualification,
+      verification: offerQualification === "QUALIFIED_CONDITIONAL" ? "VERIFIED_DEMO_CONTACT" : "UNVERIFIED_SENDER",
+      poId: null,
+      extraction: offer.method,
+      stage: offerQualification === "QUALIFIED_CONDITIONAL" ? "PARSED" : offerQualification === "UNREVIEWED" ? "UNVERIFIED" : "REVIEW_PENDING",
+    };
+  }
   const parseResult = parseMockSupplierMessage({
     rawText: message.rawText,
     senderRegistryId: message.senderRegistryId,
@@ -180,6 +221,7 @@ export function deriveMessageState(
     extraction: parseResult.extraction.method,
     stage,
     linkedIncidentId: isLinked ? "HP-INC-001" : undefined,
+    kind: "DISRUPTION_REPORT",
   };
 }
 
@@ -187,9 +229,10 @@ export function buildMessageFromEnvelope(
   envelope: IngestMockMessageInput,
   reviews: readonly { messageId: InboxMessage["id"] }[],
   incident: { messageIds: readonly InboxMessage["id"][] },
-  read = false
+  read = false,
+  offerReviews: readonly OfferReviewVersion[] = []
 ): InboxMessage {
-  const senderRegistryId = (envelope.senderRegistryId as "HP-SUP-001" | null) ?? null;
+  const senderRegistryId = (envelope.senderRegistryId as string | null) ?? null;
   const derived = deriveMessageState(
     {
       id: envelope.id as InboxMessage["id"],
@@ -197,7 +240,8 @@ export function buildMessageFromEnvelope(
       senderRegistryId,
     },
     reviews,
-    incident
+    incident,
+    offerReviews
   );
 
   return {
@@ -219,6 +263,8 @@ export function buildMessageFromEnvelope(
     poId: derived.poId,
     extraction: derived.extraction,
     linkedIncidentId: derived.linkedIncidentId,
+    kind: derived.kind,
+    offerQualification: derived.offerQualification,
   };
 }
 
@@ -238,6 +284,11 @@ export const DEMO_FIXTURES: Readonly<
     label: "Review-state scenario",
     description: "Core messages plus unverified and unmatched review cases.",
     messageIds: ["HP-MSG-WA-001", "HP-MSG-OL-001", "HP-MSG-TG-001", "HP-MSG-SPOOF", "HP-MSG-UNKNOWN"],
+  },
+  SUPPLIER_OFFER: {
+    label: "Review states + supplier offer",
+    description: "Adds the optional HP-MSG-OL-OFFER claim for P3 sender-qualification review.",
+    messageIds: ["HP-MSG-WA-001", "HP-MSG-OL-001", "HP-MSG-TG-001", "HP-MSG-SPOOF", "HP-MSG-UNKNOWN", "HP-MSG-OL-OFFER"],
   },
   EMPTY: { label: "Empty inbox", description: "No fixture messages loaded.", messageIds: [] },
 } as const;
@@ -304,6 +355,8 @@ function createDemoState() {
     }[],
     /** Appended human review versions (v2+). Version 1 is derived from the rule extractor. */
     extractionHistory: [] as ExtractionVersion[],
+    /** Appended supplier-offer qualification decisions (v2+). */
+    offerReviews: [] as OfferReviewVersion[],
   };
 }
 
@@ -352,7 +405,7 @@ function executeIngestMockMessage(input: IngestMockMessageInput): IngestResult {
     throw new Error("Message ID collision");
   }
 
-  const message = buildMessageFromEnvelope(input, state.reviews, state.incident);
+  const message = buildMessageFromEnvelope(input, state.reviews, state.incident, false, state.offerReviews);
   state = {
     ...state,
     messages: [...state.messages, message],
@@ -391,6 +444,7 @@ export const demoStore = {
       reviews: freshReviews,
       incident: freshIncident,
       extractionHistory: [],
+      offerReviews: [],
     };
     emit();
   },
@@ -435,6 +489,28 @@ export const demoStore = {
     commitIncidentLink(messageId, at ?? new Date().toISOString());
     return { status: "LINKED" as const };
   },
+  /** Explicit sender/claim qualification for a supplier offer. Never creates stock, POs or business offers. */
+  reviewSupplierOffer(messageId: InboxMessage["id"], decision: "QUALIFIED" | "REJECTED" | "MARKED_UNRESOLVED", note: string, at?: string) {
+    const message = state.messages.find((m) => m.id === messageId);
+    if (!message || message.kind !== "SUPPLIER_OFFER") throw new Error("Not a supplier offer message");
+    if (!note.trim()) throw new Error("A review reason is required");
+    const versions = selectOfferReviewVersions(state, messageId);
+    const latest = versions[versions.length - 1]!;
+    const qualification: OfferQualification = decision === "QUALIFIED" ? "QUALIFIED_CONDITIONAL" : decision === "REJECTED" ? "REJECTED" : "UNRESOLVED";
+    if (latest.qualification === qualification) return latest; // idempotent
+    if (decision === "QUALIFIED") {
+      const blockers = offerQualificationBlockers(message.senderRegistryId, parseMockSupplierOffer(message));
+      if (blockers.length) throw new Error(blockers.join(" "));
+    }
+    const next: OfferReviewVersion = {
+      id: `${messageId}-OFR-v${latest.version + 1}`, messageId, version: latest.version + 1, method: "HUMAN_REVIEW",
+      qualification, decision, actor: DEMO_REVIEW_ACTOR, createdAtIso: at ?? new Date().toISOString(), note: note.trim(),
+    };
+    const offerReviews = [...state.offerReviews, next];
+    state = { ...state, offerReviews, messages: state.messages.map((m) => buildMessageFromEnvelope(m, state.reviews, state.incident, m.read, offerReviews)) };
+    emit();
+    return next;
+  },
   /** Called by the P2 consumer once it has actually processed the verified incident. */
   acknowledgeIncidentHandoff() {
     if (state.incident.status !== "VERIFIED" || state.incident.handoff.status === "ACKNOWLEDGED_BY_P2") return;
@@ -443,12 +519,20 @@ export const demoStore = {
   },
 };
 
+export function selectOfferReviewVersions(value: DemoState, messageId: InboxMessage["id"]): readonly OfferReviewVersion[] {
+  const message = value.messages.find((m) => m.id === messageId);
+  if (!message || message.kind !== "SUPPLIER_OFFER") return [];
+  const v1: OfferReviewVersion = { id: `${messageId}-OFR-v1`, messageId, version: 1, method: "RULE_EXTRACTION", qualification: "UNREVIEWED", decision: "EXTRACTED", actor: RULE_ENGINE_ACTOR, createdAtIso: message.receivedAtIso };
+  return [v1, ...value.offerReviews.filter((v) => v.messageId === messageId)];
+}
+
 export function incidentLinkBlockers(value: DemoState, messageId: InboxMessage["id"]): string[] {
   const message = value.messages.find((item) => item.id === messageId);
   if (!message) return ["Unknown message."];
   const versions = selectExtractionVersions(value, messageId);
   const latest = versions[versions.length - 1]!;
   if (value.incident.messageIds.includes(messageId)) return [];
+  if (message.kind === "SUPPLIER_OFFER") return ["Supplier offers are P3 offer claims and cannot be linked as disruption evidence."];
   return confirmBlockers(latest, {
     senderRegistryId: message.senderRegistryId,
     canonicalIncidentShortfallKgMilli: value.incident.claimedShortfallKgMilli,
@@ -482,7 +566,7 @@ function commitIncidentLink(messageId: InboxMessage["id"], at: string) {
     reviews,
     incident,
     extractionHistory: [...state.extractionHistory, buildDecisionVersion(latest, "CONFIRMED", at, undefined, wasVerified ? `Linked to ${incident.id}` : `Verified ${incident.id}`)],
-    messages: state.messages.map((m) => buildMessageFromEnvelope(m, reviews, incident, m.read)),
+    messages: state.messages.map((m) => buildMessageFromEnvelope(m, reviews, incident, m.read, state.offerReviews)),
   };
   emit();
 }
@@ -545,7 +629,7 @@ function dispatch(event: DemoEvent) {
       },
     ];
     const newMessages = state.messages.map((m) =>
-      buildMessageFromEnvelope(m, newReviews, state.incident, m.read)
+      buildMessageFromEnvelope(m, newReviews, state.incident, m.read, state.offerReviews)
     );
     state = {
       ...state,
@@ -569,7 +653,7 @@ function dispatch(event: DemoEvent) {
       handoff: { ...state.incident.handoff, status: state.incident.handoff.status === "NOT_PUBLISHED" ? ("AWAITING_P2_CONSUMER" as const) : state.incident.handoff.status },
     };
     const newMessages = state.messages.map((m) =>
-      buildMessageFromEnvelope(m, state.reviews, newIncident, m.read)
+      buildMessageFromEnvelope(m, state.reviews, newIncident, m.read, state.offerReviews)
     );
     state = {
       ...state,
