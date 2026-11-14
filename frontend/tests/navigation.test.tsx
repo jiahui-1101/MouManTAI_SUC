@@ -30,7 +30,23 @@ function verifyAndAssessSharedIncident() {
 }
 
 /** Routes whose pages have been implemented; all others must still be empty shells. */
-const IMPLEMENTED = new Set(["/inbox", "/message-intelligence", "/channels", "/settings", "/overview", "/incidents", "/impact", "/recovery/plan-a", "/recovery/plan-b", "/prep-planning"]);
+const IMPLEMENTED = new Set([
+  "/inbox",
+  "/message-intelligence",
+  "/channels",
+  "/settings",
+  "/overview",
+  "/incidents",
+  "/impact",
+  "/recovery/plan-a",
+  "/recovery/plan-b",
+  "/prep-planning",
+  "/recovery/compare",
+  "/approvals",
+  "/execution",
+  "/outcomes",
+  "/decision-memory",
+]);
 
 describe("pages", () => {
   it.each(NAV_ITEMS.map((item) => [item.path, item.title]))("%s shows heading %s", (path, title) => {
