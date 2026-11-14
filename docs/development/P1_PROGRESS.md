@@ -8,6 +8,18 @@
 
 **Implementation:** Parser, polished `/inbox`, mock-only `/channels`, and mock-only `/settings` complete
 
+## Central shared state migration (supersedes earlier missing-interface findings)
+
+- Authorized centralized implementation now lives in `src/store/demoStore.ts`; `features/messaging/inboxStore.ts` is a re-export facade, with no independent state or subscriptions.
+- `src/data/fixtures/happyPotato.ts` contains the Shared MD canonical business fixture: suppliers, inventory, PO, recipes, forecasts, confirmed orders, offers, resources and snapshot metadata. Existing canonical message fixtures now live alongside the centralized store.
+- DemoState includes the pending HP-INC-001, HP-SNAP-001 revision 1, OPEN HP-PO-1042 and accepted chicken stock 10000. No seeded message is initially linked as verified.
+- Typed MESSAGE_RECEIVED, MESSAGE_EXTRACTION_REVIEWED, INCIDENT_VERIFIED and DEMO_RESET events update the same subscribed state. Review versions retain original parsed evidence; verification requires safe reviewed messages and correlates them to one incident.
+- Shared exports: selectActiveIncident, selectMessagesForIncident, selectOperationalSnapshot, useDemoState and demoStore. Snapshot fingerprint uses deterministic FNV-1a over canonical fixture JSON, explicitly labelled fnv1a32 (not SHA-256). Message review/verification leaves snapshot identity and quantities unchanged.
+- Published state and original evidence are recursively frozen. Incoming message records are cloned, duplicate envelope keys suppressed, and ID collisions rejected.
+- Acceptance verified: a subscribed selector test consumer sees P1 facade review/verification immediately, three distinct messages and one 20000 shortfall. P1 facade and shared store return the identical state object.
+- Validation: 46 tests across 6 files pass; typecheck and build pass.
+- Remaining: Message Intelligence review UI, human correction fields, actual P2–P5 consumers and their business workflows are not implemented by this task. Shared test-consumer acceptance is PASS; actual downstream integration remains BLOCKED until those modules consume these exports. Earlier audit entries are historical and must not be read as current shared-interface status.
+
 ## Authoritative inputs
 
 Read in this order and copied unchanged into `docs/requirements/`:
