@@ -106,13 +106,58 @@ The user's scope override takes precedence where the documents discuss real or r
 
 ## Latest verification
 
-- `npm test`: 41 tests passed across 5 test files.
+- `npm test`: 44 tests passed across 5 test files.
 - `npm run typecheck`: passed.
 - `npm run build`: passed with Vite 8.3.8.
 - No dependencies or external services were added.
 - Parser and inbox scope is deterministic and offline; no AI model or API call exists.
 
 ## Final QA audit (2026-11-14)
+
+### Requirement coverage after mock-state/accessibility increment
+
+PASS means verified within the agreed offline scope, not downstream integration acceptance.
+
+- P1-FR01 PASS — channel filters/counts tested.
+- P1-FR02 PASS — sender/subject/PO/content search reads fixture fields.
+- P1-FR03 PASS — channel, simulated provenance, timestamps and stages rendered.
+- P1-FR04 PASS — immutable original detail and masked synthetic identifiers.
+- P1-FR05 BLOCKED — one P1 module store manages read/selection; reviewed state and team DemoState are absent.
+- P1-FR06 BLOCKED — distinct messages exist; seeded link metadata is not explicit reviewed correlation.
+- P1-FR07 BLOCKED — empty, mock loading/error recovery and unverified/unmatched UI work; duplicate counter remains seeded rather than actual deduplication. Provider connection errors OUT_OF_SCOPE.
+- P1-FR08 PASS — polite atomic message/unread count notification; selection does not auto-navigate.
+- P1-FR09 PASS — responsive styles, native buttons and tested arrow-key focus/selection. Physical viewport QA remains recommended.
+- P1-FR10 BLOCKED — visual timeline exists, but reviewed/linked stages are not backed by review events.
+- P1-FR11 BLOCKED — Message Intelligence original/extraction evidence grid absent.
+- P1-FR12 BLOCKED — parser matches canonical PO/sender, but review conflict UI absent.
+- P1-FR13 BLOCKED — editable validated review candidates absent.
+- P1-FR14 BLOCKED — parser rejects unsafe senders; confirmation UI absent.
+- P1-FR15 BLOCKED — no approved shared INCIDENT_VERIFIED reducer/snapshot interface.
+- P1-FR16 BLOCKED — raw source preserved; immutable versioned human-review history absent.
+- P1-FR17 PASS — deterministic RULE_EXTRACTION/UNRESOLVED labels, no AI claims.
+- P1-FR18 BLOCKED — no actual existing shared incident to explicitly link secondary messages to; seeded IDs cannot substitute for it.
+- P1-FR19 BLOCKED — shared impacted-menu selector/context and P2 consumer absent.
+- P1-T01 PASS — canonical parser values covered by tests.
+- P1-T02 OUT_OF_SCOPE — real provider envelopes excluded.
+- P1-T03 BLOCKED — actual duplicate ingestion test/interface absent; displayed counter is not proof.
+- P1-T04 BLOCKED — three distinct canonical messages preserved; reviewed single-incident correlation absent.
+- P1-T05 PASS — unknown and wrong-PO suppliers cannot verify in parser.
+- P1-T06 PASS — update promise retains UNKNOWN ETA.
+- P1-T07 PASS — unsupported text resolves to human-review state without fabricated fields.
+- P1-T08 BLOCKED — human edits/version audit not implemented.
+- P1-T09 PASS — channel filtering tests pass.
+- P1-T10 OUT_OF_SCOPE — bridge excluded; local mock loading/error/retry covered separately.
+- P1-T11 OUT_OF_SCOPE — replay channel excluded.
+- P1-T12 BLOCKED — keyboard selection/focus regression passes and responsive CSS exists; actual mobile/tablet overflow verification not performed.
+
+### Shared interface and handoff dependencies
+
+- Typed mock data interface PASS locally: InboxMessage, InboxState and DemoFixtureId describe the existing single P1 store. This is not claimed to be the integrator-owned DemoState.
+- Explicit canonical seed/reset PASS: Channels loads predefined fixture subsets; Settings reset restores fixture/read/preferences. Loading/error controls are local presentation states only.
+- P1 → P3 offer handoff BLOCKED: Shared MD defines optional HP-MSG-OL-OFFER, but it is not in the implemented fixture and no P3 evidence consumer exists. Do not invent a second offer store.
+- P1 → P5 evidence/history handoff BLOCKED: original fixture text exists, but versioned review history and P5 evidence consumer do not.
+- SAME shared DemoState verification BLOCKED: P2–P5 routes remain placeholders; no common business snapshot/incident reducer/selectors exist to verify. Integration approval is required before defining or changing those shared contracts.
+- No parallel store, shared contract changes, downstream implementation changes, provider code or network infrastructure were introduced in this increment.
 
 - Inbox, Channels and Settings render and their covered interactions pass. Fixed the empty-fixture Inbox crash with a regression test and a link back to scenario loading.
 - Message Intelligence remains an empty route: navigation works, but extraction review, human edits, evidence version history and confirmation are NOT implemented. P1 is not complete.
