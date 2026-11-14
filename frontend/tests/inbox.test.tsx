@@ -14,6 +14,20 @@ function renderInbox() {
 }
 
 describe("unified supplier inbox", () => {
+  it("announces message counts and supports arrow-key selection", () => {
+    renderInbox();
+    expect(screen.getByText(/5 simulated messages available/)).toBeTruthy();
+    const buttons = within(screen.getByRole("region", { name: "Messages" })).getAllByRole("button");
+    fireEvent.keyDown(buttons[0]!, { key: "ArrowDown" });
+    expect(inboxStore.getSnapshot().selectedId).toBe("HP-MSG-OL-001");
+    expect(document.activeElement).toBe(buttons[1]);
+  });
+  it.each(["LOADING", "ERROR"] as const)("recovers from mock %s state", (status) => {
+    inboxStore.setMockLoadStatus(status);
+    renderInbox();
+    fireEvent.click(screen.getByRole("button", { name: status === "ERROR" ? "Retry local fixture" : "Finish mock loading" }));
+    expect(screen.getByRole("region", { name: "Messages" })).toBeTruthy();
+  });
   it("opens an empty shared fixture without crashing", () => {
     inboxStore.loadFixture("EMPTY");
     renderInbox();

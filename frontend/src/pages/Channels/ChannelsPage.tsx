@@ -34,6 +34,8 @@ export function ChannelsPage() {
         {(Object.entries(DEMO_FIXTURES) as [keyof typeof DEMO_FIXTURES, (typeof DEMO_FIXTURES)[keyof typeof DEMO_FIXTURES]][]).map(([id, fixture]) => <button type="button" key={id} className={activeFixture === id ? "is-active" : ""} aria-pressed={activeFixture === id} onClick={() => inboxStore.loadFixture(id)}><strong>{fixture.label}</strong><span>{fixture.description}</span></button>)}
       </div>
       <button className="demo-controls__reset" type="button" onClick={() => inboxStore.reset()}><RotateCcw aria-hidden="true" size={16} /> Reset shared demo</button>
+      <button type="button" onClick={() => inboxStore.setMockLoadStatus("LOADING")}>Show mock loading in Inbox</button>
+      <button type="button" onClick={() => inboxStore.setMockLoadStatus("ERROR")}>Show mock error in Inbox</button>
       <p className="demo-controls__status" role="status">Active fixture: <strong>{DEMO_FIXTURES[activeFixture].label}</strong> · {messages.length} messages loaded</p>
     </section>
   </PageContainer>;

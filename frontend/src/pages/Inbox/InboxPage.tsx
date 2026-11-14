@@ -26,7 +26,7 @@ function channelLabel(channel: InboxChannel) { return channel === "OUTLOOK" ? "O
 function exactTime(iso: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(iso)) + " MYT"; }
 
 export function InboxPage() {
-  const { messages, selectedId, suppressedDuplicateCount, preferences } = useInboxState();
+  const { messages, selectedId, suppressedDuplicateCount, preferences, loadStatus } = useInboxState();
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
   const visible = useMemo(() => messages.filter((message) => {
@@ -36,10 +36,14 @@ export function InboxPage() {
   }).sort((a, b) => preferences.unreadFirst ? Number(a.read) - Number(b.read) : 0), [filter, messages, preferences.unreadFirst, query]);
   const selected = messages.find((message) => message.id === selectedId) ?? messages[0];
 
+  if (loadStatus === "LOADING") return <PageContainer title={titleFor("/inbox")}><p role="status" aria-busy="true">Loading local mock fixture…</p><button onClick={() => inboxStore.setMockLoadStatus()}>Finish mock loading</button></PageContainer>;
+  if (loadStatus === "ERROR") return <PageContainer title={titleFor("/inbox")}><p role="alert">Mock fixture loading failed. No provider was contacted.</p><button onClick={() => inboxStore.setMockLoadStatus()}>Retry local fixture</button></PageContainer>;
+
   if (!selected) return <PageContainer title={titleFor("/inbox")}><div className="inbox__empty"><strong>No fixture messages loaded</strong><p>SIMULATED_CHANNEL · Load a predefined scenario from Channels.</p><Link to="/channels">Choose a demo scenario</Link></div></PageContainer>;
 
   return <PageContainer title={titleFor("/inbox")}>
     <div className="inbox__intro">
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{messages.length} simulated messages available; {messages.filter((message) => !message.read).length} unread.</p>
       <div><p className="inbox__eyebrow">Happy Potato • Demo data</p><p>Unified supplier messages from the shared offline scenario.</p></div>
       <span className="inbox__mode">Simulation only · no channels connected</span>
     </div>
@@ -50,7 +54,7 @@ export function InboxPage() {
     <div className="inbox__notice" role="status"><strong>{suppressedDuplicateCount} duplicate suppressed</strong><span>A repeated provider event was ignored using its channel, account and provider message ID.</span></div>
     <div className="inbox__workspace">
       <section className="inbox__list" aria-label="Messages">
-        {visible.length === 0 ? <div className="inbox__empty"><strong>No messages found</strong><span>Try another channel or search term.</span></div> : visible.map((message) => <button type="button" key={message.id} className={`message-card ${selected.id === message.id ? "is-selected" : ""}`} onClick={() => inboxStore.select(message.id)} aria-pressed={selected.id === message.id}>
+        {visible.length === 0 ? <div className="inbox__empty"><strong>No messages found</strong><span>Try another channel or search term.</span></div> : visible.map((message, index) => <button type="button" key={message.id} className={`message-card ${selected.id === message.id ? "is-selected" : ""}`} onKeyDown={(event) => { const offset = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0; if (offset) { event.preventDefault(); const target = visible[(index + offset + visible.length) % visible.length]!; inboxStore.select(target.id); const buttons = event.currentTarget.parentElement?.querySelectorAll("button"); buttons?.[(index + offset + visible.length) % visible.length]?.focus(); } }} onClick={() => inboxStore.select(message.id)} aria-pressed={selected.id === message.id}>
           <span className="message-card__icon"><ChannelIcon channel={message.channel} /></span>
           <span className="message-card__content"><span className="message-card__top"><strong>{message.senderDisplay}</strong><time dateTime={message.receivedAtIso}>{message.receivedAtIso.slice(11, 16)} MYT</time></span><span>{message.subject ?? message.poId ?? message.rawText}</span><span className="message-card__meta"><span>SIMULATED_CHANNEL</span><span className={`status-${message.stage.toLowerCase()}`}>{stageLabel(message.stage)}</span>{!message.read && <span className="message-card__unread">Unread</span>}</span></span>
         </button>)}

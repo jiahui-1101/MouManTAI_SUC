@@ -29,6 +29,7 @@ export interface InboxState {
   suppressedDuplicateCount: number;
   activeFixture: DemoFixtureId;
   preferences: DemoPreferences;
+  loadStatus?: "LOADING" | "ERROR";
 }
 
 export interface DemoPreferences { unreadFirst: boolean; showProcessingTimeline: boolean; }
@@ -79,6 +80,7 @@ export const inboxStore = {
     state = { ...state, messages, selectedId: messages[0]?.id ?? "HP-MSG-WA-001", suppressedDuplicateCount: fixture === "EMPTY" ? 0 : 1, activeFixture: fixture };
     emit();
   },
+  setMockLoadStatus(loadStatus?: "LOADING" | "ERROR") { state = { ...state, loadStatus }; emit(); },
   setPreference<K extends keyof DemoPreferences>(key: K, value: DemoPreferences[K]) { state = { ...state, preferences: { ...state.preferences, [key]: value } }; emit(); },
   reset() { state = initialState(); emit(); },
 };
