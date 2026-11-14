@@ -6,7 +6,7 @@
 
 **Branch:** `feature/p1-mock-messaging` (created from `main`)
 
-**Implementation:** Parser and `/inbox` increments complete; remaining P1 pages are not part of this increment
+**Implementation:** Parser and polished `/inbox` complete; remaining P1 pages are not part of this increment
 
 ## Authoritative inputs
 
@@ -77,7 +77,7 @@ The user's scope override takes precedence where the documents discuss real or r
 - [x] Fail closed for unsupported/ambiguous text and block unknown-sender auto-verification.
 - [x] Add focused tests for canonical values, ETA handling, evidence spans, stock separation, and review gates.
 - [x] Implement the canonical P1 inbox contract/fixture from the shared mock-data document.
-- [x] Implement and test offline inbox behavior: channel filters/counts, search, selection/read state, empty state, immutable detail, provenance, processing timeline, and incident correlation.
+- [x] Implement and test offline inbox behavior: channel filters/counts, search, selection/read state, empty state, immutable detail, provenance, processing timeline, incident correlation, unverified/unmatched messages, duplicate suppression, and Message Intelligence navigation.
 - [ ] Implement and test rule extraction and review behavior.
 - [ ] Implement and test display-only channel/settings behavior.
 - [x] Run full tests, typecheck, and production build for the parser milestone.
@@ -85,15 +85,19 @@ The user's scope override takes precedence where the documents discuss real or r
 ## Inbox implementation notes
 
 - `/inbox` renders the three canonical shared messages: `HP-MSG-WA-001`, `HP-MSG-OL-001`, and `HP-MSG-TG-001`.
+- Canonical alternative-state fixtures `HP-MSG-SPOOF` and `HP-MSG-UNKNOWN` visibly exercise unverified-sender and unmatched-message handling.
 - All messages are explicitly labelled `SIMULATED_CHANNEL`; the UI states that no channels are connected.
 - The shared module store owns selection and read state so message state survives component-local interactions.
 - Search covers the demo-safe sender, Outlook subject, `HP-PO-1042`, and immutable message text.
-- Detail shows masked provider ID, exact fixture timestamp, canonical rule result, unknown ETA, and the single `HP-INC-001` correlation rule.
+- Detail shows synthetic sender identity, masked provider ID, exact fixture timestamp, immutable original evidence, canonical rule result, unknown ETA, linked-incident state, and the single `HP-INC-001` correlation rule.
+- Duplicate-provider-event suppression is represented by shared state and disclosed in the inbox; suppressed records are not inserted as messages or incidents.
+- The selected shared message navigates to `/message-intelligence` with its canonical message ID.
+- Desktop split view collapses to a stacked tablet/mobile layout while preserving keyboard-accessible controls.
 - No provider SDK, network integration, OAuth, API, credential, or backend work was added.
 
 ## Latest verification
 
-- `npm test`: 33 tests passed across 3 test files.
+- `npm test`: 35 tests passed across 3 test files.
 - `npm run typecheck`: passed.
 - `npm run build`: passed with Vite 8.3.8.
 - No dependencies or external services were added.
