@@ -26,7 +26,7 @@ function channelLabel(channel: InboxChannel) { return channel === "OUTLOOK" ? "O
 function exactTime(iso: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(iso)) + " MYT"; }
 
 export function InboxPage() {
-  const { messages, selectedId, suppressedDuplicateCount, preferences, loadStatus } = useInboxState();
+  const { messages, selectedId, suppressedDuplicateCount, preferences, loadStatus, incident } = useInboxState();
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
   const visible = useMemo(() => messages.filter((message) => {
@@ -68,7 +68,7 @@ export function InboxPage() {
         {preferences.showProcessingTimeline && <ol className="message-detail__timeline" aria-label="Processing timeline"><li className="is-done">Received</li><li className={selected.stage !== "UNMATCHED" && selected.stage !== "UNVERIFIED" ? "is-done" : ""}>Parsed</li><li className={selected.stage === "REVIEW_PENDING" || selected.stage === "LINKED" ? "is-done" : ""}>Review</li><li className={selected.stage === "LINKED" ? "is-done" : ""}>Linked to Incident</li></ol>}
         {selected.verification === "UNVERIFIED_SENDER" && <p className="message-detail__warning"><strong>Human review required.</strong> This synthetic sender is not allowlisted, so no verified incident or deficit can be published.</p>}
         {selected.extraction === "UNRESOLVED" && <p className="message-detail__warning"><strong>Unmatched message.</strong> No PO or disruption was inferred from the original text.</p>}
-        <p className="message-detail__correlation">Canonical channel messages refer to one disruption. The shared incident remains <strong>HP-INC-001</strong>; the 20 kg PO shortfall is not multiplied.</p>
+        <p className="message-detail__correlation" data-testid="inbox-incident-status">Canonical channel messages refer to one disruption. <strong>{incident.id}</strong> is {incident.status === "VERIFIED" ? "verified" : "pending verification"} with {incident.messageIds.length} linked message{incident.messageIds.length === 1 ? "" : "s"}; the {(incident.claimedShortfallKgMilli / 1000).toFixed(3)} kg PO shortfall is not multiplied.{incident.status === "VERIFIED" && <> P2 handoff: {incident.handoff.status === "ACKNOWLEDGED_BY_P2" ? "acknowledged" : "awaiting Impact consumer"}. <Link to="/impact">Impact Explorer</Link></>}</p>
         <Link className="message-detail__action" to={`/message-intelligence?message=${selected.id}`}>Open in Message Intelligence</Link>
       </article>
     </div>

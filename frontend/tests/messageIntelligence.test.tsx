@@ -161,7 +161,7 @@ describe("Message Intelligence page", () => {
     expect(s.incident).toMatchObject({ id: "HP-INC-001", status: "VERIFIED", claimedShortfallKgMilli: 20000, messageIds: ["HP-MSG-WA-001"] });
     expect(s.messages.find((m) => m.id === "HP-MSG-WA-001")!.stage).toBe("LINKED");
     expect(confirmButton().disabled).toBe(true);
-    expect(screen.getByText("This message is already confirmed.")).toBeTruthy();
+    expect(screen.getByText(/Already linked to HP-INC-001/)).toBeTruthy();
   });
 
   it("keeps saved reviews visible after navigating away and back", async () => {

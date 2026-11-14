@@ -7,7 +7,6 @@ import { parseMockSupplierMessage, type EvidenceSpan } from "../../features/mess
 import {
   QUANTITY_UNITS,
   REVIEW_INCIDENT_TYPES,
-  confirmBlockers,
   diffValues,
   draftFromValues,
   validateDraft,
@@ -16,7 +15,8 @@ import {
   type ExtractionVersion,
   type ReviewDraft,
 } from "../../features/messaging/messageReview";
-import { demoStore, selectExtractionVersions, useDemoState, type InboxMessage } from "../../store/demoStore";
+import { demoStore, incidentLinkBlockers, selectExtractionVersions, useDemoState, type InboxMessage } from "../../store/demoStore";
+import { IncidentHandoff } from "../../features/messaging/IncidentHandoff";
 
 const TITLE = titleFor("/message-intelligence");
 const FIELD_LABELS: Record<string, string> = {
@@ -75,7 +75,10 @@ function Workspace({ message }: { message: InboxMessage }) {
   const view = versions.find((v) => v.version === viewed) ?? latest;
   const parse = parseMockSupplierMessage({ rawText: message.rawText, senderRegistryId: message.senderRegistryId });
   const dirty = JSON.stringify(draft) !== JSON.stringify(draftFromValues(latest.values));
-  const blockers = confirmBlockers(latest, { senderRegistryId: message.senderRegistryId, canonicalIncidentShortfallKgMilli: state.incident.claimedShortfallKgMilli, incidentPoId: state.incident.poId });
+  const linked = state.incident.messageIds.includes(message.id);
+  const linkMode = state.incident.status === "VERIFIED" && !linked;
+  const [pendingLink, setPendingLink] = useState(false);
+  const blockers = linked ? [`Already linked to ${state.incident.id}; repeated confirmation has no effect.`] : incidentLinkBlockers(state, message.id);
   if (dirty) blockers.push("Unsaved edits: save the correction or discard it (Esc) before confirming.");
   const locked = latest.reviewStatus === "VERIFIED";
 
@@ -94,6 +97,7 @@ function Workspace({ message }: { message: InboxMessage }) {
     setNote(""); setErrors({}); setStatus(`Version ${saved.version} recorded as ${saved.reviewStatus}.`);
   };
   const confirm = () => { demoStore.confirmExtractionReview(message.id); setStatus(`Confirmed. ${state.incident.id} verified with ${message.id}.`); };
+  const link = () => { demoStore.linkMessageToIncident(message.id); setPendingLink(false); setStatus(`${message.id} linked to ${state.incident.id}. Claimed shortfall unchanged.`); };
   const onHistoryKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const offset = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
     const target = event.key === "Home" ? 0 : event.key === "End" ? versions.length - 1 : offset ? (index + offset + versions.length) % versions.length : -1;
@@ -160,10 +164,17 @@ function Workspace({ message }: { message: InboxMessage }) {
           <button type="button" className="mi-button" disabled={!dirty} onClick={discard}>Discard edits</button>
           <button type="button" className="mi-button" disabled={locked} onClick={() => decide("REJECTED")}>Reject</button>
           <button type="button" className="mi-button" disabled={locked} onClick={() => decide("MARKED_UNRESOLVED")}>Mark unresolved</button>
-          <button type="button" className="mi-button mi-button--primary" disabled={blockers.length > 0} aria-describedby="mi-blockers" onClick={confirm}>Confirm &amp; verify incident</button>
+          {linkMode
+            ? <button type="button" className="mi-button mi-button--primary" disabled={blockers.length > 0 || pendingLink} aria-describedby="mi-blockers" onClick={() => setPendingLink(true)}>Link to existing incident {state.incident.id}</button>
+            : <button type="button" className="mi-button mi-button--primary" disabled={blockers.length > 0} aria-describedby="mi-blockers" onClick={confirm}>Confirm &amp; verify incident</button>}
         </div>
-        <div id="mi-blockers" className="mi-blockers">{blockers.length ? <><strong>Confirmation disabled:</strong><ul>{blockers.map((b) => <li key={b}>{b}</li>)}</ul></> : <span>Safe to confirm: verified sender, matched {state.incident.poId}, source evidence present.</span>}</div>
-        {state.incident.messageIds.includes(message.id) && <p className="message-detail__correlation">Linked to <strong>{state.incident.id}</strong> ({state.incident.status}). <Link to="/inbox">Back to inbox</Link></p>}
+        {pendingLink && blockers.length === 0 && <div role="group" aria-label="Confirm incident link" className="mi-blockers mi-confirm">
+          <p>Link <strong>{message.id}</strong> ({message.channel}) as additional evidence for <strong>{state.incident.id}</strong>? The same {kg(state.incident.claimedShortfallKgMilli)} supplier claim is not added again.</p>
+          <button type="button" className="mi-button mi-button--primary" onClick={link}>Confirm link</button> <button type="button" className="mi-button" onClick={() => setPendingLink(false)}>Cancel</button>
+        </div>}
+        <div id="mi-blockers" className="mi-blockers">{blockers.length ? <><strong>Confirmation disabled:</strong><ul>{blockers.map((b) => <li key={b}>{b}</li>)}</ul></> : <span>Safe to {linkMode ? "link" : "confirm"}: verified sender, matched {state.incident.poId}, compatible incident type, source evidence present.</span>}</div>
+        {linked && <p className="message-detail__correlation">Linked to <strong>{state.incident.id}</strong> ({state.incident.status}). <Link to="/inbox">Back to inbox</Link></p>}
+        <IncidentHandoff />
       </form>
       <section className="settings-card" aria-labelledby="mi-history">
         <header><h2 id="mi-history">Review history</h2></header>
