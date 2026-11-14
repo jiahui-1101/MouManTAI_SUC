@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, Check, Drumstick, Utensils, Package, ShieldCheck, Soup, Layers } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { calculatePlanB } from "../../features/recovery/plan-b/planB";
+import { preview as demoPreview } from "../../features/recovery/plan-b/preview";
 import { useDemoState } from "../../store/demoStore";
 import { selectPlanBInput } from "../../integration/planBShared";
 import type { PlanInput } from "../../features/recovery/plan-b/planB";
@@ -40,14 +41,14 @@ function MenuUsageChart({ items, available, shortageStock }: { available: number
 
 export function PlanBPage() {
   const shared = selectPlanBInput(useDemoState());
-  if (shared.status !== "READY") return <PageContainer title="Plan B — Internal Recovery">
-    <Pending status={shared.status === "STALE" ? "STALE" : "PENDING"} />
-    <p className="p4-alert" data-testid="plan-b-reason">{shared.reason} <Link to="/incidents">Open incidents</Link></p>
-  </PageContainer>;
+  if (shared.status !== "READY") {
+    const chicken = demoPreview.lots.find(lot => lot.ingredient === "chicken")?.grams ?? 0;
+    return <PlanBWorkspace key="local-demo" preview={demoPreview} baselineChicken={chicken} demoReason={shared.reason} />;
+  }
   return <PlanBWorkspace key={shared.input.fingerprint} preview={shared.input} baselineChicken={shared.sharedChickenGrams} />;
 }
 
-function PlanBWorkspace({ preview, baselineChicken }: { preview: PlanInput; baselineChicken: number }) {
+function PlanBWorkspace({ preview, baselineChicken, demoReason }: { preview: PlanInput; baselineChicken: number; demoReason?: string }) {
   const defaultFries = preview.lots.find(lot => lot.ingredient === "fries")?.grams ?? 0;
   const [chickenGrams, setChickenGrams] = useState(baselineChicken);
   const [friesGrams, setFriesGrams] = useState(defaultFries);
@@ -81,11 +82,12 @@ function PlanBWorkspace({ preview, baselineChicken }: { preview: PlanInput; base
 
   return <PageContainer title="Plan B — Internal Recovery"><main className="p4 p4-dashboard">
     <header className="p4-green-hero">
-      <div className="p4-brandline"><span>HAPPY POTATO <span>/ OPERATIONS</span></span><span className="p4-demo-tag">DEMO DATA</span></div>
+      <div className="p4-brandline"><span>HAPPY POTATO <span>/ OPERATIONS</span></span><span className="p4-demo-tag">{demoReason ? "LOCAL DEMO" : "DEMO DATA"}</span></div>
       <p className="p4-kicker">PLAN B · INTERNAL RECOVERY</p>
       <h2>Make the most of your available stock.</h2>
       <p>Chicken delivery disruption · {preview.incident?.id} · Happy Potato — Demo Outlet</p>
       <div className="p4-hero-status"><span><Package size={15}/> No new purchase</span><span>{breach ? <><AlertTriangle size={15}/> BREACH_RISK · review needed</> : <><Check size={15}/> {feasible ? "Plan feasible under demo assumptions" : "Schedule needs review"}</>}</span><span>Mock data · {preview.date} MYT</span></div>
+      {demoReason && <p data-testid="plan-b-reason">Local demo · {demoReason} · <Link to="/incidents" style={{ color: "inherit" }}>Open incidents</Link></p>}
     </header>
 
 
