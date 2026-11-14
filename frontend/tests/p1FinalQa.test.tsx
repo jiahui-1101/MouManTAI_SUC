@@ -108,11 +108,14 @@ describe("P1 final QA — architecture audit", () => {
     expect(Object.keys(pkg.dependencies).sort()).toEqual(["lucide-react", "react", "react-dom", "react-router-dom"]);
   });
 
-  it("uses one canonical DemoState and one business fixture", () => {
+  it("keeps all P1 state in the one shared DemoState and its single P1 contract fixture", () => {
     expect(inboxStore).toBe(demoStore);
-    expect(files.filter((f) => /useSyncExternalStore\(/.test(src(f)))).toHaveLength(1);
-    const businessImporters = files.filter((f) => /data\/fixtures\/happyPotato/.test(src(f)));
-    expect(businessImporters.map((f) => f.split("/src/")[1])).toEqual(["store/demoStore.ts"]);
-    expect(files.filter((f) => /"HP-OFFER-002"/.test(src(f))).map((f) => f.split(/[\\/]/).pop())).toEqual(["happyPotato.ts"]);
+    const p1Files = files.filter((f) => /\/(features\/messaging|pages\/(Inbox|MessageIntelligence|Channels|Settings))\//.test(f));
+    // P1 code never creates its own store; it only reads the shared demoStore.
+    for (const f of p1Files) expect(src(f), f).not.toMatch(/useSyncExternalStore\(|createStore|restaurantStore/);
+    const p1FixtureImporters = files.filter((f) => /fixtures\/happyPotatoP1Contract/.test(src(f)));
+    expect(p1FixtureImporters.map((f) => f.split("/src/")[1])).toEqual(["store/demoStore.ts"]);
+    expect(files.filter((f) => /"HP-OFFER-002"/.test(src(f))).map((f) => f.split(/[\\/]/).pop())).toEqual(["happyPotatoP1Contract.ts"]);
   });
+
 });

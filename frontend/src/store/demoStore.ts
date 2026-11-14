@@ -1,4 +1,4 @@
-import { CANONICAL_BUSINESS } from "../data/fixtures/happyPotato";
+import { CANONICAL_BUSINESS } from "../data/fixtures/happyPotatoP1Contract";
 import { parseMockSupplierMessage } from "../features/messaging/mockMessageRuleExtractor";
 import { useSyncExternalStore } from "react";
 import { CANONICAL_MESSAGE } from "../features/messaging/mockMessageRegistry";

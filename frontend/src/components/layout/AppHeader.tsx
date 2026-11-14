@@ -1,11 +1,14 @@
+import outletLogoUrl from "../../assets/happy-potato-logo.png";
+import logoUrl from "../../assets/moumantai-logo.png";
+
 export function AppHeader() {
   return (
-    <header className="app-header">
-      <span className="app-header__mark" aria-hidden="true">M+</span>
-      <div>
-        <p className="app-header__title">MouManTAI Recovery+</p>
-        <p className="app-header__tagline">AI Supply-to-Plate Recovery Intelligence</p>
-      </div>
+    <header className="portal-header" aria-label="MouManTAI portal">
+      <img className="portal-header__logo" src={logoUrl} alt="MouManTAI" width={510} height={65} />
+      <span className="portal-header__outlet" title="Selected outlet (synthetic demo outlet)">
+        <span>Outlet: Happy Potato</span>
+        <img src={outletLogoUrl} alt="" width={170} height={59} />
+      </span>
     </header>
   );
 }

@@ -1,3 +1,4 @@
+import "../p1.css";
 import { RotateCcw, ShieldCheck } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";

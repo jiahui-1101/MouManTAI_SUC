@@ -1,3 +1,4 @@
+import "../p1.css";
 import { Mail, MessageCircle, RotateCcw, Send } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PageContainer } from "../../components/layout/PageContainer";

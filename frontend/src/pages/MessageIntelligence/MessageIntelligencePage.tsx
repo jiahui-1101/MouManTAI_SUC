@@ -1,3 +1,4 @@
+import "../p1.css";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PageContainer } from "../../components/layout/PageContainer";

@@ -1,3 +1,4 @@
+import "../p1.css";
 import { useMemo, useState } from "react";
 import { Mail, MessageCircle, Search, Send } from "lucide-react";
 import { Link } from "react-router-dom";
