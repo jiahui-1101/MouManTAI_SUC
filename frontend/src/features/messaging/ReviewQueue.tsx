@@ -1,3 +1,4 @@
+import { DEFAULT_FILTERS, MessageFilters, matchesMessage, sortMessages } from "./MessageFilters";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search } from "lucide-react";
@@ -32,10 +33,13 @@ function toItem(state: DemoState, m: InboxMessage): QueueItem {
 export function ReviewQueue({ state, selectedId }: { state: DemoState; selectedId: string | null }) {
   const [tab, setTab] = useState<QueueTab>("ACTIVE");
   const [query, setQuery] = useState("");
+  const [criteria, setCriteria] = useState(DEFAULT_FILTERS);
   const items = useMemo(() => state.messages.map((m) => toItem(state, m)), [state]);
   const active = items.filter((i) => !i.closed);
   const filtered = items
     .filter((i) => (tab === "ACTIVE" ? !i.closed : i.closed))
+    .filter(i => matchesMessage(i.message, criteria))
+    .sort((a, b) => sortMessages(a.message, b.message, criteria))
     .filter((i) => `${i.title} ${i.message.senderDisplay} ${i.reason} ${i.message.id}`.toLowerCase().includes(query.trim().toLowerCase()));
   const [page, setPage] = useState(() => pageOf(filtered.findIndex((i) => i.message.id === selectedId)));
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -43,15 +47,14 @@ export function ReviewQueue({ state, selectedId }: { state: DemoState; selectedI
   const visible = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
   return <section className="rq" aria-labelledby="rq-title">
     <header className="rq__head">
-      <div><p className="rq__eyebrow">Human review</p><h2 id="rq-title" className="rq__title">Review queue</h2></div>
+      <div><p id="rq-title" className="rq__eyebrow">Human review</p></div>
       <span className="rq__count">{active.length} active</span>
     </header>
     <div className="rq__tools">
-      <label className="rq__search"><Search aria-hidden="true" size={16} /><span className="sr-only">Search review queue</span><input value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} placeholder="Search subject, sender, reason" /></label>
-      <div className="rq__tabs" role="group" aria-label="Queue view">
-        {(["ACTIVE", "HISTORY"] as const).map((t) => <button key={t} type="button" aria-pressed={tab === t} className={tab === t ? "is-active" : ""} onClick={() => { setTab(t); setPage(1); }}>{t === "ACTIVE" ? "Active reviews" : "History"}</button>)}
-      </div>
+
+
     </div>
+    <MessageFilters search={<label className="rq__search"><Search aria-hidden="true" size={16} /><span className="sr-only">Search review queue</span><input value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} placeholder="Search subject, sender, reason" /></label>} mode="review" reviewControl={<label><span>Review status</span><select value={tab} onChange={event => { setTab(event.target.value as QueueTab); setPage(1); }}><option value="ACTIVE">Active reviews</option><option value="HISTORY">Completed reviews</option></select></label>} value={criteria} count={filtered.length} onChange={value => { setCriteria(value); setPage(1); }} onClear={() => { setCriteria(DEFAULT_FILTERS); setQuery(""); setPage(1); setTab("ACTIVE"); }} />
     <ul className="rq__list" aria-label="Review queue items">
       {visible.length === 0 && <li className="rq__empty">{tab === "ACTIVE" ? "Nothing waiting for review." : "No completed reviews yet."}</li>}
       {visible.map((i) => <li key={i.message.id} className={`rq-card ${i.message.id === selectedId ? "is-selected" : ""}`}>
@@ -59,8 +62,8 @@ export function ReviewQueue({ state, selectedId }: { state: DemoState; selectedI
           <h3 className="rq-card__title">{i.title}</h3>
           <Link className={`fm-btn fm-btn--sm ${i.message.id === selectedId ? "fm-btn--ghost" : "fm-btn--primary"}`} to={`/message-intelligence?message=${i.message.id}`} aria-label={`Open review ${i.message.id} · ${i.message.senderDisplay}`} aria-current={i.message.id === selectedId ? "page" : undefined}>{i.message.id === selectedId ? "Reviewing" : "Open review"}</Link>
         </div>
-        <p className="rq-card__sender">{i.message.senderDisplay} · {CHANNEL[i.message.channel]} · {i.message.id}</p>
         <p className="rq-card__reason">{i.reason}</p>
+        <p className="rq-card__sender">{i.message.senderDisplay} · {CHANNEL[i.message.channel]} · {i.message.id}</p>
         <p className="rq-card__detail">{i.detail}</p>
         <div className="rq-card__meta">
           <StatusBadge tone={PRIORITY_TONE[i.priority]}>{i.priority}</StatusBadge>

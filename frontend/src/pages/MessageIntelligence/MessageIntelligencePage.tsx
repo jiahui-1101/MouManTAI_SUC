@@ -1,4 +1,5 @@
 import "../p1.css";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { PageContainer } from "../../components/layout/PageContainer";
@@ -39,7 +40,7 @@ export { segmentRawText } from "../../features/messaging/segmentRawText";
 
 export function MessageIntelligencePage() {
   const state = useDemoState();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const messageId = params.get("message");
 
   if (state.loadStatus === "LOADING") return <PageContainer title={TITLE}><div className="fm-panel p1-state"><p role="status" aria-busy="true">Loading local mock fixture…</p><button type="button" className="fm-btn fm-btn--primary" onClick={() => demoStore.setMockLoadStatus()}>Finish mock loading</button></div></PageContainer>;
@@ -50,7 +51,7 @@ export function MessageIntelligencePage() {
   // First visit: the full message queue only. The review panel opens after a message is chosen.
   const message = messageId ? state.messages.find((m) => m.id === messageId) : undefined;
   return <PageContainer title={TITLE}>
-    <SplitLayout open={Boolean(messageId)}>
+    <SplitLayout open={Boolean(messageId)} initialQueuePct={57} onMobileClose={() => setParams({})}>
       <ReviewQueue state={state} selectedId={message?.id ?? null} />
       <div className="mi-layout__detail">
         <Link className="mi-close" to="/message-intelligence" aria-label="Close review panel">×</Link>
@@ -72,6 +73,11 @@ function Workspace({ message }: { message: InboxMessage }) {
   const [errors, setErrors] = useState<DraftErrors>({});
   const [note, setNote] = useState("");
   const [status, setStatus] = useState("");
+  const [analyzing, setAnalyzing] = useState(true);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setAnalyzing(false), 900);
+    return () => window.clearTimeout(timer);
+  }, [message.id]);
   useEffect(() => { if (!message.read) demoStore.select(message.id); }, [message.id, message.read]);
   useEffect(() => { setViewed(latest.version); setDraft(draftFromValues(latest.values)); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latest.id]);
@@ -130,6 +136,7 @@ function Workspace({ message }: { message: InboxMessage }) {
   const evidenceCell = (spanField: string | null, field: CandidateField | null) => evidence(spanField, field);
   const tabs = [
     { id: "review" as const, label: "Check & correct", panel: <div className="mi-steps">
+      <p className="mi-analysis-status" role="status" aria-live="polite"><RefreshCw aria-hidden="true" size={14} className={analyzing ? "mi-analysis-spinner" : ""} /><span>{analyzing ? "✦ Analyzing evidence for AI suggestion…" : "✦ Evidence ready"}</span><small>Simulated · rule-based</small></p>
       <div className="mi-quote">
         <p className="mi-quote__label">Supplier message · original, never edited</p>
         <p data-testid="raw-text">{segmentRawText(message.rawText, view.evidenceSpans).map((seg, i) => seg.span ? <mark key={i} className="mi-mark" data-field={seg.span.field} data-start={seg.span.start} data-end={seg.span.end} title={`${FIELD_LABELS[seg.span.field] ?? seg.span.field} · chars ${seg.span.start}–${seg.span.end}`}>{seg.text}</mark> : <span key={i}>{seg.text}</span>)}</p>
@@ -184,7 +191,7 @@ function Workspace({ message }: { message: InboxMessage }) {
     <div className="mi-actionbar">
       <span className="mi-avatar" aria-hidden="true">DO</span><span className="mi-actionbar__label">Reviewer</span><strong className="mi-actionbar__name">Demo operator</strong>
       <label className="mi-actionbar__note"><span className="sr-only">Review reason / note</span><input id="reviewNote" placeholder="Reason (needed to reject or hold)" value={note} onChange={(e) => { setNote(e.target.value); setErrors((x) => ({ ...x, form: undefined })); }} /></label>
-      <button type="button" className="fm-btn fm-btn--ghost" disabled={locked} onClick={() => decide("REJECTED")}>Reject</button>
+      <span className="mi-reject-label">Reject</span>
       <button type="button" className="fm-btn fm-btn--ghost" disabled={locked} onClick={() => decide("MARKED_UNRESOLVED")}>Mark unresolved</button>
           {linkMode
             ? <button type="button" className="fm-btn fm-btn--primary" disabled={blockers.length > 0 || pendingLink} aria-describedby="mi-blockers" onClick={() => setPendingLink(true)}>Link to existing incident {state.incident.id}</button>

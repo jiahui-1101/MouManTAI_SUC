@@ -1,3 +1,4 @@
+import { DEFAULT_FILTERS, MessageFilters, matchesMessage, sortMessages } from "../../features/messaging/MessageFilters";
 import "../p1.css";
 import { useMemo, useState } from "react";
 import { PAGE_SIZE, Pager } from "../../features/messaging/Pager";
@@ -9,11 +10,7 @@ import { titleFor } from "../../constants/navigation";
 import { EmptyState, StatusBadge, type StatusTone } from "../../components/ui";
 import { type InboxChannel, type InboxMessage, inboxStore, useInboxState } from "../../features/messaging/inboxStore";
 
-type Filter = "ALL" | InboxChannel;
-const filters: readonly { value: Filter; label: string }[] = [
-  { value: "ALL", label: "All" }, { value: "WHATSAPP", label: "WhatsApp" },
-  { value: "OUTLOOK", label: "Outlook" }, { value: "TELEGRAM", label: "Telegram" },
-];
+
 
 function ChannelIcon({ channel }: { channel: InboxChannel }) {
   if (channel === "OUTLOOK") return <Mail aria-hidden="true" size={17} />;
@@ -27,29 +24,28 @@ function stageLabel(stage: InboxMessage["stage"]) {
 }
 
 const STAGE_TONE: Record<InboxMessage["stage"], StatusTone> = { LINKED: "success", REVIEW_PENDING: "info", PARSED: "neutral", UNMATCHED: "warning", UNVERIFIED: "danger" };
-const ACTIONS = <span className="p1-actions"><StatusBadge tone="simulated">Simulation only · no channels connected</StatusBadge></span>;
+const ACTIONS = null;
 
 function channelLabel(channel: InboxChannel) { return channel === "OUTLOOK" ? "Outlook" : channel[0] + channel.slice(1).toLowerCase(); }
 function exactTime(iso: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(iso)) + " MYT"; }
 
 export function InboxPage() {
-  const { messages, selectedId, suppressedDuplicateCount, preferences, loadStatus, incident } = useInboxState();
-  const [filter, setFilter] = useState<Filter>("ALL");
+  const { messages, selectedId, preferences, loadStatus, incident } = useInboxState();
   const [query, setQuery] = useState("");
+  const [criteria, setCriteria] = useState(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
-  const [closedId, setClosedId] = useState<string | null>(null);
+  const [openedId, setOpenedId] = useState<string | null>(null);
   const filtered = useMemo(() => messages.filter((message) => {
-    const matchesChannel = filter === "ALL" || message.channel === filter;
     const haystack = `${message.senderDisplay} ${message.subject ?? ""} ${message.poId ?? ""} ${message.rawText}`.toLowerCase();
-    return matchesChannel && haystack.includes(query.trim().toLowerCase());
-  }).sort((a, b) => preferences.unreadFirst ? Number(a.read) - Number(b.read) : 0), [filter, messages, preferences.unreadFirst, query]);
+    return matchesMessage(message, criteria) && haystack.includes(query.trim().toLowerCase());
+  }).sort((a, b) => sortMessages(a, b, criteria) || (preferences.unreadFirst ? Number(a.read) - Number(b.read) : 0)), [messages, preferences.unreadFirst, query, criteria]);
   const selected = messages.find((message) => message.id === selectedId) ?? messages[0];
   const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const current = Math.min(page, pages);
   const visible = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
   // The detail panel opens once a message has been opened (read) and stays until closed.
-  const panelOpen = Boolean(selected?.read) && closedId !== selected?.id;
-  const open = (id: string) => { setClosedId(null); inboxStore.select(id); };
+  const panelOpen = openedId !== null && openedId === selected?.id;
+  const open = (id: string) => { setOpenedId(id); inboxStore.select(id); };
 
   if (loadStatus === "LOADING") return <PageContainer title={titleFor("/inbox")} actions={ACTIONS}><div className="fm-panel p1-state"><p role="status" aria-busy="true">Loading local mock fixture…</p><button type="button" className="fm-btn fm-btn--primary" onClick={() => inboxStore.setMockLoadStatus()}>Finish mock loading</button></div></PageContainer>;
   if (loadStatus === "ERROR") return <PageContainer title={titleFor("/inbox")} actions={ACTIONS}><div className="fm-panel p1-state"><p role="alert">Mock fixture loading failed. No provider was contacted.</p><button type="button" className="fm-btn fm-btn--primary" onClick={() => inboxStore.setMockLoadStatus()}>Retry local fixture</button></div></PageContainer>;
@@ -59,31 +55,33 @@ export function InboxPage() {
   const list = <section className="rq inbox-queue" aria-labelledby="inbox-queue-title">
     <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{messages.length} simulated messages available; {unread} unread.</p>
     <header className="rq__head">
-      <div><p className="rq__eyebrow">Supplier messages</p><h2 id="inbox-queue-title" className="rq__title">All channels</h2></div>
+      <div><p id="inbox-queue-title" className="rq__eyebrow">Supplier messages</p></div>
       <span className="rq__count">{unread} unread</span>
     </header>
     <div className="rq__tools">
-      <label className="rq__search"><Search aria-hidden="true" size={16} /><span className="sr-only">Search messages</span><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Search sender, subject, PO or message" /></label>
-      <div className="inbox__filters" role="group" aria-label="Inbox filters">
-        {filters.map(({ value, label }) => <button key={value} type="button" className={filter === value ? "is-active" : ""} aria-pressed={filter === value} onClick={() => { setFilter(value); setPage(1); }}>{label} <span>{value === "ALL" ? messages.length : messages.filter((item) => item.channel === value).length}</span></button>)}
-      </div>
-      <p className="inbox__notice"><strong>{suppressedDuplicateCount} duplicate{suppressedDuplicateCount === 1 ? "" : "s"} suppressed</strong><span>Repeated provider events are ignored by channel, account and provider message ID.</span></p>
+
     </div>
-    <section className="inbox__list" aria-label="Messages">
+    <MessageFilters search={<label className="rq__search"><Search aria-hidden="true" size={16} /><span className="sr-only">Search messages</span><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="Search sender, subject, PO or message" /></label>} value={criteria} count={filtered.length} onChange={value => { setCriteria(value); setPage(1); }} onClear={() => { setCriteria(DEFAULT_FILTERS); setQuery(""); setPage(1);  }} />
+    <div className="inbox-table-head" aria-hidden="true"><span>Sender</span><span>Subject / reference</span><span>Source</span><span>Status</span><span>Review</span><span>Received</span></div>
+    <section className="inbox__list inbox-table" aria-label="Messages">
       {visible.length === 0 ? <div className="inbox__empty"><strong>No messages found</strong><span>Try another channel or search term.</span></div> : visible.map((message, index) => <button type="button" key={message.id} className={`message-card ${panelOpen && selected.id === message.id ? "is-selected" : ""} ${message.read ? "" : "is-unread"}`} onKeyDown={(event) => { const offset = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0; if (offset) { event.preventDefault(); const target = visible[(index + offset + visible.length) % visible.length]!; open(target.id); const buttons = event.currentTarget.parentElement?.querySelectorAll("button"); buttons?.[(index + offset + visible.length) % visible.length]?.focus(); } }} onClick={() => open(message.id)} aria-pressed={panelOpen && selected.id === message.id}>
-          <span className="message-card__icon"><ChannelIcon channel={message.channel} /></span>
-          <span className="message-card__content"><span className="message-card__top"><strong>{message.senderDisplay}</strong><time dateTime={message.receivedAtIso}>{message.receivedAtIso.slice(11, 16)} MYT</time></span><span className="message-card__subject">{message.subject ?? message.poId ?? "Unmatched supplier message"}</span><span className="message-card__preview">{message.rawText}</span><span className="message-card__meta"><StatusBadge tone="simulated">SIMULATED_CHANNEL</StatusBadge><StatusBadge tone={STAGE_TONE[message.stage]}>{stageLabel(message.stage)}</StatusBadge>{!message.read && <StatusBadge tone="warning">Unread</StatusBadge>}<span className="message-card__channel">{channelLabel(message.channel)}</span></span></span>
+          <span className="inbox-row__sender"><strong>{message.senderDisplay}</strong><small>{message.senderRegistryId ?? "Unverified contact"}</small></span>
+          <span className="inbox-row__subject"><strong>{message.subject ?? message.poId ?? "Unmatched supplier message"}</strong><small>{message.rawText}</small></span>
+          <span className="inbox-row__source">{channelLabel(message.channel)}</span>
+          <span className="inbox-row__status"><StatusBadge tone={STAGE_TONE[message.stage]}>{stageLabel(message.stage)}</StatusBadge></span>
+          <span className="inbox-row__review"><StatusBadge tone={message.read ? "neutral" : "warning"}>{message.read ? "Opened" : "Unread"}</StatusBadge></span>
+          <span className="inbox-row__time"><time dateTime={message.receivedAtIso}>{message.receivedAtIso.slice(11, 16)} MYT</time><small>{message.receivedAtIso.slice(0, 10)}</small></span>
         </button>)}
     </section>
     <Pager total={filtered.length} page={current} pageSize={PAGE_SIZE} onPage={setPage} label="Inbox pages" />
   </section>;
 
   return <PageContainer title={titleFor("/inbox")} actions={ACTIONS}>
-    <SplitLayout label="Resize message list" open={panelOpen}>
+    <SplitLayout label="Resize message list" open={panelOpen} onMobileClose={() => setOpenedId(null)}>
           {list}
           <div className="mi-layout__detail">
       <article className="message-detail" aria-label="Selected message">
-              <button type="button" className="mi-close" aria-label="Close message panel" onClick={() => setClosedId(selected.id)}>×</button>
+              <button type="button" className="mi-close" aria-label="Close message panel" onClick={() => setOpenedId(null)}>×</button>
               <header><div><span className="message-detail__channel"><ChannelIcon channel={selected.channel} /> {channelLabel(selected.channel)}</span><h2>{selected.subject ?? selected.poId ?? "Unmatched supplier message"}</h2></div><span className={`fm-badge fm-badge--${STAGE_TONE[selected.stage]} message-detail__status`}>{stageLabel(selected.stage)}</span></header>
               <dl className="message-detail__facts"><div><dt>Synthetic sender</dt><dd>{selected.senderDisplay} · {selected.verification === "VERIFIED_DEMO_CONTACT" ? "Verified demo contact" : "Unverified sender"}</dd></div><div><dt>Exact received time</dt><dd><time dateTime={selected.receivedAtIso}>{exactTime(selected.receivedAtIso)}</time></dd></div><div><dt>Provider ID</dt><dd>{selected.providerMessageId.replace(/(.{8}).+/, "$1••••")}</dd></div><div><dt>Provenance</dt><dd><strong>SIMULATED_CHANNEL</strong> · not live</dd></div></dl>
               <section className="message-detail__original" aria-labelledby="original-message-heading"><div><h3 id="original-message-heading">Immutable original message</h3><span>Read-only source evidence</span></div><p>{selected.rawText}</p></section>
