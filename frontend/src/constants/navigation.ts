@@ -47,7 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { path: "/impact", label: "Impact Explorer", title: "Impact Explorer", icon: Network },
       { path: "/recovery/plan-a", label: "Plan A — Supplier Recovery", title: "Plan A — Supplier Recovery", icon: ShoppingCart },
       { path: "/recovery/plan-b", label: "Plan B — Internal Recovery", title: "Plan B — Internal Recovery", icon: Soup },
-      { path: "/prep-planning", label: "Prep Planning", title: "Prep Planning", icon: CalendarClock },
+      { path: "/prep-planning", label: "Prep Planning", title: "Recovery Prep Planning", icon: CalendarClock },
       { path: "/recovery/compare", label: "Recovery Comparison", title: "Recovery Comparison", icon: ArrowLeftRight },
     ],
   },

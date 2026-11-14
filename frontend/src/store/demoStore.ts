@@ -774,6 +774,25 @@ subscribeP2(() => {
     state = { ...createDemoState(), activeFixture: state.activeFixture, messages: fixtureMessages(state.activeFixture), preferences: state.preferences };
     state = { ...state, selectedId: state.messages[0]?.id ?? "HP-MSG-WA-001" };
   }
+  // P2's "Supplier disruption demo" (simulateSupplierReport) records a SIMULATED_CHANNEL message in P2.
+  // Surface it in the P1 inbox under the same message ID so it is reviewed through the normal P1 flow.
+  // (P1-originated messages forwarded to P2 already exist here and are skipped by ID.)
+  for (const m of p2.messages) {
+    if (state.messages.some((existing) => existing.id === m.id)) continue;
+    executeIngestMockMessage({
+      id: m.id,
+      channel: m.channel,
+      provenance: "SIMULATED_CHANNEL",
+      // Distinct account/provider key: P2's "sim:<channel>:NNN" IDs overlap the P1 fixtures' provider IDs.
+      channelAccountId: `p2-demo-${m.channel.toLowerCase()}`,
+      providerMessageId: `p2-demo:${m.id}`,
+      senderDisplay: "Demo Poultry Supply A",
+      senderRegistryId: "HP-SUP-001", // P2 test reports are always from the PO supplier
+      receivedAtIso: m.receivedAtIso,
+      subject: m.subject,
+      rawText: m.text,
+    });
+  }
   if (state.restaurant === p2.restaurant) return;
   let incident = state.incident;
   const impact = selectCurrentImpact(p2.restaurant, incident.id);

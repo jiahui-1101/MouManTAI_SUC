@@ -130,7 +130,7 @@ describe("Offline mock messaging state operations", () => {
     renderRoute("/inbox");
 
     // Click on Telegram message HP-MSG-TG-001
-    const tgButton = screen.getByRole("button", { name: /Demo Poultry Supply A09:05 MYT/ });
+    const tgButton = screen.getByRole("button", { name: /^Demo Poultry Supply A.*09:05 MYT/ });
     fireEvent.click(tgButton);
 
     const detail = screen.getByRole("article", { name: "Selected message" });

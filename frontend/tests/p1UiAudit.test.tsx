@@ -7,6 +7,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { routes } from "../src/app/router";
 import { demoStore, selectActiveIncident, selectExtractionVersions, selectOfferReviewVersions } from "../src/store/demoStore";
+import { chooseInboxChannel, openInboxRow, reviewStatusLine } from "./helpers.p1";
 import { NAV_ITEMS } from "../src/constants/navigation";
 
 const s = () => demoStore.getSnapshot();
@@ -22,8 +23,8 @@ describe("Inbox controls", () => {
     const r = app("/inbox");
     // C-01 channel filters with counts
     for (const [label, n] of [["WhatsApp", 2], ["Outlook", 1], ["Telegram", 2], ["All", 5]] as const) {
-      fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${label}`) }));
-      expect(btn(new RegExp(`^${label}`)).getAttribute("aria-pressed")).toBe("true");
+      chooseInboxChannel(label);
+      expect((screen.getByLabelText("Channel") as HTMLSelectElement).selectedOptions[0]!.textContent).toBe(label);
       expect(list().getAllByRole("button")).toHaveLength(n);
     }
     // C-02 search + no-result empty state
@@ -67,7 +68,7 @@ describe("Inbox controls", () => {
 
   it("C-09 Impact Explorer link appears only after real verification", async () => {
     const r = app("/inbox");
-    fireEvent.click(list().getByRole("button", { name: /Demo Poultry Supply A09:01 MYT/ }));
+    fireEvent.click(list().getByRole("button", { name: /^Demo Poultry Supply A.*09:01 MYT/ }));
     const detail = () => within(screen.getByRole("article", { name: "Selected message" }));
     expect(detail().queryByRole("link", { name: "Impact Explorer" })).toBeNull();
     act(() => { demoStore.confirmExtractionReview("HP-MSG-WA-001"); });
@@ -113,7 +114,7 @@ describe("Message Intelligence controls", () => {
     fireEvent.click(btn("Save correction"));
     const v2 = selectExtractionVersions(s(), "HP-MSG-WA-001")[1]!;
     expect(v2).toMatchObject({ method: "HUMAN_CORRECTION", shortfallKgMilli: 15000, note: "Partial per phone" });
-    expect(screen.getByRole("status").textContent).toBe("Saved version 2 as HUMAN_CORRECTION.");
+    expect(reviewStatusLine()!.textContent).toBe("Saved version 2 as HUMAN_CORRECTION.");
     // C-16 confirm blocked by contradiction with precise reason
     expect(btn(/confirm & verify incident/i).disabled).toBe(true);
     expect(screen.getByText(/Incompatible incident type: PARTIAL_DELIVERY/)).toBeTruthy();
@@ -210,15 +211,15 @@ describe("Channels and Settings controls", () => {
     const r = app("/settings");
     fireEvent.click(screen.getByRole("checkbox", { name: /Show processing timeline/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /Show unread messages first/ }));
-    act(() => demoStore.select("HP-MSG-WA-001")); // opening a message shows its detail panel
     await nav(r, "/inbox");
+    openInboxRow("Demo Poultry Supply A", "09:01"); // opening a message shows its detail panel
     expect(screen.queryByRole("list", { name: "Processing timeline" })).toBeNull();
     expect(list().getAllByRole("button").at(-1)!.textContent).toMatch(/Demo Poultry Supply A/);
     await nav(r, "/settings");
     fireEvent.click(btn(/Reset demo/));
     expect(s().preferences).toEqual({ unreadFirst: false, showProcessingTimeline: true });
-    act(() => demoStore.select("HP-MSG-WA-001"));
     await nav(r, "/inbox");
+    openInboxRow("Demo Poultry Supply A", "09:01");
     expect(screen.getByRole("list", { name: "Processing timeline" })).toBeTruthy();
   });
 

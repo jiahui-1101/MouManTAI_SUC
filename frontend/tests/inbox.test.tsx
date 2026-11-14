@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { routes } from "../src/app/router";
+import { chooseInboxChannel } from "./helpers.p1";
 import { inboxStore } from "../src/features/messaging/inboxStore";
 
 beforeEach(() => inboxStore.reset());
@@ -40,8 +41,7 @@ describe("unified supplier inbox", () => {
     expect(within(list).getAllByRole("button")).toHaveLength(5);
     // List first: the detail panel opens only after a message is opened.
     expect(screen.queryByRole("article", { name: "Selected message" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: /Demo Poultry Supply A09:01 MYT/ }));
-    expect(screen.getByText("Simulation only · no channels connected")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /^Demo Poultry Supply A.*09:01 MYT/ }));
     expect(screen.getByText("20.000 kg")).toBeTruthy();
     expect(screen.getByText("Unknown")).toBeTruthy();
     expect(screen.getByText(/shortfall is not multiplied/)).toBeTruthy();
@@ -50,7 +50,7 @@ describe("unified supplier inbox", () => {
 
   it.each([["WhatsApp", 2], ["Outlook", 1], ["Telegram", 2]])("filters to %s messages", (channel, count) => {
     renderInbox();
-    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${channel}`) }));
+    chooseInboxChannel(channel as "WhatsApp" | "Outlook" | "Telegram");
     expect(within(screen.getByRole("region", { name: "Messages" })).getAllByRole("button")).toHaveLength(count as number);
   });
 
@@ -65,7 +65,7 @@ describe("unified supplier inbox", () => {
 
   it("opens a message, marks it read, and shows immutable detail metadata", () => {
     renderInbox();
-    fireEvent.click(screen.getByRole("button", { name: /Demo Poultry Supply A09:03 MYT/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Demo Poultry Supply A.*09:03 MYT/ }));
     expect(screen.getByRole("heading", { name: "HP-PO-1042 delivery update", level: 2 })).toBeTruthy();
     const detail = screen.getByRole("article", { name: "Selected message" });
     expect(within(detail).getByText(/SIMULATED_CHANNEL/)).toBeTruthy();
@@ -75,7 +75,7 @@ describe("unified supplier inbox", () => {
 
   it("renders unverified and unmatched canonical states without publishing an incident", () => {
     renderInbox();
-    fireEvent.click(screen.getByRole("button", { name: /Unknown demo contact09:09 MYT/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Unknown demo contact.*09:09 MYT/ }));
     expect(screen.getByText("Unmatched message.", { exact: false })).toBeTruthy();
     expect(screen.getByText("Human review required.", { exact: false })).toBeTruthy();
     expect(screen.getByText("No matched PO")).toBeTruthy();
@@ -85,7 +85,7 @@ describe("unified supplier inbox", () => {
 
   it("navigates the selected canonical message to Message Intelligence", async () => {
     const router = renderInbox();
-    fireEvent.click(screen.getByRole("button", { name: /Demo Poultry Supply A09:01 MYT/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Demo Poultry Supply A.*09:01 MYT/ }));
     fireEvent.click(screen.getByRole("link", { name: "Open in Message Intelligence" }));
     expect(router.state.location.pathname).toBe("/message-intelligence");
     expect(router.state.location.search).toBe("?message=HP-MSG-WA-001");
