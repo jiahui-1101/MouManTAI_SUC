@@ -24,6 +24,6 @@ export function IncidentHandoff() {
       <div><dt>Evidence messages</dt><dd data-testid="incident-messages">{linked.length ? linked.map((m) => `${m.id} (${m.channel})`).join(", ") : "None yet"}</dd></div>
       <div><dt>P2 handoff</dt><dd data-testid="handoff-status">{HANDOFF_TEXT[incident.handoff.status]}</dd></div>
     </dl>
-    {incident.status === "VERIFIED" && <Link className="message-detail__action" to={incident.handoff.target}>Open Impact Explorer</Link>}
+    {incident.status === "VERIFIED" && <Link className="fm-btn fm-btn--primary" to={incident.handoff.target}>Open Impact Explorer</Link>}
   </section>;
 }

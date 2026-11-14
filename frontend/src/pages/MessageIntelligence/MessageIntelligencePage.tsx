@@ -39,15 +39,15 @@ export function MessageIntelligencePage() {
   const [params] = useSearchParams();
   const messageId = params.get("message");
 
-  if (state.loadStatus === "LOADING") return <PageContainer title={TITLE}><p role="status" aria-busy="true">Loading local mock fixture…</p><button type="button" className="mi-button" onClick={() => demoStore.setMockLoadStatus()}>Finish mock loading</button></PageContainer>;
-  if (state.loadStatus === "ERROR") return <PageContainer title={TITLE}><p role="alert">Mock fixture loading failed. No provider was contacted.</p><button type="button" className="mi-button" onClick={() => demoStore.setMockLoadStatus()}>Retry local fixture</button></PageContainer>;
+  if (state.loadStatus === "LOADING") return <PageContainer title={TITLE}><p role="status" aria-busy="true">Loading local mock fixture…</p><button type="button" className="fm-btn fm-btn--ghost" onClick={() => demoStore.setMockLoadStatus()}>Finish mock loading</button></PageContainer>;
+  if (state.loadStatus === "ERROR") return <PageContainer title={TITLE}><p role="alert">Mock fixture loading failed. No provider was contacted.</p><button type="button" className="fm-btn fm-btn--ghost" onClick={() => demoStore.setMockLoadStatus()}>Retry local fixture</button></PageContainer>;
   if (!messageId) {
-    return <PageContainer title={TITLE}><div className="inbox__empty mi-empty"><strong>No message selected</strong><p>Choose a simulated message to review.</p>
+    return <PageContainer title={TITLE}><div className="fm-empty mi-empty"><strong>No message selected</strong><p>Choose a simulated message to review.</p>
       {state.messages.length === 0 ? <Link to="/channels">Load a demo scenario</Link> : <ul className="mi-picker">{state.messages.map((m) => <li key={m.id}><Link to={`/message-intelligence?message=${m.id}`}>{m.id} · {m.senderDisplay}</Link></li>)}</ul>}
     </div></PageContainer>;
   }
   const message = state.messages.find((m) => m.id === messageId);
-  if (!message) return <PageContainer title={TITLE}><div role="alert" className="inbox__empty mi-empty"><strong>Message not found</strong><p>{messageId} is not in the active offline fixture.</p><Link to="/inbox">Back to inbox</Link></div></PageContainer>;
+  if (!message) return <PageContainer title={TITLE}><div role="alert" className="fm-empty mi-empty"><strong>Message not found</strong><p>{messageId} is not in the active offline fixture.</p><Link to="/inbox">Back to inbox</Link></div></PageContainer>;
   return <PageContainer title={TITLE}>{message.kind === "SUPPLIER_OFFER" ? <OfferReview key={message.id} message={message} /> : <Workspace key={message.id} message={message} />}</PageContainer>;
 }
 
@@ -119,7 +119,7 @@ function Workspace({ message }: { message: InboxMessage }) {
       </section>
       <section className="mi__extraction" aria-labelledby="mi-extraction">
         <header><h2 id="mi-extraction">Structured extraction · v{view.version}</h2><span className={`mi-chip mi-method-${view.method.toLowerCase()}`}>{view.method}</span><span className="mi-chip">{view.reviewStatus}</span></header>
-        {view.version !== latest.version && <p className="message-detail__warning">Viewing previous version {view.version} (read-only). Latest is v{latest.version}. <button type="button" className="mi-link" onClick={() => setViewed(latest.version)}>View latest</button></p>}
+        {view.version !== latest.version && <p className="fm-banner fm-banner--warning p1-banner">Viewing previous version {view.version} (read-only). Latest is v{latest.version}. <button type="button" className="mi-link" onClick={() => setViewed(latest.version)}>View latest</button></p>}
         <dl className="mi-fields">
           <div><dt>Matched supplier</dt><dd>{view.values.supplierId ? `${view.values.supplierId} · ${supplierName ?? "unknown"}` : "None"}</dd><dd>{evidence(null, "supplierId")}</dd></div>
           <div><dt>Purchase order</dt><dd>{view.values.poId ?? "No matched PO"} <span className={`mi-chip mi-po-${poStatus.toLowerCase()}`}>{poStatus}</span></dd><dd>{evidence("poId", "poId")}</dd></div>
@@ -135,7 +135,7 @@ function Workspace({ message }: { message: InboxMessage }) {
     </div>
 
     <div className="mi__grid">
-      <form className="settings-card mi-form" aria-labelledby="mi-review" noValidate onSubmit={(e) => { e.preventDefault(); save(); }} onKeyDown={(e) => { if (e.key === "Escape" && dirty) { e.preventDefault(); discard(); } }}>
+      <form className="fm-panel mi-form" aria-labelledby="mi-review" noValidate onSubmit={(e) => { e.preventDefault(); save(); }} onKeyDown={(e) => { if (e.key === "Escape" && dirty) { e.preventDefault(); discard(); } }}>
         <header><h2 id="mi-review">Human review · edits create v{latest.version + 1}</h2></header>
         <fieldset disabled={locked}>
           <legend className="sr-only">Candidate values</legend>
@@ -152,24 +152,24 @@ function Workspace({ message }: { message: InboxMessage }) {
         {Object.entries(errors).some(([k, v]) => k !== "form" && v) && <p role="alert" className="mi-error">Validation failed. Nothing was saved.</p>}
         <p className="mi-hint">Changed values without a supporting raw-text span are recorded as human assertions, not source evidence. Press Esc to discard edits.</p>
         <div className="mi-actions">
-          <button type="submit" className="mi-button mi-button--primary" disabled={locked}>Save correction</button>
-          <button type="button" className="mi-button" disabled={!dirty} onClick={discard}>Discard edits</button>
-          <button type="button" className="mi-button" disabled={locked} onClick={() => decide("REJECTED")}>Reject</button>
-          <button type="button" className="mi-button" disabled={locked} onClick={() => decide("MARKED_UNRESOLVED")}>Mark unresolved</button>
+          <button type="submit" className="fm-btn fm-btn--primary" disabled={locked}>Save correction</button>
+          <button type="button" className="fm-btn fm-btn--ghost" disabled={!dirty} onClick={discard}>Discard edits</button>
+          <button type="button" className="fm-btn fm-btn--ghost" disabled={locked} onClick={() => decide("REJECTED")}>Reject</button>
+          <button type="button" className="fm-btn fm-btn--ghost" disabled={locked} onClick={() => decide("MARKED_UNRESOLVED")}>Mark unresolved</button>
           {linkMode
-            ? <button type="button" className="mi-button mi-button--primary" disabled={blockers.length > 0 || pendingLink} aria-describedby="mi-blockers" onClick={() => setPendingLink(true)}>Link to existing incident {state.incident.id}</button>
-            : <button type="button" className="mi-button mi-button--primary" disabled={blockers.length > 0} aria-describedby="mi-blockers" onClick={confirm}>Confirm &amp; verify incident</button>}
+            ? <button type="button" className="fm-btn fm-btn--primary" disabled={blockers.length > 0 || pendingLink} aria-describedby="mi-blockers" onClick={() => setPendingLink(true)}>Link to existing incident {state.incident.id}</button>
+            : <button type="button" className="fm-btn fm-btn--primary" disabled={blockers.length > 0} aria-describedby="mi-blockers" onClick={confirm}>Confirm &amp; verify incident</button>}
         </div>
         {pendingLink && blockers.length === 0 && <div role="group" aria-label="Confirm incident link" className="mi-blockers mi-confirm">
           <p>Link <strong>{message.id}</strong> ({message.channel}) as additional evidence for <strong>{state.incident.id}</strong>? The same {kg(state.incident.claimedShortfallKgMilli)} supplier claim is not added again.</p>
-          <button type="button" className="mi-button mi-button--primary" onClick={link}>Confirm link</button> <button type="button" className="mi-button" onClick={() => setPendingLink(false)}>Cancel</button>
+          <button type="button" className="fm-btn fm-btn--primary" onClick={link}>Confirm link</button> <button type="button" className="fm-btn fm-btn--ghost" onClick={() => setPendingLink(false)}>Cancel</button>
         </div>}
         <div id="mi-blockers" className="mi-blockers">{blockers.length ? <><strong>Confirmation disabled:</strong><ul>{blockers.map((b) => <li key={b}>{b}</li>)}</ul></> : <span>Safe to {linkMode ? "link" : "confirm"}: verified sender, matched {state.incident.poId}, compatible incident type, source evidence present.</span>}</div>
-        {linked && <p className="message-detail__correlation">Linked to <strong>{state.incident.id}</strong> ({state.incident.status}). <Link to="/inbox">Back to inbox</Link></p>}
+        {linked && <p className="fm-banner fm-banner--info p1-banner">Linked to <strong>{state.incident.id}</strong> ({state.incident.status}). <Link to="/inbox">Back to inbox</Link></p>}
         <IncidentHandoff />
         <EvidencePanel messageId={message.id} />
       </form>
-      <section className="settings-card" aria-labelledby="mi-history">
+      <section className="fm-panel" aria-labelledby="mi-history">
         <header><h2 id="mi-history">Review history</h2></header>
         <ol className="mi-history" aria-label="Extraction versions">{versions.map((v, i) => <li key={v.id}><button type="button" aria-current={v.version === view.version ? "true" : undefined} className={v.version === view.version ? "is-active" : ""} onClick={() => setViewed(v.version)} onKeyDown={(e) => onHistoryKey(e, i)}>
           <strong>v{v.version} · {v.method} · {v.reviewStatus}</strong>

@@ -26,7 +26,7 @@ export function OfferReview({ message }: { message: InboxMessage }) {
   const c = parse.claim;
   return <div className="mi">
     <p className="mi__label"><strong>Rule-based extraction — no AI model used.</strong> SIMULATED_CHANNEL · supplier offer claim.</p>
-    <p className="message-detail__warning" data-testid="offer-limits"><strong>Offer claim only.</strong> This is not goods received, not confirmed procurement and not a completed supplier action. Canonical business offer {evidence?.matchesCanonicalOfferId ?? "—"} is unchanged.</p>
+    <p className="fm-banner fm-banner--warning p1-banner" data-testid="offer-limits"><strong>Offer claim only.</strong> This is not goods received, not confirmed procurement and not a completed supplier action. Canonical business offer {evidence?.matchesCanonicalOfferId ?? "—"} is unchanged.</p>
     <p className={status ? "mi__status" : "sr-only"} role="status" aria-live="polite">{status}</p>
     <div className="mi__grid">
       <section className="message-detail__original" aria-labelledby="ofr-raw"><div><h2 id="ofr-raw">Immutable original message</h2><span>{message.senderDisplay} · {message.senderRegistryId ?? "unregistered"}</span></div>
@@ -42,18 +42,18 @@ export function OfferReview({ message }: { message: InboxMessage }) {
       </section>
     </div>
     <div className="mi__grid">
-      <section className="settings-card" aria-labelledby="ofr-review"><header><h2 id="ofr-review">Sender &amp; claim qualification</h2></header>
+      <section className="fm-panel" aria-labelledby="ofr-review"><header><h2 id="ofr-review">Sender &amp; claim qualification</h2></header>
         <div className="mi-field"><label htmlFor="offerNote">Review reason</label><textarea id="offerNote" rows={2} value={note} onChange={(e) => { setNote(e.target.value); setError(""); }} /></div>
         {error && <p role="alert" className="mi-error">{error}</p>}
         <div className="mi-actions">
-          <button type="button" className="mi-button mi-button--primary" disabled={blockers.length > 0} aria-describedby="ofr-blockers" onClick={() => decide("QUALIFIED")}>Qualify sender &amp; offer (conditional)</button>
-          <button type="button" className="mi-button" onClick={() => decide("REJECTED")}>Reject offer</button>
-          <button type="button" className="mi-button" onClick={() => decide("MARKED_UNRESOLVED")}>Mark unresolved</button>
+          <button type="button" className="fm-btn fm-btn--primary" disabled={blockers.length > 0} aria-describedby="ofr-blockers" onClick={() => decide("QUALIFIED")}>Qualify sender &amp; offer (conditional)</button>
+          <button type="button" className="fm-btn fm-btn--ghost" onClick={() => decide("REJECTED")}>Reject offer</button>
+          <button type="button" className="fm-btn fm-btn--ghost" onClick={() => decide("MARKED_UNRESOLVED")}>Mark unresolved</button>
         </div>
         <div id="ofr-blockers" className="mi-blockers">{blockers.length ? <ul>{blockers.map((b) => <li key={b}>{b}</li>)}</ul> : <span>Sender {message.senderRegistryId} is an approved demo supplier; qualification stays conditional.</span>}</div>
         <EvidencePanel messageId={message.id} />
       </section>
-      <section className="settings-card" aria-labelledby="ofr-history"><header><h2 id="ofr-history">Review history</h2></header>
+      <section className="fm-panel" aria-labelledby="ofr-history"><header><h2 id="ofr-history">Review history</h2></header>
         <ol className="mi-history" aria-label="Offer review versions">{versions.map((v) => <li key={v.id}><div className="mi-history__item"><strong>v{v.version} · {v.method} · {v.qualification}</strong><span>{v.decision} by {v.actor} · {v.createdAtIso}</span>{v.note && <span>Note: {v.note}</span>}</div></li>)}</ol>
       </section>
     </div>
