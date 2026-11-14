@@ -134,7 +134,7 @@ function ImpactContent() {
         </div>
       )}
 
-      <ImpactContext incident={incident} snapshot={restaurant.snapshot} messages={messages} impactState={impactState} />
+      <ImpactContext incident={incident} snapshot={restaurant.snapshot} messages={messages} />
 
       {impactState === "CURRENT" && impact && <BeforeAfter impact={impact} />}
 

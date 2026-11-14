@@ -167,21 +167,26 @@ describe("Impact Explorer page", () => {
     renderAt("/impact");
     expect(screen.getByText("Impact withheld — incident not verified")).toBeTruthy();
     expect(screen.queryByText("Before vs after the supplier claim")).toBeNull();
-    expect(screen.getByText("UNVERIFIED supplier claim")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Explore Plan A" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText("Claim not applied yet")).toBeTruthy();
+    expect(screen.getByText("Plan A · External supplier").closest("[aria-disabled=true]")).toBeTruthy();
   });
 
   it("renders canonical before/after and inventory values", () => {
     verifiedAssessed();
     renderAt("/impact");
     const ba = screen.getByText("Before vs after the supplier claim").closest("section")!;
-    expect(dd(ba, "Planned incoming (PO, not stock)")).toBe("20kg");
-    expect(dd(ba, "Projected total if received")).toBe("30kg");
-    expect(dd(ba, "Supplier-claimed incoming today")).toBe("0kg");
-    expect(dd(ba, "Conditional total (no-delivery scenario)")).toBe("10kg");
-    expect(dd(ba, "Full forecast requirement")).toBe("22kg");
-    expect(dd(ba, "Forecast ingredient gap")).toBe("12kg");
-    expect(within(ba).getAllByText("Physical accepted chicken")).toHaveLength(2);
+    fireEvent.click(within(ba).getByRole("button", { name: "Show details: Before the claim" }));
+    const before = within(ba).getByLabelText("Details: Before the claim");
+    expect(dd(before, "Planned PO incoming")).toBe("20kg");
+    expect(dd(before, "Total supply")).toBe("30kg");
+    expect(dd(before, "Physical on hand")).toBe("10kg");
+    fireEvent.click(within(ba).getByRole("button", { name: "Show details: After the claim" }));
+    const after = within(ba).getByLabelText("Details: After the claim");
+    expect(dd(after, "Supplier-claimed today")).toBe("0kg");
+    expect(dd(after, "Total supply")).toBe("10kg");
+    expect(dd(after, "Forecast need")).toBe("22kg");
+    expect(dd(after, "Missing")).toBe("12kg");
+    expect(dd(after, "Physical on hand")).toBe("10kg");
     const inv = screen.getByText("Inventory impact · chilled chicken").closest("section")!;
     expect(within(inv).getByText("Available after protecting confirmed").parentElement?.textContent).toContain("1.25kg");
   });
@@ -250,15 +255,15 @@ describe("Impact Explorer page", () => {
   it("recovery CTAs enable only when impact is current; stale disables them", () => {
     verifiedAssessed();
     renderAt("/impact");
-    expect(screen.getByRole("link", { name: /Explore Plan A/ }).getAttribute("href")).toBe("/recovery/plan-a");
-    expect(screen.getByRole("link", { name: /Explore Plan B/ }).getAttribute("href")).toBe("/recovery/plan-b");
-    expect(screen.getByRole("button", { name: "Compare recovery plans" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByRole("link", { name: /Plan A · External supplier/ }).getAttribute("href")).toBe("/recovery/plan-a");
+    expect(screen.getByRole("link", { name: /Plan B · Internal recovery/ }).getAttribute("href")).toBe("/recovery/plan-b");
+    expect(screen.getByText("Compare recovery plans").closest("[aria-disabled=true]")).toBeTruthy();
     expect(screen.getByRole("link", { name: /View incident/ }).getAttribute("href")).toBe("/incidents?incident=HP-INC-001");
     act(() => simulateChickenRecount(8000));
     expect(screen.getByText("Impact is stale")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Explore Plan A" }).hasAttribute("disabled")).toBe(true);
+    expect(screen.getByText("Plan A · External supplier").closest("[aria-disabled=true]")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Re-assess impact" }));
-    expect(screen.getByRole("link", { name: /Explore Plan A/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Plan A · External supplier/ })).toBeTruthy();
   });
 
   it("evidence details are expandable and simulated messages are tagged", () => {
@@ -269,8 +274,8 @@ describe("Impact Explorer page", () => {
     renderAt("/impact");
     const summary = screen.getByText("Evidence details (2 linked messages)");
     fireEvent.click(summary);
-    expect(screen.getAllByText("SIMULATED_CHANNEL")).toHaveLength(2);
-    expect(screen.queryByText(/LIVE_CHANNEL/)).toBeNull();
+    expect(screen.getAllByText("Simulated channel")).toHaveLength(2);
+    expect(screen.queryByText(/^Live channel$/i)).toBeNull();
   });
 });
 
@@ -313,8 +318,12 @@ describe("cross-page consistency", () => {
 
     renderAt("/impact");
     expect(screen.getAllByText(rev).length).toBeGreaterThan(0);
-    expect(dd(screen.getByText("Incident context").closest("section")!, "Supplier-reported shortage")).toBe("20kg");
-    expect(dd(screen.getByText("Before vs after the supplier claim").closest("section")!, "Forecast ingredient gap")).toBe("12kg");
+    const context = screen.getByText("Incident context").closest("section")!;
+    fireEvent.click(within(context).getByRole("button", { name: "Show details: PO shortage" }));
+    expect(dd(context, "Reported shortage")).toBe("20kg");
+    const comparison = screen.getByText("Before vs after the supplier claim").closest("section")!;
+    fireEvent.click(within(comparison).getByRole("button", { name: "Show details: After the claim" }));
+    expect(dd(comparison, "Missing")).toBe("12kg");
   });
 
   it("state is preserved when navigating between P2 pages", () => {

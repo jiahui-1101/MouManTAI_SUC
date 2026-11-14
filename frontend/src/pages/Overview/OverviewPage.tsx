@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { AlertTriangle, ChevronRight, ClipboardCheck, Package, PackageX, ShieldAlert, Target, Truck, UtensilsCrossed, Warehouse, X } from "lucide-react";
+import { AlertTriangle, ClipboardCheck, Package, ShieldAlert, Target, UtensilsCrossed, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
@@ -12,13 +12,11 @@ import { assessImpactAction, useRestaurantStore } from "../../services/mock/rest
 import { isImpactStale, selectCurrentImpact } from "../../services/mock/restaurantState";
 import { verifySnapshotFreshness } from "../../features/impact/calculations";
 import {
-  isVerified,
   menuSummary,
   overviewActions,
   overviewCounts,
   primaryIncident,
   readinessRows,
-  supplierName,
   type Metric,
 } from "../../features/incidents/model";
 import { ActivityList } from "../../features/incidents/components/ActivityList";

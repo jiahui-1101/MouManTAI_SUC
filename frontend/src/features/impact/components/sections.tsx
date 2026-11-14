@@ -15,8 +15,8 @@ import {
   openConfirmedOrders,
 } from "../calculations";
 import { CAPABILITY_INGREDIENT } from "../graph";
-import { INCIDENT_TYPE_LABEL, ingredientName, supplierName, type ImpactState } from "../../incidents/model";
-import { Badge, Card, Notice, Qty, StatusBadge, SyntheticTag, fmtQty } from "../../incidents/components/ui";
+import { type ImpactState } from "../../incidents/model";
+import { Badge, Card, Notice, Qty, StatusBadge, fmtQty } from "../../incidents/components/ui";
 import { DisruptionPanel } from "../../incidents/components/DisruptionPanel";
 import { useRestaurantStore } from "../../../services/mock/restaurantStore";
 import { readinessRows } from "../../incidents/model";
@@ -25,7 +25,7 @@ import { multiplyByPortions } from "../../../utils/quantity";
 
 /* A — incident context ---------------------------------------------------- */
 
-export function ImpactContext({ incident, snapshot, messages, impactState }: { incident: Incident; snapshot: OperationalSnapshot; messages: SimulatedMessage[]; impactState: ImpactState }) {
+export function ImpactContext({ incident, snapshot, messages }: { incident: Incident; snapshot: OperationalSnapshot; messages: SimulatedMessage[] }) {
   const po = snapshot.purchaseOrders.find((p) => p.id === incident.poId);
   const claim = snapshot.supplierClaims.find((c) => c.poId === incident.poId);
   const { restaurant } = useRestaurantStore();
@@ -145,7 +145,6 @@ export function BeforeAfter({ impact }: { impact: ImpactAssessment }) {
   const before = impact.before!;
   const after = impact.after!;
   const s = impact.summary!;
-  const projectedBefore = before.availableAfterReservationsMilli + before.plannedIncomingMilli;
   const afterTotal = s.chickenAvailableKgMilli;
   const need = s.chickenForecastRequirementKgMilli;
   return (
