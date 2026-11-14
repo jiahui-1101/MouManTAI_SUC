@@ -8,31 +8,34 @@ beforeEach(() => inboxStore.reset());
 afterEach(cleanup);
 
 function renderInbox() {
-  render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: ["/inbox"] })} />);
+  const router = createMemoryRouter(routes, { initialEntries: ["/inbox"] });
+  render(<RouterProvider router={router} />);
+  return router;
 }
 
 describe("unified supplier inbox", () => {
   it("renders all three shared simulated channel messages and canonical extraction", () => {
     renderInbox();
     const list = screen.getByRole("region", { name: "Messages" });
-    expect(within(list).getAllByRole("button")).toHaveLength(3);
+    expect(within(list).getAllByRole("button")).toHaveLength(5);
     expect(screen.getByText("Simulation only · no channels connected")).toBeTruthy();
-    expect(screen.getByText("20.000 kg shortfall")).toBeTruthy();
+    expect(screen.getByText("20.000 kg")).toBeTruthy();
     expect(screen.getByText("Unknown")).toBeTruthy();
     expect(screen.getByText(/shortfall is not multiplied/)).toBeTruthy();
+    expect(screen.getByText("1 duplicate suppressed")).toBeTruthy();
   });
 
-  it.each(["WhatsApp", "Outlook", "Telegram"])("filters to %s messages", (channel) => {
+  it.each([["WhatsApp", 2], ["Outlook", 1], ["Telegram", 2]])("filters to %s messages", (channel, count) => {
     renderInbox();
     fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${channel}`) }));
-    expect(within(screen.getByRole("region", { name: "Messages" })).getAllByRole("button")).toHaveLength(1);
+    expect(within(screen.getByRole("region", { name: "Messages" })).getAllByRole("button")).toHaveLength(count as number);
   });
 
   it("searches canonical content and shows an empty state", () => {
     renderInbox();
     const search = screen.getByRole("textbox", { name: "Search messages" });
     fireEvent.change(search, { target: { value: "HP-PO-1042" } });
-    expect(within(screen.getByRole("region", { name: "Messages" })).getAllByRole("button")).toHaveLength(3);
+    expect(within(screen.getByRole("region", { name: "Messages" })).getAllByRole("button")).toHaveLength(4);
     fireEvent.change(search, { target: { value: "not in fixtures" } });
     expect(screen.getByText("No messages found")).toBeTruthy();
   });
@@ -41,8 +44,27 @@ describe("unified supplier inbox", () => {
     renderInbox();
     fireEvent.click(screen.getByRole("button", { name: /Demo Poultry Supply A09:03 MYT/ }));
     expect(screen.getByRole("heading", { name: "HP-PO-1042 delivery update", level: 2 })).toBeTruthy();
-    expect(screen.getByText("SIMULATED_CHANNEL · not live")).toBeTruthy();
-    expect(screen.getByText(/Hi Happy Potato, sorry/)).toBeTruthy();
+    const detail = screen.getByRole("article", { name: "Selected message" });
+    expect(within(detail).getByText(/SIMULATED_CHANNEL/)).toBeTruthy();
+    expect(within(detail).getByText(/Hi Happy Potato, sorry/)).toBeTruthy();
     expect(inboxStore.getSnapshot().messages.find((message) => message.id === "HP-MSG-OL-001")?.read).toBe(true);
+  });
+
+  it("renders unverified and unmatched canonical states without publishing an incident", () => {
+    renderInbox();
+    fireEvent.click(screen.getByRole("button", { name: /Unknown demo contact09:09 MYT/ }));
+    expect(screen.getByText("Unmatched message.", { exact: false })).toBeTruthy();
+    expect(screen.getByText("Human review required.", { exact: false })).toBeTruthy();
+    expect(screen.getByText("No matched PO")).toBeTruthy();
+    expect(screen.getByText("Not linked")).toBeTruthy();
+    expect(within(screen.getByRole("article", { name: "Selected message" })).getByText("Hi, can you call me?")).toBeTruthy();
+  });
+
+  it("navigates the selected canonical message to Message Intelligence", async () => {
+    const router = renderInbox();
+    fireEvent.click(screen.getByRole("link", { name: "Open in Message Intelligence" }));
+    expect(router.state.location.pathname).toBe("/message-intelligence");
+    expect(router.state.location.search).toBe("?message=HP-MSG-WA-001");
+    expect(await screen.findByRole("heading", { name: "Message Intelligence" })).toBeTruthy();
   });
 });
