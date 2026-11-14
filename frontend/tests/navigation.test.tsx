@@ -6,8 +6,14 @@ import { NAV_ITEMS } from "../src/constants/navigation";
 
 afterEach(cleanup);
 
-/** Routes whose pages are implemented (P5: /recovery/compare, /approvals). */
-const IMPLEMENTED_PAGES = new Set(["/recovery/compare", "/approvals"]);
+/** Routes whose pages are implemented (P5: /recovery/compare, /approvals, /execution, /outcomes, /decision-memory). */
+const IMPLEMENTED_PAGES = new Set([
+  "/recovery/compare",
+  "/approvals",
+  "/execution",
+  "/outcomes",
+  "/decision-memory",
+]);
 
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
