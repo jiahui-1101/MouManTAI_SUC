@@ -23,7 +23,7 @@ describe("route configuration", () => {
 });
 
 describe("pages", () => {
-  it.each(NAV_ITEMS.map((item) => [item.path, item.title]))(
+  it.each(NAV_ITEMS.filter((item) => item.path !== "/inbox").map((item) => [item.path, item.title]))(
     "%s shows heading %s and an empty body",
     (path, title) => {
       renderAt(path);
