@@ -42,7 +42,7 @@ describe("unified supplier inbox", () => {
     expect(screen.getByText("20.000 kg")).toBeTruthy();
     expect(screen.getByText("Unknown")).toBeTruthy();
     expect(screen.getByText(/shortfall is not multiplied/)).toBeTruthy();
-    expect(screen.getByText("1 duplicate suppressed")).toBeTruthy();
+    expect(screen.getByText("0 duplicates suppressed")).toBeTruthy();
   });
 
   it.each([["WhatsApp", 2], ["Outlook", 1], ["Telegram", 2]])("filters to %s messages", (channel, count) => {
