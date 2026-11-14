@@ -15,11 +15,18 @@ import {
   ReviseDialog,
 } from './common';
 import { P5DevControls } from './P5DevControls';
+import './p5.css';
 
 const STRATEGY_TITLE: Record<ScenarioStrategy, string> = {
   A: 'Plan A — Buy replacement chicken',
   B: 'Plan B — Protect orders with existing stock',
 };
+
+const STRATEGY_BADGE: Record<ScenarioStrategy, { label: string; tone: 'info' | 'simulated' }> = {
+  A: { label: 'External Supplier Sourcing', tone: 'info' },
+  B: { label: 'Internal Stock & Prep', tone: 'simulated' },
+};
+
 const PLAN_ROUTE: Record<ScenarioStrategy, string> = { A: '/recovery/plan-a', B: '/recovery/plan-b' };
 
 function feasibilityReason(s: RecoveryScenarioWithActions): string {
@@ -37,6 +44,26 @@ function feasibilityReason(s: RecoveryScenarioWithActions): string {
 
 const isHardBlocked = (s: RecoveryScenarioWithActions) => s.feasibility === 'INFEASIBLE' || s.feasibility === 'UNKNOWN';
 
+function RowHeader({ label, tooltip }: { label: string; tooltip: string }) {
+  return (
+    <div className="p5-th-content">
+      <span className="p5-th-label">{label}</span>
+      <span
+        tabIndex={0}
+        role="button"
+        className="p5-tooltip-trigger"
+        aria-label={`${label}: ${tooltip}`}
+        title={tooltip}
+      >
+        <span aria-hidden="true">ⓘ</span>
+        <span className="p5-tooltip-bubble" role="tooltip">
+          {tooltip}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 function ImpactStrip() {
   const { impact } = useP5World();
   if (!impact) {
@@ -49,18 +76,27 @@ function ImpactStrip() {
   return (
     <div className="p5-stack" role="region" aria-label="Impact context">
       <div className="p5-grid2">
-        <div className="fm-panel p5-card" data-testid="impact-po-shortfall">
+        <div className="fm-panel p5-card p5-card--accent-warn" data-testid="impact-po-shortfall">
+          <div className="p5-row" style={{ justifyContent: 'space-between', marginBottom: '4px' }}>
+            <span className="p5-badge p5-badge--warn">Supplier Shortfall</span>
+            <span className="p5-mono p5-muted">{impact.poId ?? 'HP-PO-1042'}</span>
+          </div>
           <h3>Supplier PO shortfall: {formatKgMilli(impact.poShortfallKgMilli ?? 0)}</h3>
           <p className="p5-muted">
-            {impact.poId ?? 'HP-PO-1042'} expected {formatKgMilli(impact.poExpectedKgMilli ?? 0)}, supplier claims {formatKgMilli(impact.poClaimedKgMilli ?? 0)} today
+            {impact.poId ?? 'HP-PO-1042'} expected {formatKgMilli(impact.poExpectedKgMilli ?? 0)}, supplier claims{' '}
+            {formatKgMilli(impact.poClaimedKgMilli ?? 0)} today
           </p>
         </div>
-        <div className="fm-panel p5-card" data-testid="impact-forecast-gap">
+        <div className="fm-panel p5-card p5-card--accent-info" data-testid="impact-forecast-gap">
+          <div className="p5-row" style={{ justifyContent: 'space-between', marginBottom: '4px' }}>
+            <span className="p5-badge p5-badge--info">Demand Coverage</span>
+            <span className="p5-mono p5-muted">Accepted Stock</span>
+          </div>
           <h3>Forecast chicken demand gap: {formatKgMilli(impact.forecastGapKgMilli ?? impact.demandGapKgMilli ?? 0)}</h3>
           <p className="p5-muted">Forecast need vs accepted on-hand</p>
         </div>
       </div>
-      <p className="p5-muted">
+      <p className="p5-muted" style={{ fontSize: '12.5px' }}>
         Why these differ: the PO shortfall is what the supplier will not deliver; the demand gap is what remains after
         counting chicken already accepted on hand.
       </p>
@@ -72,26 +108,39 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
   const cond = s.feasibility === 'CONDITIONAL' ? ' (conditional)' : '';
   const a = s.strategy === 'A';
   return (
-    <div className="fm-table-wrap p5-table-wrap" role="region" aria-label={`Metrics for ${STRATEGY_TITLE[s.strategy]}`} tabIndex={0}>
-      <table className="fm-table p5-table">
+    <div
+      className="p5-compare-table-wrap fm-table-wrap"
+      role="region"
+      aria-label={`Metrics for ${STRATEGY_TITLE[s.strategy]}`}
+      tabIndex={0}
+    >
+      <table className="p5-compare-table fm-table">
         <caption className="p2-sr sr-only">Metrics for {STRATEGY_TITLE[s.strategy]}</caption>
         <tbody>
           <tr>
-            <th scope="row">Strategy</th>
+            <th scope="row">
+              <RowHeader label="Strategy" tooltip="Recovery strategy name and operational approach" />
+            </th>
             <td>{STRATEGY_TITLE[s.strategy]}</td>
           </tr>
           <tr>
-            <th scope="row">Feasibility</th>
+            <th scope="row">
+              <RowHeader label="Feasibility" tooltip="Feasibility status under current synthetic operational constraints" />
+            </th>
             <td>
               <strong>{s.feasibility}</strong> — {feasibilityReason(s)}
             </td>
           </tr>
           <tr>
-            <th scope="row">New purchase</th>
+            <th scope="row">
+              <RowHeader label="New purchase" tooltip="New purchase quantity required for recovery" />
+            </th>
             <td>{a ? `${formatKgMilli(s.newPurchaseKgMilli)} chilled chicken` : formatKgMilli(s.newPurchaseKgMilli)}</td>
           </tr>
           <tr>
-            <th scope="row">Additional cost</th>
+            <th scope="row">
+              <RowHeader label="Additional cost" tooltip="Projected additional landed cost for this recovery strategy" />
+            </th>
             <td>
               {a
                 ? `${formatSenAsRM(s.additionalCostSen)} projected additional landed cost`
@@ -99,11 +148,18 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
             </td>
           </tr>
           <tr>
-            <th scope="row">Chicken forecast portions served</th>
+            <th scope="row">
+              <RowHeader label="Forecast served" tooltip="Chicken forecast portions served under this plan" />
+            </th>
             <td>{a ? `${s.forecastChickenPortionsServed}${cond}` : `${s.forecastChickenPortionsServed} planned`}</td>
           </tr>
           <tr>
-            <th scope="row">Chicken forecast portions unmet</th>
+            <th scope="row">
+              <RowHeader
+                label="Forecast unmet"
+                tooltip="Chicken forecast portions unmet (forecast demand gap only, not order breaches)"
+              />
+            </th>
             <td>
               {a
                 ? `${s.forecastChickenPortionsUnmet}${cond}`
@@ -111,11 +167,18 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
             </td>
           </tr>
           <tr>
-            <th scope="row">Confirmed chicken portions protected</th>
+            <th scope="row">
+              <RowHeader
+                label="Confirmed protected"
+                tooltip="Confirmed chicken portions protected for existing orders"
+              />
+            </th>
             <td>{a ? `${s.confirmedChickenPortionsProtected}${cond}` : `${s.confirmedChickenPortionsProtected} planned`}</td>
           </tr>
           <tr>
-            <th scope="row">Assumptions</th>
+            <th scope="row">
+              <RowHeader label="Assumptions" tooltip="Key operational conditions and assumptions set by the plan owner" />
+            </th>
             <td>
               {s.assumptions.length ? (
                 <ul className="p5-list">
@@ -129,7 +192,9 @@ function PlanRows({ s }: { s: RecoveryScenarioWithActions }) {
             </td>
           </tr>
           <tr>
-            <th scope="row">Scenario / version</th>
+            <th scope="row">
+              <RowHeader label="Scenario / version" tooltip="Scenario identifier, version, and referenced evidence" />
+            </th>
             <td className="p5-mono">
               {s.id} · v{s.version}
               {s.evidenceRefs.length > 0 && ` · refs ${s.evidenceRefs.join(', ')}`}
@@ -151,56 +216,97 @@ function PlanColumn(props: {
 }) {
   const { strategy, scenario } = props;
   const title = `Plan ${strategy}`;
+  const isA = strategy === 'A';
+
   if (!scenario) {
     return (
-      <section className="fm-panel p5-card p5-stack" aria-label={title} data-testid={`plan-${strategy}`}>
-        <h2>{title} not ready</h2>
+      <section
+        className={`fm-panel p5-card p5-compare-card ${
+          isA ? 'p5-compare-card--plan-a' : 'p5-compare-card--plan-b'
+        } p5-stack`}
+        aria-label={title}
+        data-testid={`plan-${strategy}`}
+      >
+        <div className={`p5-compare-header ${isA ? 'p5-compare-header--plan-a' : 'p5-compare-header--plan-b'}`}>
+          <h2>{title} not ready</h2>
+        </div>
         <p className="p5-muted">The plan owner has not published this plan yet.</p>
-        <Link to={PLAN_ROUTE[strategy]}>Go to {title}</Link>
+        <div style={{ marginTop: 'auto' }}>
+          <Link to={PLAN_ROUTE[strategy]}>Go to {title}</Link>
+        </div>
       </section>
     );
   }
+
   const stale = selectIsScenarioStale(scenario, props.snapshot);
   const reasonId = `choose-${strategy}-reason`;
+  const badgeInfo = STRATEGY_BADGE[strategy];
+
   return (
-    <section className="fm-panel p5-card p5-stack" aria-label={title} data-testid={`plan-${strategy}`}>
-      <div className="p5-row">
-        <h2>{STRATEGY_TITLE[strategy]}</h2>
-        {stale && <StatusBadge tone="danger">STALE — recalculation required</StatusBadge>}
-        {props.selected && <StatusBadge tone="simulated">Selected (not approved)</StatusBadge>}
-      </div>
-      <PlanRows s={scenario} />
-      {isHardBlocked(scenario) && (
-        <AlertBanner tone="danger" title="Hard blocker">
-          <p>Feasibility {scenario.feasibility}: {feasibilityReason(scenario)}.</p>
-          {scenario.assumptions.length > 0 && (
-            <ul className="p5-list">
-              {scenario.assumptions.map((x) => (
-                <li key={x}>{x}</li>
-              ))}
-            </ul>
-          )}
-        </AlertBanner>
-      )}
-      {scenario.feasibility === 'CONDITIONAL' && (
-        <AlertBanner tone="warning" title="Conditions">
-          <p>Figures hold only {feasibilityReason(scenario)}.</p>
-        </AlertBanner>
-      )}
-      <div className="p5-row">
-        <Button
-          variant="primary"
-          disabled={props.blockedReason !== null}
-          aria-describedby={props.blockedReason ? reasonId : undefined}
-          onClick={props.onChoose}
-        >
-          Choose {title}
-        </Button>
-        {props.blockedReason && (
-          <span id={reasonId} className="p5-reason">
-            {props.blockedReason}
+    <section
+      className={`fm-panel p5-card p5-compare-card ${
+        isA ? 'p5-compare-card--plan-a' : 'p5-compare-card--plan-b'
+      }${props.selected ? ' p5-compare-card--selected' : ''}`}
+      aria-label={title}
+      data-testid={`plan-${strategy}`}
+    >
+      <div className={`p5-compare-header ${isA ? 'p5-compare-header--plan-a' : 'p5-compare-header--plan-b'}`}>
+        <div className="p5-row" style={{ justifyContent: 'space-between', marginBottom: '4px' }}>
+          <StatusBadge tone={badgeInfo.tone}>{badgeInfo.label}</StatusBadge>
+          <span className="p5-mono p5-muted">
+            {scenario.id} · v{scenario.version}
           </span>
-        )}
+        </div>
+        <div className="p5-row">
+          <h2>{STRATEGY_TITLE[strategy]}</h2>
+          {stale && <StatusBadge tone="danger">STALE — recalculation required</StatusBadge>}
+          {props.selected && <StatusBadge tone="simulated">Selected (not approved)</StatusBadge>}
+        </div>
+      </div>
+
+      <PlanRows s={scenario} />
+
+      {isHardBlocked(scenario) && (
+        <div style={{ marginTop: '12px' }}>
+          <AlertBanner tone="danger" title="Hard blocker">
+            <p>
+              Feasibility {scenario.feasibility}: {feasibilityReason(scenario)}.
+            </p>
+            {scenario.assumptions.length > 0 && (
+              <ul className="p5-list">
+                {scenario.assumptions.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            )}
+          </AlertBanner>
+        </div>
+      )}
+
+      {scenario.feasibility === 'CONDITIONAL' && (
+        <div style={{ marginTop: '12px' }}>
+          <AlertBanner tone="warning" title="Conditions">
+            <p>Figures hold only {feasibilityReason(scenario)}.</p>
+          </AlertBanner>
+        </div>
+      )}
+
+      <div className="p5-compare-footer">
+        <div className="p5-row">
+          <Button
+            variant="primary"
+            disabled={props.blockedReason !== null}
+            aria-describedby={props.blockedReason ? reasonId : undefined}
+            onClick={props.onChoose}
+          >
+            Choose {title}
+          </Button>
+          {props.blockedReason && (
+            <span id={reasonId} className="p5-reason">
+              {props.blockedReason}
+            </span>
+          )}
+        </div>
       </div>
     </section>
   );

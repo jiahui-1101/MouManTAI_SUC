@@ -315,6 +315,33 @@ describe("Approvals", () => {
     expect(item.textContent).toContain("STALE");
     expect(item.textContent).not.toContain("Active (simulated)");
   });
+
+  it("approval history details toggle reveals chosen and unchosen plan summaries and audit context", () => {
+    const ctx = setup();
+    selectAs(ctx, "B");
+    show(ctx, <ApprovalsView />);
+    approveViaUi();
+    const item = screen.getByTestId("approval-history-item");
+    const toggle = within(item).getByRole("button", { name: /Show details/i });
+    expect(toggle).toBeTruthy();
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(within(item).queryByText(/Chosen Plan — Plan B/i)).toBeNull();
+
+    // Expand details
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.textContent).toContain("Hide details");
+    expect(within(item).getByText(/Chosen Plan — Plan B/i)).toBeTruthy();
+    expect(within(item).getByText(/Alternative Plan — Plan A/i)).toBeTruthy();
+    expect(within(item).getByText(/Governance & Audit Metadata/i)).toBeTruthy();
+    expect(within(item).getByText(/SIMULATED_ACTION/i)).toBeTruthy();
+
+    // Collapse details
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.textContent).toContain("Show details");
+    expect(within(item).queryByText(/Chosen Plan — Plan B/i)).toBeNull();
+  });
 });
 
 describe("Execution Tracker (/execution)", () => {

@@ -50,21 +50,27 @@ export function DecisionMemoryView() {
 
       {/* Header counts */}
       <DataPanel className="p5-card p5-stack" aria-label="Decision memory summary">
-        <h2>Decision Memory</h2>
-        <div className="p5-row">
-          <span>
-            Simulated successful recoveries (demo evidence):{' '}
-            <strong className="p5-mono" data-testid="p5-success-count">
-              {successCount}
-            </strong>
-          </span>
-          <span className="p5-muted">·</span>
-          <span>
-            Total cases:{' '}
-            <strong className="p5-mono" data-testid="p5-total-count">
-              {totalCount}
-            </strong>
-          </span>
+        <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2>Decision Memory</h2>
+          <span className="p5-badge fm-badge p5-badge--sim">Organizational Learnings</span>
+        </div>
+        <div className="p5-kpi-grid">
+          <div className="p5-kpi-card p5-kpi-card--verified">
+            <span className="p5-kpi-lbl">Simulated successful recoveries (demo evidence)</span>
+            <span className="p5-kpi-val">
+              <strong className="p5-mono" data-testid="p5-success-count">
+                {successCount}
+              </strong>
+            </span>
+          </div>
+          <div className="p5-kpi-card p5-kpi-card--approved">
+            <span className="p5-kpi-lbl">Total cases</span>
+            <span className="p5-kpi-val">
+              <strong className="p5-mono" data-testid="p5-total-count">
+                {totalCount}
+              </strong>
+            </span>
+          </div>
         </div>
         <p className="p5-muted" style={{ fontSize: '12px' }}>
           Reference library of simulated recoveries. Success count strictly includes verified SUCCESS cases.
@@ -73,9 +79,12 @@ export function DecisionMemoryView() {
 
       {/* Filter Toolbar */}
       <DataPanel className="p5-card p5-stack" aria-label="Filters and search">
-        <h3>Filter and search cases</h3>
-        <div className="p5-row">
-          <label htmlFor={idSearch} style={{ flex: '1 1 200px' }}>
+        <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+          <h3>Filter and search cases</h3>
+          <span className="p5-muted">{entries.length} matching case{entries.length === 1 ? '' : 's'}</span>
+        </div>
+        <div className="p5-row" style={{ alignItems: 'flex-end' }}>
+          <label htmlFor={idSearch} style={{ flex: '1 1 220px', minWidth: '180px' }}>
             Search (incident, scenario, lessons):
             <input
               id={idSearch}
@@ -87,7 +96,7 @@ export function DecisionMemoryView() {
             />
           </label>
 
-          <label htmlFor={idStrat}>
+          <label htmlFor={idStrat} style={{ minWidth: '130px' }}>
             Strategy:
             <select
               id={idStrat}
@@ -102,7 +111,7 @@ export function DecisionMemoryView() {
             </select>
           </label>
 
-          <label htmlFor={idType}>
+          <label htmlFor={idType} style={{ minWidth: '130px' }}>
             Incident type:
             <select
               id={idType}
@@ -115,7 +124,7 @@ export function DecisionMemoryView() {
             </select>
           </label>
 
-          <label htmlFor={idIng}>
+          <label htmlFor={idIng} style={{ minWidth: '140px' }}>
             Ingredient:
             <select
               id={idIng}
@@ -128,7 +137,7 @@ export function DecisionMemoryView() {
             </select>
           </label>
 
-          <label htmlFor={idStatus}>
+          <label htmlFor={idStatus} style={{ minWidth: '130px' }}>
             Outcome:
             <select
               id={idStatus}
@@ -144,7 +153,7 @@ export function DecisionMemoryView() {
             </select>
           </label>
 
-          <label htmlFor={idVerif}>
+          <label htmlFor={idVerif} style={{ minWidth: '150px' }}>
             Verification:
             <select
               id={idVerif}
@@ -164,7 +173,10 @@ export function DecisionMemoryView() {
 
       {/* Case List */}
       <DataPanel className="p5-card p5-stack" aria-label="Decision memory entries">
-        <h3>Saved Recovery Cases ({entries.length})</h3>
+        <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+          <h3>Saved Recovery Cases ({entries.length})</h3>
+          <span className="p5-badge fm-badge">Historical Snapshots</span>
+        </div>
 
         {entries.length === 0 ? (
           <p className="p5-muted" data-testid="p5-empty-memory">
@@ -192,7 +204,15 @@ export function DecisionMemoryView() {
                       <strong className="p5-mono">{entry.incidentId}</strong>
                     </th>
                     <td>
-                      <span className="p5-badge fm-badge">
+                      <span
+                        className={`p5-badge fm-badge ${
+                          entry.strategy === 'A'
+                            ? 'p5-badge--info'
+                            : entry.strategy === 'B'
+                            ? 'p5-badge--sim'
+                            : 'p5-badge--warn'
+                        }`}
+                      >
                         {entry.strategy === 'ESCALATED' ? 'ESCALATED' : `Plan ${entry.strategy}`}
                       </span>
                     </td>
@@ -248,7 +268,7 @@ export function DecisionMemoryView() {
           onClose={() => setSelectedEntry(null)}
         >
           <div className="p5-stack" data-testid="p5-memory-detail">
-            <div className="p5-row">
+            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
               <span>
                 Snapshot fingerprint:{' '}
                 <abbr className="p5-mono" title={selectedEntry.fingerprint}>
@@ -277,17 +297,19 @@ export function DecisionMemoryView() {
             </div>
 
             {/* Predicted vs Actual Summary */}
-            <div className="p5-card p5-stack">
+            <div className="p5-card p5-stack" style={{ background: 'var(--surface-secondary)' }}>
               <h4>Predicted vs Simulated Actual Summary</h4>
               {selectedEntry.predicted ? (
                 <div className="p5-stack p5-muted">
                   <div className="p5-row">
                     <span>Predicted cost: <strong>{formatSenAsRM(selectedEntry.predicted.additionalCostSen)}</strong></span>
+                    <span>·</span>
                     <span>Predicted purchase: <strong>{formatKgMilli(selectedEntry.predicted.newPurchaseKgMilli)}</strong></span>
+                    <span>·</span>
                     <span>Protected portions: <strong>{selectedEntry.predicted.confirmedChickenPortionsProtected}</strong></span>
                   </div>
                   {selectedEntry.actual && (
-                    <div className="p5-row">
+                    <div className="p5-row" style={{ borderTop: '1px solid var(--border-default)', paddingTop: '8px' }}>
                       {selectedEntry.actual.receivedKgMilli !== undefined && (
                         <span>Actual received: <strong>{formatKgMilli(selectedEntry.actual.receivedKgMilli)}</strong></span>
                       )}
@@ -343,7 +365,7 @@ export function DecisionMemoryView() {
                   ))}
               </ul>
 
-              <h4>Demo Interpretations</h4>
+              <h4 style={{ marginTop: '8px' }}>Demo Interpretations</h4>
               <ul className="p5-list" data-testid="p5-demo-interpretations">
                 {selectedEntry.lessons
                   .filter((l) => l.kind === 'DEMO_INTERPRETATION')
@@ -358,7 +380,7 @@ export function DecisionMemoryView() {
               </ul>
             </div>
 
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ textAlign: 'right', marginTop: '8px' }}>
               <Button
                 variant="primary"
                 onClick={() => setSelectedEntry(null)}
@@ -372,4 +394,3 @@ export function DecisionMemoryView() {
     </div>
   );
 }
-

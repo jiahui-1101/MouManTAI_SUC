@@ -114,8 +114,8 @@ export function ExecutionView() {
           )}
 
           {/* Header */}
-          <header className="fm-panel p5-card p5-stack" aria-label="Approved plan execution header">
-            <div className="p5-row">
+          <header className="fm-panel p5-card p5-card--accent-sim p5-stack" aria-label="Approved plan execution header">
+            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
               <h2>
                 Execution Tracker — Plan {activeApproval.selectedStrategy} ({activeApproval.scenarioId} v{activeApproval.scenarioVersion})
               </h2>
@@ -126,16 +126,19 @@ export function ExecutionView() {
             <p className="p5-muted">
               Simulation only — no supplier, POS or kitchen system is contacted.
             </p>
-            <div className="p5-row p5-muted">
+            <div className="p5-row p5-muted" style={{ fontSize: '12.5px' }}>
               <span>
                 Approval ID: <strong className="p5-mono">{activeApproval.id}</strong>
               </span>
+              <span>·</span>
               <span>
                 Approved by: <strong>{activeApproval.actorRole}</strong> ({activeApproval.actorId})
               </span>
+              <span>·</span>
               <span>
                 Approved at: <span className="p5-mono">{activeApproval.createdAtIso.slice(11, 16)}</span>
               </span>
+              <span>·</span>
               <span>
                 Demo clock: <strong className="p5-mono">{w.clock ?? '—'}</strong>
               </span>
@@ -144,12 +147,27 @@ export function ExecutionView() {
 
           {/* Progress */}
           <section className="fm-panel p5-card p5-stack" aria-label="Execution progress">
-            <h3>Execution progress</h3>
-            <div className="p5-row">
-              <span>Approved: <strong>{approvedCount}</strong></span>
-              <span>Simulated execution: <strong>{simExecCount}</strong></span>
-              <span>Awaiting evidence: <strong>{awaitingCount}</strong></span>
-              <span>Verified: <strong>{verifiedCount}</strong></span>
+            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+              <h3>Execution progress</h3>
+              <span className="p5-badge fm-badge">{tasks.length} total tasks</span>
+            </div>
+            <div className="p5-kpi-grid">
+              <div className="p5-kpi-card p5-kpi-card--approved">
+                <span className="p5-kpi-lbl">Approved</span>
+                <span className="p5-kpi-val">{approvedCount}</span>
+              </div>
+              <div className="p5-kpi-card p5-kpi-card--sim">
+                <span className="p5-kpi-lbl">Simulated execution</span>
+                <span className="p5-kpi-val">{simExecCount}</span>
+              </div>
+              <div className="p5-kpi-card p5-kpi-card--awaiting">
+                <span className="p5-kpi-lbl">Awaiting evidence</span>
+                <span className="p5-kpi-val">{awaitingCount}</span>
+              </div>
+              <div className="p5-kpi-card p5-kpi-card--verified">
+                <span className="p5-kpi-lbl">Verified</span>
+                <span className="p5-kpi-val">{verifiedCount}</span>
+              </div>
             </div>
             <p className="p5-muted" data-testid="p5-progress-text">
               {awaitingCount} of {tasks.length} tasks awaiting evidence
@@ -158,7 +176,10 @@ export function ExecutionView() {
 
           {/* Tasks List */}
           <section className="p5-stack" aria-label="Execution tasks">
-            <h2>Execution tasks</h2>
+            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+              <h2>Execution tasks</h2>
+              <span className="p5-muted">{tasks.length} task{tasks.length === 1 ? '' : 's'} assigned</span>
+            </div>
             {tasks.map((task) => (
               <TaskCard
                 key={task.id}
@@ -209,22 +230,46 @@ function TaskCard({
   const blocker = preflightExecution(p5, adapter.deps, task.id);
   const isSimulationDisabled = blockedBanner || blocker !== null;
 
+  const stateClass =
+    task.state === 'VERIFIED'
+      ? 'p5-task-card--verified'
+      : task.state === 'AWAITING_EVIDENCE'
+      ? 'p5-task-card--awaiting'
+      : task.state === 'SIMULATED_EXECUTION'
+      ? 'p5-task-card--sim'
+      : 'p5-task-card--approved';
+
   return (
-    <article className="fm-panel p5-card p5-stack" data-testid={`p5-task-card-${task.id}`}>
-      <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-        <div>
+    <article className={`fm-panel p5-card p5-task-card ${stateClass} p5-stack`} data-testid={`p5-task-card-${task.id}`}>
+      <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div className="p5-stack" style={{ gap: '4px' }}>
           <h3>{taskTitle(task)}</h3>
           <span className="p5-muted p5-mono">
             Key: <abbr title={task.idempotencyKey}>{shortFingerprint(task.idempotencyKey)}</abbr>
           </span>
         </div>
         <div className="p5-row">
-          <span className="p5-badge fm-badge" data-testid={`p5-task-state-${task.id}`}>
+          <span
+            className={`p5-badge fm-badge ${
+              task.state === 'VERIFIED'
+                ? 'p5-badge--success'
+                : task.state === 'AWAITING_EVIDENCE'
+                ? 'p5-badge--info'
+                : task.state === 'SIMULATED_EXECUTION'
+                ? 'p5-badge--warn'
+                : ''
+            }`}
+            data-testid={`p5-task-state-${task.id}`}
+          >
             {task.state}
           </span>
           {task.actionType === 'MENU_LIMIT_TASK' && (
             <span
-              className={`p5-badge fm-badge ${task.externalSyncStatus === 'MANUALLY_CONFIRMED_DEMO' ? 'fm-badge--success p5-badge--brand' : 'fm-badge--warning p5-badge--warn'}`}
+              className={`p5-badge fm-badge ${
+                task.externalSyncStatus === 'MANUALLY_CONFIRMED_DEMO'
+                  ? 'fm-badge--success p5-badge--brand'
+                  : 'fm-badge--warning p5-badge--warn'
+              }`}
               data-testid={`p5-task-sync-${task.id}`}
             >
               {task.externalSyncStatus === 'MANUALLY_CONFIRMED_DEMO'
@@ -237,9 +282,13 @@ function TaskCard({
 
       {/* Strategy-specific content */}
       {task.actionType === 'PO_DRAFT' && (
-        <div className="p5-stack p5-muted" data-testid="p5-po-draft-content">
+        <div
+          className="p5-stack p5-muted"
+          style={{ background: 'var(--surface-secondary)', padding: '12px 14px', borderRadius: 'var(--radius-md)' }}
+          data-testid="p5-po-draft-content"
+        >
           <p>
-            <strong>Local PO draft — NOT SENT</strong>
+            <strong style={{ color: 'var(--text-primary)' }}>Local PO draft — NOT SENT</strong>
           </p>
           <div className="p5-row">
             <span>Supplier: <strong>{(scenario as any)?.supplierId ?? 'Not provided by Plan A scenario'}</strong></span>
@@ -252,14 +301,19 @@ function TaskCard({
       )}
 
       {task.actionType === 'RECEIPT_CHECK' && (
-        <p className="p5-muted" data-testid="p5-receipt-check-content">
-          Awaiting simulated receipt + quality check before 10:45.
-        </p>
+        <div
+          className="p5-muted"
+          style={{ background: 'var(--surface-secondary)', padding: '12px 14px', borderRadius: 'var(--radius-md)' }}
+          data-testid="p5-receipt-check-content"
+        >
+          <p>Awaiting simulated receipt + quality check before 10:45.</p>
+        </div>
       )}
 
       {task.actionType === 'PREP_BATCH_TASK' && (
         <div className="p5-row p5-muted">
           <span>Batch ID: <strong className="p5-mono">{task.targetId ?? '—'}</strong></span>
+          <span>·</span>
           <span>Planned portions: <strong>{plannedPortionsFor(task, scenario)}</strong></span>
         </div>
       )}
@@ -267,11 +321,12 @@ function TaskCard({
       {task.actionType === 'MENU_LIMIT_TASK' && (
         <div className="p5-row p5-muted">
           <span>Item: <strong>{adapter.deps.resolveMenuDisplayName?.(task.targetId ?? '') ?? MENU_NAMES[task.targetId ?? ''] ?? task.targetId}</strong></span>
+          <span>·</span>
           <span>Menu ID: <strong className="p5-mono">{task.targetId ?? '—'}</strong></span>
         </div>
       )}
 
-      <div className="p5-row p5-muted">
+      <div className="p5-row p5-muted" style={{ fontSize: '12.5px' }}>
         <span>Allowed roles: <strong>{allowed.join(', ')}</strong></span>
       </div>
 
@@ -306,8 +361,8 @@ function TaskCard({
       </div>
 
       {/* Audit timeline */}
-      <details className="p5-card" style={{ marginTop: '6px' }} data-testid={`p5-task-audit-${task.id}`}>
-        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+      <details className="p5-card" style={{ marginTop: '6px', background: 'var(--surface-secondary)' }} data-testid={`p5-task-audit-${task.id}`}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-primary)' }}>
           Audit timeline ({auditEntries.length} event{auditEntries.length === 1 ? '' : 's'})
         </summary>
         {auditEntries.length === 0 ? (
@@ -320,7 +375,7 @@ function TaskCard({
               <li key={idx} className="p5-muted">
                 <strong>{entry.from} → {entry.to}</strong> by <strong>{entry.actorRole}</strong> ({entry.actorId}) at{' '}
                 <span className="p5-mono">{entry.atIso.slice(11, 16)}</span>: "{entry.reason}"{' '}
-                <span className="p5-badge fm-badge" style={{ fontSize: '10px' }}>simulated</span>
+                <span className="p5-badge fm-badge p5-badge--sim" style={{ fontSize: '10.5px' }}>simulated</span>
               </li>
             ))}
           </ul>

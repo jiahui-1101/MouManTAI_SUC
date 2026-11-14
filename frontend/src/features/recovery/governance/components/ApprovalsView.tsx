@@ -4,12 +4,18 @@ import { Button, StatusBadge, AlertBanner } from '../../../../components/ui';
 import { isApprovalExpired, preflightApproval } from '../../../approvals/approvalLogic';
 import { approvalKey } from '../../../approvals/idempotency';
 import { formatKgMilli, formatSenAsRM, shortFingerprint } from '../format';
-import type { ApprovalRecord, ProposedAction, RecoveryScenarioWithActions } from '../p5Contracts';
+import type { ApprovalRecord, ProposedAction, RecoveryScenarioWithActions, ScenarioStrategy } from '../p5Contracts';
 import { BENIGN_ERRORS, p5ErrorMessage } from '../p5Errors';
 import { useP5Runtime, useP5Store, useP5World } from '../p5Store';
 import { Dialog, ReasonDialog } from './Dialog';
 import { EscalateDialog, EscalationPanel, LiveRegion, NotWiredNotice, P5ContextHeader, RoleSwitcher } from './common';
 import { P5DevControls } from './P5DevControls';
+import './p5.css';
+
+const STRATEGY_TITLE: Record<ScenarioStrategy, string> = {
+  A: 'Plan A — Buy replacement chicken',
+  B: 'Plan B — Protect orders with existing stock',
+};
 
 function scopeLine(a: ProposedAction, s: RecoveryScenarioWithActions): string {
   switch (a.actionType) {
@@ -24,38 +30,234 @@ function scopeLine(a: ProposedAction, s: RecoveryScenarioWithActions): string {
   }
 }
 
-function History({ approvals, fingerprint, clock }: { approvals: ApprovalRecord[]; fingerprint: string; clock: string }) {
+function HistoryItem({
+  record: a,
+  fingerprint,
+  clock,
+  scenarioA,
+  scenarioB,
+}: {
+  record: ApprovalRecord;
+  fingerprint: string;
+  clock: string;
+  scenarioA: RecoveryScenarioWithActions | null;
+  scenarioB: RecoveryScenarioWithActions | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const stale = a.snapshotFingerprint !== fingerprint;
+  const expired = a.state === 'APPROVED' && isApprovalExpired(a, clock);
+  const active = a.state === 'APPROVED' && !stale && !expired;
+
+  const chosenStrategy = a.selectedStrategy;
+  const unchosenStrategy: ScenarioStrategy = chosenStrategy === 'A' ? 'B' : 'A';
+  const chosenScenario = chosenStrategy === 'A' ? scenarioA : scenarioB;
+  const unchosenScenario = unchosenStrategy === 'A' ? scenarioA : scenarioB;
+
+  return (
+    <li className="p5-card p5-history-item" data-testid="approval-history-item">
+      <div className="p5-history-header">
+        <div className="p5-row">
+          <StatusBadge tone={a.state === 'REJECTED' || expired ? 'danger' : 'neutral'}>
+            {expired ? 'EXPIRED' : a.state}
+          </StatusBadge>
+          {stale && <StatusBadge tone="danger">STALE</StatusBadge>}
+          {active && <StatusBadge tone="simulated">Active (simulated)</StatusBadge>}
+          {!active && a.state === 'APPROVED' && <span className="p5-muted">Not active</span>}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)}
+          className="p5-details-toggle"
+        >
+          {expanded ? 'Hide details ▴' : 'Show details ▸'}
+        </Button>
+      </div>
+
+      <p className="p5-mono">
+        {a.scenarioId} · v{a.scenarioVersion} · {a.id}
+      </p>
+      <p>
+        {a.actorRole} ({a.actorId}) · {a.createdAtIso}
+      </p>
+      <p>Reason: {a.reason}</p>
+
+      {expanded && (
+        <div className="p5-history-details">
+          <div className="p5-history-plans-grid">
+            {/* Chosen Plan Summary */}
+            <div className="p5-history-plan p5-history-plan--chosen p5-stack">
+              <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+                <h4>Chosen Plan — Plan {chosenStrategy}</h4>
+                <StatusBadge tone="simulated">Chosen</StatusBadge>
+              </div>
+              <p className="p5-muted">{STRATEGY_TITLE[chosenStrategy]}</p>
+              <div className="p5-stack" style={{ gap: '6px', fontSize: '13px' }}>
+                <div>
+                  Scenario: <strong className="p5-mono">{a.scenarioId} · v{a.scenarioVersion}</strong>
+                </div>
+                <div>
+                  Feasibility: <strong>{a.predicted.feasibility}</strong>
+                </div>
+                <div>
+                  New purchase: <strong>{formatKgMilli(a.predicted.newPurchaseKgMilli)}</strong>
+                </div>
+                <div>
+                  Projected additional cost: <strong>{formatSenAsRM(a.predicted.additionalCostSen)}</strong>
+                </div>
+                <div>
+                  Portions served / unmet:{' '}
+                  <strong>
+                    {a.predicted.forecastChickenPortionsServed} served / {a.predicted.forecastChickenPortionsUnmet} unmet
+                  </strong>
+                </div>
+                <div>
+                  Confirmed portions protected: <strong>{a.predicted.confirmedChickenPortionsProtected}</strong>
+                </div>
+                <div>
+                  Approved actions:{' '}
+                  <strong>
+                    {a.approvedActionTypes.length > 0 ? a.approvedActionTypes.join(', ') : 'None'}
+                  </strong>
+                </div>
+                {chosenScenario && chosenScenario.assumptions.length > 0 && (
+                  <div>
+                    <span className="p5-muted">Key assumptions:</span>
+                    <ul className="p5-list" style={{ marginTop: '4px' }}>
+                      {chosenScenario.assumptions.map((x) => (
+                        <li key={x}>{x}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Unchosen Plan Summary */}
+            <div className="p5-history-plan p5-history-plan--unchosen p5-stack">
+              <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+                <h4>Alternative Plan — Plan {unchosenStrategy}</h4>
+                <StatusBadge tone="neutral">Not chosen</StatusBadge>
+              </div>
+              {unchosenScenario ? (
+                <>
+                  <p className="p5-muted">{STRATEGY_TITLE[unchosenStrategy]}</p>
+                  <div className="p5-stack" style={{ gap: '6px', fontSize: '13px' }}>
+                    <div>
+                      Scenario: <strong className="p5-mono">{unchosenScenario.id} · v{unchosenScenario.version}</strong>
+                    </div>
+                    <div>
+                      Feasibility: <strong>{unchosenScenario.feasibility}</strong>
+                    </div>
+                    <div>
+                      New purchase: <strong>{formatKgMilli(unchosenScenario.newPurchaseKgMilli)}</strong>
+                    </div>
+                    <div>
+                      Projected additional cost: <strong>{formatSenAsRM(unchosenScenario.additionalCostSen)}</strong>
+                    </div>
+                    <div>
+                      Portions served / unmet:{' '}
+                      <strong>
+                        {unchosenScenario.forecastChickenPortionsServed} served /{' '}
+                        {unchosenScenario.forecastChickenPortionsUnmet} unmet
+                      </strong>
+                    </div>
+                    <div>
+                      Confirmed portions protected: <strong>{unchosenScenario.confirmedChickenPortionsProtected}</strong>
+                    </div>
+                    <p className="p5-muted" style={{ fontSize: '12px', marginTop: '4px' }}>
+                      Decision Trade-off: Plan {chosenStrategy} was selected over Plan {unchosenStrategy} for operational
+                      suitability and inventory availability.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <p className="p5-muted">
+                  Alternative plan details are unavailable for this historical snapshot.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Governance & Audit Metadata */}
+          <div className="p5-history-audit p5-stack">
+            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+              <h4>Governance & Audit Metadata</h4>
+              <StatusBadge tone="simulated">SIMULATED_ACTION</StatusBadge>
+            </div>
+            <div className="p5-history-meta-grid">
+              <div>
+                <span className="p5-muted">Incident ID: </span>
+                <strong className="p5-mono">{a.incidentId}</strong>
+              </div>
+              <div>
+                <span className="p5-muted">Approval ID: </span>
+                <strong className="p5-mono">{a.id}</strong>
+              </div>
+              <div>
+                <span className="p5-muted">Snapshot Fingerprint: </span>
+                <abbr className="p5-mono" title={a.snapshotFingerprint}>
+                  {shortFingerprint(a.snapshotFingerprint)}
+                </abbr>
+              </div>
+              <div>
+                <span className="p5-muted">Actor: </span>
+                <strong>{a.actorRole}</strong> ({a.actorId})
+              </div>
+              <div>
+                <span className="p5-muted">Recorded at: </span>
+                <span className="p5-mono">{a.createdAtIso}</span>
+              </div>
+              <div>
+                <span className="p5-muted">Expiry: </span>
+                <span className="p5-mono">{a.expiresAtIso ?? 'No time-based expiry (snapshot bound)'}</span>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <span className="p5-muted">Approval reason: </span>
+                <em>"{a.reason}"</em>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function History({
+  approvals,
+  fingerprint,
+  clock,
+  scenarioA,
+  scenarioB,
+}: {
+  approvals: ApprovalRecord[];
+  fingerprint: string;
+  clock: string;
+  scenarioA: RecoveryScenarioWithActions | null;
+  scenarioB: RecoveryScenarioWithActions | null;
+}) {
   return (
     <section className="fm-panel p5-card p5-stack" aria-label="Approval history">
-      <h2>Approval history</h2>
+      <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+        <h2>Approval history</h2>
+        <span className="p5-badge fm-badge">{approvals.length} record{approvals.length === 1 ? '' : 's'}</span>
+      </div>
       {approvals.length === 0 ? (
         <p className="p5-muted">No approval decisions recorded yet.</p>
       ) : (
         <ul className="p5-stack" data-testid="approval-history" style={{ listStyle: 'none', padding: 0 }}>
-          {approvals.map((a) => {
-            const stale = a.snapshotFingerprint !== fingerprint;
-            const expired = a.state === 'APPROVED' && isApprovalExpired(a, clock);
-            const active = a.state === 'APPROVED' && !stale && !expired;
-            return (
-              <li key={a.id} className="p5-card" data-testid="approval-history-item">
-                <div className="p5-row">
-                  <StatusBadge tone={a.state === 'REJECTED' || expired ? 'danger' : 'neutral'}>
-                    {expired ? 'EXPIRED' : a.state}
-                  </StatusBadge>
-                  {stale && <StatusBadge tone="danger">STALE</StatusBadge>}
-                  {active && <StatusBadge tone="simulated">Active (simulated)</StatusBadge>}
-                  {!active && a.state === 'APPROVED' && <span className="p5-muted">Not active</span>}
-                </div>
-                <p className="p5-mono">
-                  {a.scenarioId} · v{a.scenarioVersion} · {a.id}
-                </p>
-                <p>
-                  {a.actorRole} ({a.actorId}) · {a.createdAtIso}
-                </p>
-                <p>Reason: {a.reason}</p>
-              </li>
-            );
-          })}
+          {approvals.map((a) => (
+            <HistoryItem
+              key={a.id}
+              record={a}
+              fingerprint={fingerprint}
+              clock={clock}
+              scenarioA={scenarioA}
+              scenarioB={scenarioB}
+            />
+          ))}
         </ul>
       )}
     </section>
@@ -85,7 +287,15 @@ export function ApprovalsView() {
   const snapshot = w.snapshot;
   const clock = w.clock;
   const incidentApprovals = p5.approvals.filter((a) => a.incidentId === w.incidentId);
-  const history = <History approvals={incidentApprovals} fingerprint={snapshot.fingerprint} clock={clock} />;
+  const history = (
+    <History
+      approvals={incidentApprovals}
+      fingerprint={snapshot.fingerprint}
+      clock={clock}
+      scenarioA={w.scenarioA}
+      scenarioB={w.scenarioB}
+    />
+  );
   const sel = p5.selection;
 
   const page = (body: React.ReactNode) => (
@@ -167,8 +377,11 @@ export function ApprovalsView() {
 
   return page(
     <>
-      <section className="fm-panel p5-card p5-stack" aria-label="Approval request">
-        <h2>Approval request — Plan {sel.strategy}</h2>
+      <section className="fm-panel p5-card p5-card--accent-brand p5-stack" aria-label="Approval request">
+        <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+          <h2>Approval request — Plan {sel.strategy}</h2>
+          <StatusBadge tone="simulated">Pending approval</StatusBadge>
+        </div>
         <div className="fm-table-wrap p5-table-wrap" role="region" aria-label="Approval request details" tabIndex={0}>
           <table className="fm-table p5-table">
             <caption className="p2-sr sr-only">Approval request details</caption>

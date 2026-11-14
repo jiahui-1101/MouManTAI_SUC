@@ -80,6 +80,14 @@ export function OutcomesView() {
 
   const currentRole = w.role ?? 'ViewerAuditor';
 
+  const outcomeTone = !outcome || outcome.status === 'UNVERIFIED'
+    ? 'p5-card--accent-warn'
+    : outcome.status === 'SUCCESS'
+    ? 'p5-card--accent-success'
+    : outcome.status === 'FAILED'
+    ? 'p5-card--accent-danger'
+    : 'p5-card--accent-warn';
+
   return (
     <div className="p5" data-testid="p5-outcomes-view">
       <P5DevControls />
@@ -105,9 +113,9 @@ export function OutcomesView() {
       ) : (
         <>
           {/* Header */}
-          <header className="p5-card p5-stack" aria-label="Simulated outcome status">
-            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
-              <div className="p5-row">
+          <header className={`p5-card p5-stack ${outcomeTone}`} aria-label="Simulated outcome status">
+            <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="p5-row" style={{ alignItems: 'center' }}>
                 <h2>Simulated Outcome:</h2>
                 <span
                   className={`p5-badge ${
@@ -119,7 +127,7 @@ export function OutcomesView() {
                       ? 'p5-badge--danger'
                       : 'p5-badge--warn'
                   }`}
-                  style={{ fontSize: '15px', padding: '4px 12px' }}
+                  style={{ fontSize: '14px', padding: '4px 12px', fontWeight: 700 }}
                   data-testid="p5-outcome-badge"
                 >
                   Simulated Outcome: {outcome ? outcome.status : 'UNVERIFIED'}
@@ -140,7 +148,7 @@ export function OutcomesView() {
               </p>
             )}
 
-            <div className="p5-row" style={{ marginTop: '10px' }}>
+            <div className="p5-row" style={{ marginTop: '8px' }}>
               <Button
                 variant="primary"
                 onClick={handleVerify}
@@ -173,7 +181,10 @@ export function OutcomesView() {
           {/* Verification Reasons Summary */}
           {outcome && outcome.reasons.length > 0 && (
             <section className="p5-card p5-stack" aria-label="Verification reasons">
-              <h3>Verification evaluation reasons</h3>
+              <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+                <h3>Verification evaluation reasons</h3>
+                <span className="p5-badge fm-badge">{outcome.reasons.length} total checks</span>
+              </div>
               <div className="p5-grid2">
                 <ReasonGroup title="Hard failures" kind="HARD_FAILURE" reasons={outcome.reasons} badgeClass="p5-badge--danger" />
                 <ReasonGroup title="Missing evidence" kind="MISSING" reasons={outcome.reasons} badgeClass="p5-badge--warn" />
@@ -185,16 +196,19 @@ export function OutcomesView() {
 
           {/* Predicted vs Simulated Actual Table */}
           <section className="p5-card p5-stack" aria-label="Predicted vs Simulated Actual">
-            <h2>Predicted vs Simulated Actual</h2>
+            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+              <h2>Predicted vs Simulated Actual</h2>
+              <span className="p5-mono p5-muted">Approval {activeApproval.id}</span>
+            </div>
             <div className="fm-table-wrap p5-table-wrap" role="region" aria-label="Predicted vs Simulated Actual Table" tabIndex={0}>
               <table className="fm-table p5-table" data-testid="p5-predicted-actual-table">
                 <caption className="p2-sr sr-only">Predicted vs Simulated Actual Table</caption>
                 <thead>
                   <tr>
-                    <th scope="col">Metric / Task</th>
-                    <th scope="col">Predicted (from Approval)</th>
-                    <th scope="col">Simulated Actual</th>
-                    <th scope="col">Source & Revision</th>
+                    <th scope="col" style={{ width: '28%' }}>Metric / Task</th>
+                    <th scope="col" style={{ width: '26%' }}>Predicted (from Approval)</th>
+                    <th scope="col" style={{ width: '26%' }}>Simulated Actual</th>
+                    <th scope="col" style={{ width: '20%' }}>Source & Revision</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -216,15 +230,18 @@ export function OutcomesView() {
 
           {/* Missing Evidence Checklist */}
           {missingList.length > 0 && (
-            <section className="p5-card p5-stack" aria-label="Missing evidence checklist" data-testid="p5-missing-evidence-list">
-              <h3>Missing Evidence Checklist</h3>
+            <section className="p5-card p5-card--accent-warn p5-stack" aria-label="Missing evidence checklist" data-testid="p5-missing-evidence-list">
+              <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+                <h3>Missing Evidence Checklist</h3>
+                <span className="p5-badge p5-badge--warn">{missingList.length} missing item{missingList.length === 1 ? '' : 's'}</span>
+              </div>
               <ul className="p5-list">
                 {missingList.map((m) => {
                   const matchingTask = findMatchingTask(m, tasks);
                   const kind = evidenceKindOf(m);
                   const allowed = ROLES_BY_EVIDENCE[kind] ?? [];
                   return (
-                    <li key={m} className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <li key={m} className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
                       <span>
                         Need <strong>{m}</strong> for task{' '}
                         <strong className="p5-mono">{matchingTask ? matchingTask.id : 'incident'}</strong> — allowed roles:{' '}
@@ -252,10 +269,13 @@ export function OutcomesView() {
 
           {/* Evidence Entry Forms */}
           <section id="p5-evidence-entry-section" className="p5-card p5-stack" aria-label="Record simulated evidence">
-            <h2>Record Simulated Evidence</h2>
+            <div className="p5-row" style={{ justifyContent: 'space-between' }}>
+              <h2>Record Simulated Evidence</h2>
+              <span className="p5-badge p5-badge--sim">Simulated Evidence Log</span>
+            </div>
 
             <div className="p5-row">
-              <label htmlFor="p5-task-select">
+              <label htmlFor="p5-task-select" style={{ minWidth: '240px' }}>
                 Select Task:
                 <select
                   id="p5-task-select"
@@ -300,8 +320,16 @@ function ReasonGroup({
 }) {
   const filtered = reasons.filter((r) => r.kind === kind);
   if (filtered.length === 0) return null;
+
+  const groupToneClass =
+    kind === 'HARD_FAILURE'
+      ? 'p5-reason-card--danger'
+      : kind === 'PASS'
+      ? 'p5-reason-card--success'
+      : 'p5-reason-card--warn';
+
   return (
-    <div className="p5-stack">
+    <div className={`p5-stack p5-card p5-reason-card ${groupToneClass}`} style={{ padding: '12px 14px', background: 'var(--surface-secondary)' }}>
       <h4>{title} ({filtered.length})</h4>
       <ul className="p5-list">
         {filtered.map((r, i) => (
@@ -475,8 +503,8 @@ function PlanBTableRows({
 function EvidenceSourceBadge({ ev }: { ev?: VerificationEvidence }) {
   if (!ev) return <span className="p5-muted">—</span>;
   return (
-    <div className="p5-row" style={{ gap: '4px' }}>
-      <span className="p5-badge" title={ev.source}>SIMULATED_EVIDENCE</span>
+    <div className="p5-row" style={{ gap: '6px' }}>
+      <span className="p5-badge p5-badge--sim" title={ev.source}>SIMULATED_EVIDENCE</span>
       <span className="p5-mono" style={{ fontSize: '11px' }}>
         rev {ev.revision} ({ev.id.slice(0, 16)})
       </span>
@@ -816,7 +844,7 @@ function EvidenceForm({
               <div className="p5-stack">
                 <span style={{ fontWeight: 600 }}>Waste:</span>
                 <div className="p5-row">
-                  <label style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <label style={{ flexDirection: 'row', alignItems: 'center', gap: '6px' }}>
                     <input
                       type="radio"
                       name="waste"
@@ -826,7 +854,7 @@ function EvidenceForm({
                     />
                     Unknown
                   </label>
-                  <label style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <label style={{ flexDirection: 'row', alignItems: 'center', gap: '6px' }}>
                     <input
                       type="radio"
                       name="waste"
@@ -909,8 +937,8 @@ function EvidenceForm({
       </form>
 
       {/* Revision History */}
-      <details className="p5-card" style={{ marginTop: '8px' }} data-testid="p5-revision-history">
-        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+      <details className="p5-card" style={{ marginTop: '8px', background: 'var(--surface-secondary)' }} data-testid="p5-revision-history">
+        <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-primary)' }}>
           Revision history for this task ({evidenceLogs.all.length} revision{evidenceLogs.all.length === 1 ? '' : 's'})
         </summary>
         {evidenceLogs.all.length === 0 ? (
@@ -959,3 +987,4 @@ function payloadSummary(ev: VerificationEvidence): string {
       return `Fulfilled ${ev.payload.confirmedFulfilled}/${ev.payload.confirmedRequired} confirmed portions`;
   }
 }
+

@@ -1,5 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { useId, useState } from 'react';
 import { Button, StatusBadge, DataPanel, AlertBanner } from '../../../../components/ui';
 import { shortFingerprint } from '../format';
 import type { DemoRole } from '../p5Contracts';
@@ -15,15 +14,25 @@ export function RoleSwitcher() {
   const { adapter } = useP5Runtime();
   const id = useId();
   return (
-    <div className="fm-panel p5-card" data-testid="p5-role-switcher">
-      <label htmlFor={id}>Demo role — not real access control</label>
-      <select id={id} className="fm-select" value={w.role ?? ''} onChange={(e) => adapter.setRole(e.target.value as DemoRole)}>
-        {ROLES.map((r) => (
-          <option key={r} value={r}>
-            {r}
-          </option>
-        ))}
-      </select>
+    <div className="fm-panel p5-card" data-testid="p5-role-switcher" style={{ padding: '12px 18px' }}>
+      <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <label htmlFor={id} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+          <span>Demo role — not real access control</span>
+        </label>
+        <select
+          id={id}
+          className="fm-select"
+          value={w.role ?? ''}
+          onChange={(e) => adapter.setRole(e.target.value as DemoRole)}
+          style={{ minWidth: '180px' }}
+        >
+          {ROLES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
@@ -48,31 +57,38 @@ export function LiveRegion({ message }: { message: string }) {
 export function P5ContextHeader() {
   const w = useP5World();
   return (
-    <DataPanel className="p5-card p5-stack">
-      <div className="p5-row">
-        <span>
-          Incident <strong className="p5-mono">{w.incidentId ?? '—'}</strong>
-        </span>
-        {w.snapshot && (
-          <>
-            <span>
-              Snapshot <strong className="p5-mono">{w.snapshot.id}</strong> rev {w.snapshot.revision}
-            </span>
-            <span>
-              Fingerprint{' '}
-              <abbr className="p5-mono" title={w.snapshot.fingerprint}>
-                {shortFingerprint(w.snapshot.fingerprint)}
-              </abbr>
-            </span>
-          </>
-        )}
-        {w.clock && (
+    <DataPanel className="p5-card p5-stack p5-card--accent-brand">
+      <div className="p5-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="p5-row">
           <span>
-            Demo clock <strong className="p5-mono">{w.clock}</strong>
+            Incident <strong className="p5-mono">{w.incidentId ?? '—'}</strong>
           </span>
-        )}
+          {w.snapshot && (
+            <>
+              <span>·</span>
+              <span>
+                Snapshot <strong className="p5-mono">{w.snapshot.id}</strong> rev {w.snapshot.revision}
+              </span>
+              <span>·</span>
+              <span>
+                Fingerprint{' '}
+                <abbr className="p5-mono" title={w.snapshot.fingerprint}>
+                  {shortFingerprint(w.snapshot.fingerprint)}
+                </abbr>
+              </span>
+            </>
+          )}
+          {w.clock && (
+            <>
+              <span>·</span>
+              <span>
+                Demo clock <strong className="p5-mono">{w.clock}</strong>
+              </span>
+            </>
+          )}
+        </div>
       </div>
-      <div className="p5-row">
+      <div className="p5-row" style={{ alignItems: 'center', gap: '8px' }}>
         <StatusBadge tone="simulated" title="SIMULATED_CALCULATION">
           SIMULATED_CALCULATION · Demo calculation
         </StatusBadge>
@@ -80,7 +96,9 @@ export function P5ContextHeader() {
           SYNTHETIC_BUSINESS · Happy Potato • Demo data
         </StatusBadge>
       </div>
-      <p className="p5-muted">Not a production food-safety or procurement authorization system.</p>
+      <p className="p5-muted" style={{ fontSize: '12px' }}>
+        Not a production food-safety or procurement authorization system.
+      </p>
     </DataPanel>
   );
 }
@@ -103,7 +121,7 @@ export function EscalationPanel({ onMessage }: { onMessage: (m: string) => void 
           <strong>Recalculation requested from Plan A / Plan B owners.</strong> Choosing re-opens once they publish updated plans.
         </p>
       ) : (
-        <div className="p5-row">
+        <div className="p5-row" style={{ marginTop: '4px' }}>
           <Button variant="secondary" disabled={viewer} onClick={() => setOpen(true)}>
             Revise constraints
           </Button>
@@ -155,15 +173,5 @@ export function EscalateDialog({ onDone }: { onDone: (message: string | null) =>
         return null;
       }}
     />
-  );
-}
-
-export function PlanLinks({ children }: { children?: ReactNode }) {
-  return (
-    <p className="p5-row">
-      {children}
-      <Link to="/recovery/plan-a">Open Plan A</Link>
-      <Link to="/recovery/plan-b">Open Plan B</Link>
-    </p>
   );
 }
