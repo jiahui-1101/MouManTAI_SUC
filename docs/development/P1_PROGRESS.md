@@ -111,7 +111,7 @@ The user's scope override takes precedence where the documents discuss real or r
 - [x] Implement the canonical P1 inbox contract/fixture from the shared mock-data document.
 - [x] Implement and test offline inbox behavior: channel filters/counts, search, selection/read state, empty state, immutable detail, provenance, processing timeline, incident correlation, unverified/unmatched messages, duplicate suppression, and Message Intelligence navigation.
 - [x] Implement actual mock-state operations: real offline ingestMockMessage, idempotent deduplication, dynamic duplicate counting, derived stages, and DemoState reset.
-- [ ] Implement and test rule extraction and review behavior.
+- [x] Implement and test rule extraction and review behavior (Prompt 3: `/message-intelligence`).
 - [x] Implement and test mock-only channel/settings behavior.
 - [x] Run full tests, typecheck, and production build for the parser milestone.
 
@@ -145,3 +145,18 @@ The user's scope override takes precedence where the documents discuss real or r
 - P1-T09 PASS — channel filtering tests pass.
 - P1-T10 OUT_OF_SCOPE — bridge excluded; local mock loading/error/retry covered separately.
 - P1-T11 OUT_OF_SCOPE — replay channel excluded.
+
+## Prompt 3 milestone — Message Intelligence & human review (2026-11-14)
+
+- `/message-intelligence?message=ID` loads the message from the shared DemoState; empty (no param), missing-message, loading and error states implemented.
+- Immutable original text side-by-side with structured extraction; evidence spans highlighted with exact `start/end` offsets (verified against raw text).
+- Shows supplier, PO with `MATCHED/UNVERIFIED/CONFLICT/UNRESOLVED`, incident type, expected, delivered claim, derived shortfall, ETA (`UNKNOWN` kept) and verification reasons.
+- Human review form (`features/messaging/messageReview.ts`): validates nonnegative numbers, kg/g conversion, rejects `L`, PO registry + PO/supplier relationship, claim > expected, UNAVAILABLE/PARTIAL_DELIVERY contradictions and ETA format.
+- Save Correction appends an immutable `HUMAN_CORRECTION` version (actor `Demo operator (demo-reviewer-01)`, timestamp, `changedFields`, note) to `DemoState.extractionHistory`. Version 1 `RULE_EXTRACTION` is derived deterministically from the rule extractor and never mutated; raw text untouched.
+- Changed fields lose their source span and are listed in `humanAssertedFields`, shown as “Human assertion · no source span”.
+- Decisions: Save, Reject, Mark unresolved (reason required), Reopen (save after reject), Confirm. Confirm appends a `VERIFIED` version then dispatches existing `MESSAGE_EXTRACTION_REVIEWED` and `INCIDENT_VERIFIED` (contracts unchanged).
+- Confirm disabled with explicit reasons: unverified/mismatched sender (candidate supplier edits cannot override identity), unmatched PO, unresolved/no evidence, rejected/unresolved latest decision, shortfall conflicting with `HP-INC-001` 20.000 kg, unsaved edits. Store re-checks blockers and throws.
+- Review history lists all versions with keyboard navigation (↑/↓/Home/End) and read-only viewing of previous versions; Esc discards unsaved edits. History persists across navigation via shared state.
+- Tests: `tests/messageIntelligence.test.tsx` (9 tests). Navigation test now excludes the implemented page from the empty-page check.
+- Verification: `vitest` 59/59 passed, `tsc -b --noEmit` passed, `vite build` passed (run in a Linux copy because local `node_modules` are Windows binaries).
+- Push: not completed from this session — no GitHub credentials available; push `feature/p1-mock-messaging` manually.
