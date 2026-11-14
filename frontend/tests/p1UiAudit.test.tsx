@@ -125,6 +125,7 @@ describe("Message Intelligence controls", () => {
     fireEvent.click(btn("Save correction"));
     expect(screen.getByText(/nothing to save/)).toBeTruthy();
     // C-19 history click views old version, C-20 "View latest"
+    fireEvent.click(screen.getByRole("tab", { name: /^History/ }));
     const hist = within(screen.getByRole("list", { name: "Extraction versions" }));
     fireEvent.click(hist.getAllByRole("button")[0]!);
     expect(screen.getByText(/Viewing previous version 1/)).toBeTruthy();
@@ -162,6 +163,7 @@ describe("Message Intelligence controls", () => {
     fireEvent.click(screen.getByRole("link", { name: "Back to inbox" }));
     expect(r.state.location.pathname).toBe("/inbox");
     await nav(r, "/message-intelligence?message=HP-MSG-TG-001");
+    fireEvent.click(screen.getByRole("tab", { name: "Evidence & handoff" }));
     fireEvent.click(screen.getByRole("link", { name: "Open Impact Explorer" }));
     expect(r.state.location.pathname).toBe("/impact");
   });

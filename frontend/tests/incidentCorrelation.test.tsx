@@ -26,6 +26,7 @@ describe("incident verification and cross-channel correlation", () => {
     expect(incident).toMatchObject({ id: "HP-INC-001", poId: "HP-PO-1042", ingredientId: "HP-ING-CHICKEN", snapshotId: "HP-SNAP-001", snapshotRevision: 1, type: "UNAVAILABLE", status: "VERIFIED", claimedShortfallKgMilli: 20000, messageIds: ["HP-MSG-WA-001"] });
     expect(incident.handoff.status).toBe("AWAITING_P2_CONSUMER");
     expect(screen.getByTestId("handoff-status").textContent).toMatch(/Impact has not been calculated/);
+    fireEvent.click(screen.getByRole("tab", { name: "Evidence & handoff" }));
     expect(screen.getByRole("link", { name: "Open Impact Explorer" }).getAttribute("href")).toBe("/impact");
 
     for (const id of ["HP-MSG-OL-001", "HP-MSG-TG-001"]) {

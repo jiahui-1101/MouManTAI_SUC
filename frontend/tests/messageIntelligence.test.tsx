@@ -34,7 +34,7 @@ describe("Message Intelligence page", () => {
     expect(screen.getByRole("status").getAttribute("aria-busy")).toBe("true");
     act(() => demoStore.setMockLoadStatus("ERROR"));
     fireEvent.click(screen.getByRole("button", { name: /retry local fixture/i }));
-    expect(screen.getByText("Rule-based extraction — no AI model used.")).toBeTruthy();
+    expect(screen.getByText("Rule-based · no AI")).toBeTruthy();
   });
 
   it("renders immutable raw text with exact evidence offsets and extracted fields", () => {
@@ -49,10 +49,10 @@ describe("Message Intelligence page", () => {
       expect(CANONICAL_MESSAGE.slice(start, end)).toBe(mark.textContent);
     });
     expect(raw.querySelector('[data-field="claimedDeliveryKgMilli"]')?.textContent).toBe("0kg");
-    const fields = screen.getByRole("region", { name: /structured extraction/i });
+    const fields = screen.getByRole("region", { name: /Check the extracted values/i });
     for (const text of ["HP-SUP-001 · Demo Poultry Supply A", "HP-PO-1042", "MATCHED", "UNAVAILABLE", "20.000 kg", "0.000 kg"]) expect(within(fields).getAllByText(new RegExp(text)).length).toBeGreaterThan(0);
     expect(within(fields).getByText(/UNKNOWN \(update promise/)).toBeTruthy();
-    expect(within(fields).getByText("Rule extraction is pending explicit human confirmation.")).toBeTruthy();
+    expect(screen.getByText("Rule extraction is pending explicit human confirmation.")).toBeTruthy(); // Evidence & handoff tab
   });
 
   it("validates quantities, units, PO/supplier relationship and contradictions without saving", () => {
@@ -102,6 +102,7 @@ describe("Message Intelligence page", () => {
   it("allows viewing previous versions and keyboard navigation through history", () => {
     act(() => { demoStore.decideExtractionReview("HP-MSG-WA-001", "MARKED_UNRESOLVED", "Need call-back", "2026-11-21T09:30:00+08:00"); });
     open();
+    fireEvent.click(screen.getByRole("tab", { name: /^History/ }));
     const history = screen.getByRole("list", { name: "Extraction versions" });
     const buttons = within(history).getAllByRole("button");
     expect(buttons).toHaveLength(2);
@@ -173,6 +174,7 @@ describe("Message Intelligence page", () => {
     await act(async () => { await router.navigate("/inbox"); });
     expect(screen.queryByText(/Review history/)).toBeNull();
     await act(async () => { await router.navigate("/message-intelligence?message=HP-MSG-WA-001"); });
+    fireEvent.click(screen.getByRole("tab", { name: /^History/ }));
     expect(within(screen.getByRole("list", { name: "Extraction versions" })).getAllByRole("button")).toHaveLength(2);
     expect(screen.getByText(/v2 · RULE_EXTRACTION · UNRESOLVED/)).toBeTruthy();
   });
@@ -195,5 +197,23 @@ describe("Review queue", () => {
     fireEvent.click(screen.getByRole("button", { name: "History" }));
     expect(queue().getByText("In incident HP-INC-001")).toBeTruthy();
     expect(queue().getByRole("link", { name: /Open review HP-MSG-WA-001/ }).getAttribute("aria-current")).toBe("page");
+  });
+});
+
+describe("Review layout", () => {
+  it("resizes the queue with the keyboard and keeps decisions visible above the tabs", () => {
+    renderAt("/message-intelligence?message=HP-MSG-WA-001");
+    const handle = screen.getByRole("separator", { name: "Resize review queue" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("480");
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(Number(handle.getAttribute("aria-valuenow"))).toBeGreaterThan(480);
+    fireEvent.keyDown(handle, { key: "Home" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("480");
+    expect(screen.queryByText(/Rule-based extraction — no AI model used/)).toBeNull();
+    for (const tab of ["Review & correct", "History (1)", "Evidence & handoff"]) {
+      fireEvent.click(screen.getByRole("tab", { name: tab }));
+      expect(screen.getByRole("button", { name: /confirm & verify incident/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Reject" })).toBeTruthy();
+    }
   });
 });

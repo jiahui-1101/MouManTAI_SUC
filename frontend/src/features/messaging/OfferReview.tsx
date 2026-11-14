@@ -5,6 +5,7 @@ import { segmentRawText } from "./segmentRawText";
 import { offerQualificationBlockers, parseMockSupplierOffer } from "./supplierOffer";
 import { selectSupplierOfferEvidence } from "./evidenceSelectors";
 import { EvidencePanel } from "./EvidencePanel";
+import { StatusBadge } from "../../components/ui";
 
 const rm = (sen: number) => `RM${(sen / 100).toFixed(2)}`;
 
@@ -24,8 +25,15 @@ export function OfferReview({ message }: { message: InboxMessage }) {
     catch (e) { setError((e as Error).message); }
   };
   const c = parse.claim;
-  return <div className="mi">
-    <p className="mi__label"><strong>Rule-based extraction — no AI model used.</strong> SIMULATED_CHANNEL · supplier offer claim.</p>
+  return <div className="mi mi-detail">
+    <header className="mi-detail__head">
+      <div className="mi-detail__titles">
+        <p className="rq__eyebrow">Supplier offer review <span className="mi-detail__id">{message.id}</span></p>
+        <h2 className="mi-detail__title">{message.subject ?? "Supplier offer claim"}</h2>
+        <p className="mi-detail__meta">{message.senderDisplay} · {message.senderRegistryId ?? "unregistered"} · Outlook</p>
+      </div>
+      <div className="mi-detail__badges"><StatusBadge tone="info">Rule-based · no AI</StatusBadge><StatusBadge tone="simulated">Simulated</StatusBadge></div>
+    </header>
     <p className="fm-banner fm-banner--warning p1-banner" data-testid="offer-limits"><strong>Offer claim only.</strong> This is not goods received, not confirmed procurement and not a completed supplier action. Canonical business offer {evidence?.matchesCanonicalOfferId ?? "—"} is unchanged.</p>
     <p className={status ? "mi__status" : "sr-only"} role="status" aria-live="polite">{status}</p>
     <div className="mi__grid">
