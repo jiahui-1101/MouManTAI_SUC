@@ -1,9 +1,13 @@
 import { Link } from "react-router-dom";
 import { AlertTriangle, ChevronRight, ClipboardCheck, ShieldAlert, Target, UtensilsCrossed } from "lucide-react";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { titleFor } from "../../constants/navigation";
-import { HP_BUSINESS, HP_OUTLET } from "../../data/fixtures/happyPotato";
+import { HP_BUSINESS, HP_IDS } from "../../data/fixtures/happyPotato";
+import chickenPopcorn from "../../assets/menu/chicken-popcorn.jpg";
+import chickenTenders from "../../assets/menu/chicken-tenders.jpg";
+import happyCombo from "../../assets/menu/happy-combo.jpg";
+import flavouredFries from "../../assets/menu/flavoured-fries.jpg";
 import { useRestaurantStore } from "../../services/mock/restaurantStore";
 import { isImpactStale, selectCurrentImpact } from "../../services/mock/restaurantState";
 import { verifySnapshotFreshness } from "../../features/impact/calculations";
@@ -21,12 +25,12 @@ import { ActivityList } from "../../features/incidents/components/ActivityList";
 import { DemoControls } from "../../features/incidents/components/DemoControls";
 import { NextActions } from "../../features/incidents/components/NextActions";
 import { P2ErrorBoundary } from "../../features/incidents/components/P2ErrorBoundary";
-import { Badge, Card, EmptyState, Notice, Qty, StatusBadge, SyntheticTag, fmtQty } from "../../features/incidents/components/ui";
+import { Badge, Card, EmptyState, Notice, Qty, StatusBadge, fmtQty } from "../../features/incidents/components/ui";
 import "../../features/incidents/p2.css";
 
 export function OverviewPage() {
   return (
-    <PageContainer title={titleFor("/overview")}>
+    <PageContainer title={titleFor("/overview")} actions={<DemoControls />}>
       <P2ErrorBoundary label="Operations overview">
         <OverviewContent />
       </P2ErrorBoundary>
@@ -47,21 +51,6 @@ function OverviewContent() {
 
   return (
     <div className="p2">
-      <div className="p2-meta" aria-label="Operational context">
-        <div className="p2-meta__item"><span className="p2-meta__label">Outlet</span><span>{HP_OUTLET.name}</span></div>
-        <div className="p2-meta__item">
-          <span className="p2-meta__label">Demo clock</span>
-          <span>{HP_BUSINESS.fixtureBusinessDate} · {HP_BUSINESS.simulationClockLocal} MYT</span>
-        </div>
-        <div className="p2-meta__item"><span className="p2-meta__label">Snapshot</span><span className="p2-mono">{snapshot.id} · r{snapshot.revision}</span></div>
-        <div className="p2-meta__item"><span className="p2-meta__label">Data</span><SyntheticTag /></div>
-        <div className="p2-meta__item">
-          <span className="p2-meta__label">Status</span>
-          {incident ? <StatusBadge status={incident.status} /> : <Badge tone="ok">No supplier incidents</Badge>}
-        </div>
-        <DemoControls />
-      </div>
-
       {freshness.status === "STALE" && <Notice tone="bad" title="Snapshot integrity warning">{freshness.reasons.join(" · ")}</Notice>}
       {stale && (
         <Notice tone="warn" title="Impact is stale">
@@ -125,7 +114,7 @@ function OverviewContent() {
             <Readiness />
           </Card>
 
-          <Card title="Menu items and chicken dependency" actions={<Link to="/impact" className="p2-link">Impact Explorer</Link>}>
+          <Card title="Menu" actions={<Link to="/impact" className="p2-link">Impact Explorer</Link>}>
             <MenuCards />
           </Card>
         </div>
@@ -137,7 +126,7 @@ function OverviewContent() {
             ) : (
               <NextActions actions={nextActions(restaurant, incident)} />
             )}
-            {counts.awaitingVerification > 0 && <p className="p2-fineprint">{counts.awaitingVerification} report awaiting P1 verification.</p>}
+            {counts.awaitingVerification > 0 && <p className="p2-fineprint">Verify the supplier report before assessing its impact.</p>}
             {impact?.status === "BREACH_RISK" && <Notice tone="bad" title="Confirmed demand exceeds eligible chicken">Escalate before accepting new chicken orders.</Notice>}
           </Card>
           <Card title="Recent incident activity">
@@ -152,6 +141,10 @@ function OverviewContent() {
 function Kpi({ icon, label, metric, to }: { icon: ReactNode; label: string; metric: Metric; to: string }) {
   return (
     <Link to={to} className={`p2-kpi p2-kpi--${metric.kind}`}>
+      <svg className="p2-kpi__wave" viewBox="0 0 240 18" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 0H240V8C193 1 151 17 106 13C63 9 27 3 0 9Z" />
+        <path d="M0 9C27 3 63 9 106 13C151 17 193 1 240 8" />
+      </svg>
       <span className="p2-kpi__icon" aria-hidden="true">{icon}</span>
       <span className="p2-kpi__label">{label}</span>
       <span className="p2-kpi__value">
@@ -170,12 +163,12 @@ function Readiness() {
     <div className="p2-readiness">
       {rows.map((r) => {
         const supply = r.eligibleMilli + r.plannedIncomingMilli;
-        const scale = Math.max(r.forecastMilli, supply, 1);
+        const scale = Math.max(r.forecastMilli, r.confirmedMilli, supply, 1);
         return (
           <div key={r.ingredientId} className="p2-ready">
             <div className="p2-ready__head">
               <span className="p2-ready__name">{r.name}</span>
-              {r.projectedGapMilli > 0 ? <Badge tone="bad">Gap <Qty milli={r.projectedGapMilli} unit={r.unit} /></Badge> : <Badge tone="ok">Covered</Badge>}
+              {r.projectedGapMilli > 0 ? <Badge tone="bad">Gap <Qty milli={r.projectedGapMilli} unit={r.unit} /></Badge> : r.eligibleMilli < r.forecastMilli ? <Badge tone="warn">Depends on delivery</Badge> : <Badge tone="ok">Covered</Badge>}
             </div>
             <div className="p2-bar" role="img" aria-label={`${r.name}: eligible ${fmtQty(r.eligibleMilli)} ${r.unit}, planned incoming ${fmtQty(r.plannedIncomingMilli)} ${r.unit}, forecast need ${fmtQty(r.forecastMilli)} ${r.unit}, confirmed need ${fmtQty(r.confirmedMilli)} ${r.unit}`}>
               <span className="p2-bar__seg p2-bar__seg--stock" style={{ width: `${(r.eligibleMilli / scale) * 100}%` }} />
@@ -204,24 +197,64 @@ function Readiness() {
   );
 }
 
+const MENU_PHOTOS: Partial<Record<string, string>> = {
+  [HP_IDS.menu.chickenPopcorn]: chickenPopcorn,
+  [HP_IDS.menu.chickenTenders]: chickenTenders,
+  [HP_IDS.menu.happyCombo]: happyCombo,
+  [HP_IDS.menu.fries]: flavouredFries,
+};
+
+const MENU_FILTERS = [
+  ["ALL", "All"],
+  ["AFFECTED", "Affected"],
+  ["UNAFFECTED", "Unaffected"],
+] as const;
+
 function MenuCards() {
   const { restaurant } = useRestaurantStore();
   const menus = menuSummary(restaurant);
+  const [filter, setFilter] = useState<(typeof MENU_FILTERS)[number][0]>("ALL");
+  const visibleMenus = menus.filter((menu) => filter === "ALL" || menu.dependency === filter);
+
   return (
-    <ul className="p2-menus">
-      {menus.map((m) => (
-        <li key={m.menuId}>
-          <Link to="/impact" className={`p2-menu p2-menu--${m.dependency.toLowerCase()}`} aria-label={`${m.name}: ${m.dependency === "AFFECTED" ? "uses chilled chicken" : m.dependency === "UNAFFECTED" ? "unaffected" : "unknown BOM"}`}>
-            <span className="p2-menu__name">{m.name}</span>
-            <span className="p2-menu__dep">
-              {m.dependency === "AFFECTED" ? <Badge tone="warn">Uses chilled chicken</Badge> : m.dependency === "UNAFFECTED" ? <Badge tone="ok">Unaffected</Badge> : <Badge tone="bad">Unknown BOM</Badge>}
-            </span>
-            <span className="p2-menu__row"><span>Forecast</span><span className="p2-num">{m.forecast}</span></span>
-            <span className="p2-menu__row"><span>Confirmed</span><span className="p2-num">{m.confirmed}</span></span>
-            <span className="p2-menu__row"><span>Chicken / portion</span><span>{m.chickenPerPortionMilli ? <Qty milli={m.chickenPerPortionMilli} /> : "—"}</span></span>
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <>
+      <div className="p2-menu__toolbar">
+        <div className="p2-menu__filters" role="group" aria-label="Filter menu by chicken impact">
+          {MENU_FILTERS.map(([value, label]) => (
+            <button key={value} type="button" className="p2-btn p2-btn--sm" aria-pressed={filter === value} onClick={() => setFilter(value)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="p2-muted" role="status">{visibleMenus.length} of {menus.length} items</p>
+      </div>
+      {visibleMenus.length === 0 ? <EmptyState title="No menu items match this filter" /> : (
+        <ul className="p2-menus">
+          {visibleMenus.map((m) => {
+            const photo = MENU_PHOTOS[m.menuId];
+            return (
+              <li key={m.menuId}>
+                <Link to="/impact" className="p2-menu" aria-label={`${m.name}: ${m.dependency === "AFFECTED" ? "uses chilled chicken" : m.dependency === "UNAFFECTED" ? "unaffected" : "unknown BOM"}`}>
+                  <div className="p2-menu__photo">
+                    {photo && <img src={photo} alt="" width={768} height={512} loading="lazy" />}
+                  </div>
+                  <div className="p2-menu__body">
+                    <h3 className="p2-menu__name">{m.name}</h3>
+                    <div className="p2-menu__dep">
+                      {m.dependency === "AFFECTED" ? <Badge tone="warn">Affected</Badge> : m.dependency === "UNAFFECTED" ? <Badge tone="ok">Unaffected</Badge> : <Badge tone="bad">Recipe unknown</Badge>}
+                    </div>
+                    <dl className="p2-menu__stats">
+                      <div className="p2-menu__row"><dt>Forecast portions</dt><dd className="p2-num">{m.forecast}</dd></div>
+                      <div className="p2-menu__row"><dt>Confirmed portions</dt><dd className="p2-num">{m.confirmed}</dd></div>
+                      <div className="p2-menu__row"><dt>Chicken per portion</dt><dd>{m.chickenPerPortionMilli ? <Qty milli={m.chickenPerPortionMilli} /> : "—"}</dd></div>
+                    </dl>
+                  </div>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
   );
 }

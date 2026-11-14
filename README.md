@@ -1,12 +1,12 @@
-# MouManTAI Recovery+ (SUC)
+# MouManTAI (SUC)
 
 **AI Supply-to-Plate Recovery Intelligence** — a restaurant operations tool that turns a supplier disruption
 message (WhatsApp, Outlook email or Telegram) into an assessed impact, two recovery strategies
 (Plan A: external supplier recovery, Plan B: internal stock/menu/prep recovery), a versioned approval and a
 verified outcome.
 
-**Current status:** The FeedMe-inspired Recovery+ prototype includes a shared Portal shell and three
-populated Happy Potato demo pages: Overview, Incidents and Impact Explorer. Use **Demo test mode**
+**Current status:** The FeedMe-inspired MouManTAI prototype includes a shared Portal shell and three
+populated Happy Potato demo pages: Overview, Incidents and Impact Explorer. Use **Supplier disruption demo**
 on Overview to simulate a supplier report, verify it, assess impact, recount stock and reset the scenario.
 The other routes are placeholders in this integration. Live messaging, FeedMe connectivity and the
 recovery-to-outcome workflow are pending.
@@ -119,5 +119,5 @@ To add a page: add an entry to `frontend/src/constants/navigation.ts` and map it
 
 ## Honesty notes
 
-- Recovery+ is an independent hackathon concept inspired by FeedMe Portal.
+- MouManTAI is an independent hackathon concept inspired by FeedMe Portal.
 - Operational data and channel events are synthetic. The demo runs locally in the browser.
