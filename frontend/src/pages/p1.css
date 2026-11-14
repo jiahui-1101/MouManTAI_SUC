@@ -634,3 +634,11 @@ html, .shell__sidebar, .mi-layout, .mi-layout * { scrollbar-width: thin; scrollb
  .inbox-queue .inbox-table .message-card .inbox-row__status { grid-area: 3 / 2; }
  .inbox-queue .inbox-table .message-card .inbox-row__review { grid-area: 4 / 1 / 5 / -1; }
 }
+/* Reject: same plain text as before, but a real control */
+.mi-reject-link { padding: 0 2px; border: 0; background: none; font: inherit; font-size: 13px; cursor: pointer; }
+.mi-reject-link:hover:not(:disabled) { color: var(--status-danger); text-decoration: underline; }
+.mi-reject-link:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+.mi-reject-link:disabled { opacity: .45; cursor: not-allowed; }
+/* Duplicate-suppression note: small footer text under the inbox pager */
+.inbox__dup-note { margin: 8px 0 0; color: var(--text-secondary); font-size: 11.5px; text-align: right; }
+.inbox__dup-note strong { color: var(--text-secondary); font-weight: 600; }
