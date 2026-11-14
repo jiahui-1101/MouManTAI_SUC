@@ -59,10 +59,6 @@
 **Team:** NJHL  
 **Solution Type:** Intelligence add-on for the FeedMe Portal, with a web prototype on synthetic data
 
-<p align="center">
-  <img src="docs/images/problem.png" alt="Four KL cafés, one recurring dilemma" width="900">
-</p>
-
 It's 10:00. Lunch is coming. A supplier messages: **today's chicken delivery is cancelled.** What do you do?
 
 Restaurants already see low inventory. What they lack is the next step. Four Kuala Lumpur cafés were reported in Malay Mail (June 2026) facing the same problem:
@@ -157,11 +153,48 @@ flowchart LR
     Memory -. improves .-> Impact
 ```
 
+The same flow as a UML sequence, from the supplier's message to a verified outcome:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant S as Supplier
+    participant B as Live Message Bridge
+    participant M as MouManTAI
+    participant K as Kitchen staff
+    participant O as Manager
+    S->>B: "Today's chicken delivery is cancelled"
+    B->>M: Normalised message event
+    M->>M: Extract PO HP-PO-1042 · chicken · 20 kg · cancelled
+    M->>K: Ask to confirm extraction
+    K-->>M: One-tap confirm
+    M->>M: Verified incident → impact: need 22 kg, have 10 kg, gap 12 kg
+    M->>M: Build Plan A (backup supplier) and Plan B (internal) under hard rules
+    M->>O: Plan A vs Plan B with cost and portions at risk
+    O-->>M: Approve chosen plan with reason
+    M->>K: Execution tasks (PO, menu limits, prep batches)
+    K-->>M: Evidence (goods receipt, counts)
+    M->>M: Verify outcome → decision memory → improve forecasts
+```
+
 ## System Architecture
 
 <p align="center">
-  <img src="docs/images/system-architecture.png" alt="Four layers: Understand, Predict, Plan, Decide" width="900">
+  <img src="docs/images/system-architecture.png" alt="MouManTAI Architecture: source, connectivity, decision services, AI integration, user experience, applications, decision and action, and data flow layers" width="100%">
 </p>
+
+The diagram's editable source is [docs/images/system-architecture.svg](docs/images/system-architecture.svg).
+
+| # | Layer | What it does |
+|---|---|---|
+| 1 | **Source** | Supplier messages from WhatsApp, Outlook and Telegram, plus FeedMe sales, orders, stock, POs and recipes |
+| 2 | **Connectivity & Identity** | Live Message Bridge (Node.js): verified webhooks, read-only mailbox, bot polling, server-side tokens, normalised and de-duplicated events |
+| 3 | **Decision Services** | Message intelligence, incident correlation, impact, Plan A, Plan B, comparison, approval, execution and outcomes, on the FeedMe database |
+| 4 | **AI Integration** | GLiNER, Chronos-2 + LoRA, LightGBM, OR-Tools CP-SAT, with deterministic rules as fallback |
+| 5 | **User Experience** | Alerts, one-tap confirm, impact explorer, Plan A vs B, role-based approval, decision memory |
+| 6 | **User Applications** | The FeedMe Portal add-on pages, from Overview to Outcomes |
+| 7 | **Decision & Action** | Manager-approved recovery actions: backup PO, menu limits, reallocation, prep batches, order protection |
+| 8 | **Data & Decision Flow** | Message → confirm → incident → impact → plans → approval → execution → outcome → better forecasts |
 
 MouManTAI is built in four layers. The table separates the **production architecture** from what the **prototype** in this repository does today.
 
@@ -208,9 +241,14 @@ See [docs/development/SHARED_STATE_INTEGRATION.md](docs/development/SHARED_STATE
 
 ## Worked Example: The Chicken Delivery
 
-<p align="center">
-  <img src="docs/images/understand-predict.png" alt="From a supplier message to a 12 kg gap" width="900">
-</p>
+```mermaid
+flowchart LR
+    A["📩 Supplier message<br/><i>Delivery cancelled</i>"] --> B["🔎 Extracted<br/>PO HP-PO-1042<br/>chicken · 20 kg · cancelled"]
+    B --> C["✅ Staff confirmed"]
+    C --> D["📊 Need 22 kg<br/>On hand 10 kg"]
+    D --> E["⚠️ 12 kg gap"]
+    style E fill:#FFF4EC,stroke:#F97316,color:#C2410C
+```
 
 **1 Understand.** The supplier writes that the delivery is cancelled. MouManTAI extracts:
 
@@ -303,9 +341,15 @@ Plan B allocates the remaining chicken to 12 additional Happy Combos.
 
 ## Decision Logic
 
-<p align="center">
-  <img src="docs/images/plan-rules.png" alt="Rules first, then optimise" width="900">
-</p>
+```mermaid
+flowchart LR
+    Cand["Candidate plans<br/>supplier offers · internal options"] --> Gate{"Must pass?<br/>food safety · deadline ·<br/>confirmed orders"}
+    Gate -- no --> Drop["Discarded"]
+    Gate -- yes --> Score["Compare<br/>cost · contribution ·<br/>waste · disruption"]
+    Score --> Show["Plan A vs Plan B<br/>shown to manager"]
+    style Drop fill:#FEF2F2,stroke:#DC2626,color:#991B1B
+    style Show fill:#FFF4EC,stroke:#F97316
+```
 
 Plans are built **rules first, then optimised**:
 
@@ -316,11 +360,32 @@ Plans are built **rules first, then optimised**:
 
 A plan that fails any must-pass rule is never offered, whatever it costs.
 
-<p align="center">
-  <img src="docs/images/decide-loop.png" alt="Approve, Execute, Record outcome, Improve forecasts" width="900">
-</p>
-
 The decision is a closed loop: **Approve → Execute → Record outcome → Improve forecasts**, then back to Predict.
+
+```mermaid
+flowchart LR
+    Approve["1 Approve<br/>manager signs off"] --> Execute["2 Execute<br/>order placed · tasks run"]
+    Execute --> Record["3 Record outcome<br/>what really happened"]
+    Record --> Improve["4 Improve forecasts"]
+    Improve -. next disruption .-> Approve
+```
+
+Each execution task follows a strict lifecycle (UML state diagram, from `features/approvals/executionLogic.ts`). Simulation never marks a task verified: only evidence can.
+
+```mermaid
+stateDiagram-v2
+    [*] --> APPROVED: Manager approves plan
+    APPROVED --> SIMULATED_EXECUTION: Simulate next step + reason
+    SIMULATED_EXECUTION --> AWAITING_EVIDENCE
+    AWAITING_EVIDENCE --> Outcome: Evidence recorded
+    state Outcome {
+        [*] --> SUCCESS
+        [*] --> PARTIAL
+        [*] --> FAILED
+        [*] --> UNVERIFIED
+    }
+    Outcome --> [*]: Saved to decision memory
+```
 
 ---
 
@@ -485,17 +550,16 @@ Prices still need to be validated with merchants.
 
 ### Market
 
-<p align="center">
-  <img src="docs/images/market.png" alt="Starting small, inside a large base" width="900">
-</p>
-
 FeedMe serves **~11,000 merchants** across Southeast Asia (FeedMe, Nov 2025 funding announcement). Our first target, **200 outlets**, is less than 2% of that base.
 
 ### Projection (200 outlets, 50/50 plan split)
 
-<p align="center">
-  <img src="docs/images/revenue-projection.png" alt="Revenue projection" width="900">
-</p>
+```mermaid
+pie showData
+    title Monthly recurring revenue (RM), 200 outlets
+    "Starter: 100 × RM49" : 4900
+    "Pro: 100 × RM99" : 9900
+```
 
 | Line | Monthly |
 |---|---:|
@@ -507,9 +571,11 @@ FeedMe serves **~11,000 merchants** across Southeast Asia (FeedMe, Nov 2025 fund
 
 ### Merchant ROI (≈ 2 supply disruptions per month)
 
-<p align="center">
-  <img src="docs/images/merchant-roi.png" alt="Merchant ROI" width="900">
-</p>
+```mermaid
+flowchart LR
+    R["48 recovered portions × RM7<br/><b>RM336</b>"] --> C["− RM80<br/>recovery cost"] --> F["− RM99<br/>Pro fee"] --> K["<b>RM157</b><br/>kept per month"]
+    style K fill:#ECFDF3,stroke:#15803D
+```
 
 | Line | Monthly |
 |---|---:|
