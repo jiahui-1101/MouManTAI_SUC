@@ -255,3 +255,13 @@ Verification: `npm test` 85/85 (13 files), `npm run typecheck` pass, `npm run bu
 ### Remaining external dependencies (not P1-owned)
 - P2 `/impact`, P3 `/recovery/plan-a`, P5 pages are empty; they do not yet consume `selectActiveIncident`, `selectPublishedEvents`, `selectSupplierOfferEvidence`, `selectIncidentEvidence`/`selectMessageEvidence`, or call `acknowledgeIncidentHandoff()`. Handoff therefore correctly shows "awaiting P2 consumer".
 - Push to GitHub must be done from a local terminal (blocked from the agent environment).
+
+## FeedMe Portal frontend redesign (2026-11-14)
+
+- Merged latest `origin/main` (bf74d35) into `feature/p1-mock-messaging` (merge 2b83619). Kept main's tokens, global layout, header/sidebar, `components/ui` kit and teammate fixture `data/fixtures/happyPotato.ts`.
+- P1's previous JSON business fixture moved unchanged to `data/fixtures/happyPotatoP1Contract.ts` (consumed only by `demoStore.ts`). Main now also has P2's `restaurantStore`; unifying the two stores/fixtures is a deliberate **business-integration dependency**, out of scope for this design task.
+- P1 page styles moved from `styles/global.css` into `pages/p1.css`, rewritten on the semantic tokens (`--action-primary`, `--brand-primary-soft`, `--status-*`, `--border-default`, `--radius-*`, `--focus-color`).
+- `/inbox`, `/message-intelligence` (incl. supplier-offer review, incident handoff and audit evidence panels), `/channels`, `/settings` now use `PageContainer` actions, `StatusBadge`, `EmptyState`, `fm-panel`, `fm-btn`, `fm-banner` and Portal-style segmented filters, cards, forms and focus rings. No behaviour, IDs, events or selectors changed.
+- Fixes found in browser QA: `.sr-only` missing from main (P1-scoped helper added); header badges overflowed on mobile; `fm-banner` flex layout made inbox banner intercept the "Open in Message Intelligence" click; raw-message text inherited the 11.5px caption size; review note/ETA fields now span full width.
+- Verification: `npm test` 286/286 (30 files, includes P2–P4 suites from main), `npm run typecheck` pass, `npm run build` pass. Chromium checks at iPhone 13, 820px and 1440px: zero horizontal overflow and zero runtime errors on all P1 routes; mouse and keyboard journeys (offer qualification, confirm, link) pass.
+- Commits: 2b83619 merge, f32f227 inbox, 90ffbac message intelligence, 3748690 channels, 1db96b5 settings, plus the follow-up responsive fix commit.
