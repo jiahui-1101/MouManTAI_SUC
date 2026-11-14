@@ -380,7 +380,9 @@ export function selectWorkflowSteps(
       } else {
         const awaiting = tasks.filter((t) => t.state === 'AWAITING_EVIDENCE').length;
         const total = tasks.length;
-        executeStatus = `${awaiting}/${total} awaiting evidence`;
+        const inProgress = tasks.filter((t) => t.state === 'SIMULATED_EXECUTION').length;
+        // Each task takes two simulated steps; show the first step too so every submitted reason moves the counter.
+        executeStatus = `${awaiting}/${total} awaiting evidence${inProgress ? ` · ${inProgress} in progress` : ''}`;
         executeTone = awaiting === total ? 'info' : 'simulated';
         executeIcon = awaiting === total ? '●' : '○';
       }

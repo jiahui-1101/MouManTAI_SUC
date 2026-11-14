@@ -1281,3 +1281,5 @@ a.fm-btn--danger * {
     display: block;
   }
 }
+.p5-complete-all { display: inline-flex; align-items: center; gap: 8px; }
+.p5-complete-all__error { color: var(--status-danger); font-size: 12px; }

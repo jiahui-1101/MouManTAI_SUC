@@ -196,7 +196,7 @@ export function ExecutionView() {
               </div>
             </div>
             <p className="p5-muted" data-testid="p5-progress-text">
-              {awaitingCount} of {tasks.length} tasks awaiting evidence
+              {awaitingCount} of {tasks.length} tasks awaiting evidence{simExecCount > 0 ? ` · ${simExecCount} in progress (one more step each)` : ''}
             </p>
           </section>
 
