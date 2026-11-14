@@ -68,6 +68,7 @@ export type P5ErrorCode =
   | 'SCENARIO_NOT_READY'
   | 'FINGERPRINT_MISMATCH'
   | 'STALE_SCENARIO'
+  | 'SCENARIO_INFEASIBLE'
   | 'DEMO_FORBIDDEN'
   | 'DUPLICATE_REQUEST'
   | 'APPROVAL_EXPIRED'
@@ -77,6 +78,10 @@ export type P5ErrorCode =
   | 'PLAN_B_PURCHASE_FORBIDDEN'
   | 'NOT_FOUND'
   | 'INVALID_EVIDENCE';
+
+export function isScenarioInfeasible(feasibility: Feasibility): boolean {
+  return feasibility === 'INFEASIBLE' || feasibility === 'UNKNOWN';
+}
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: P5ErrorCode; detail: string };
 export const ok = <T>(value: T): Result<T> => ({ ok: true, value });

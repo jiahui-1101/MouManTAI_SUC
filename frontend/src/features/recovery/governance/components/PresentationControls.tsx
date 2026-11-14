@@ -32,7 +32,7 @@ export function usePresentationShortcuts(onMessage?: (m: string) => void) {
         if (!cp) return;
         e.preventDefault();
         const res = runCheckpoint(cp.id, runtime);
-        onMessage?.(res.ok ? `Demo state: ${cp.label}` : `Could not reach “${cp.label}”: ${res.detail}`);
+        onMessage?.(res.ok ? res.value.statusLine : `Could not reach “${cp.label}”: ${res.detail}`);
       }
     };
     window.addEventListener('keydown', onKey);

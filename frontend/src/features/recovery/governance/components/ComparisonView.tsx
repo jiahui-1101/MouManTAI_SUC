@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button, StatusBadge, AlertBanner } from '../../../../components/ui';
 import { formatKgMilli, formatSenAsRM } from '../format';
 import { publishPlanAFromShared } from '../p5RootAdapter';
-import type { RecoveryScenarioWithActions, ScenarioStrategy, SnapshotRef } from '../p5Contracts';
+import { isScenarioInfeasible, type RecoveryScenarioWithActions, type ScenarioStrategy, type SnapshotRef } from '../p5Contracts';
 import { approvalKey } from '../../../approvals/idempotency';
 import { FEASIBILITY_LABELS } from '../labels';
 import { BENIGN_ERRORS, p5ErrorMessage } from '../p5Errors';
@@ -45,7 +45,7 @@ function feasibilityReason(s: RecoveryScenarioWithActions): string {
   }
 }
 
-const isHardBlocked = (s: RecoveryScenarioWithActions) => s.feasibility === 'INFEASIBLE' || s.feasibility === 'UNKNOWN';
+const isHardBlocked = (s: RecoveryScenarioWithActions) => isScenarioInfeasible(s.feasibility);
 
 function RowHeader({ label, tooltip }: { label: string; tooltip: string }) {
   return (

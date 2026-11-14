@@ -7,10 +7,20 @@
  * TODO(G0): true refresh persistence belongs to the Integrator's root store.
  */
 import type { StoreApi } from 'zustand';
+import { isApprovalExpired } from '../../approvals/approvalLogic';
 import { advanceMyTasks } from '../../approvals/executionLogic';
-import { fail, ok, type DemoRole, type ExecutionAction, type Result } from './p5Contracts';
+import {
+  fail,
+  isScenarioInfeasible,
+  ok,
+  type ApprovalRecord,
+  type DemoRole,
+  type ExecutionAction,
+  type Result,
+} from './p5Contracts';
 import type { P5Deps } from './p5Deps';
-import type { P5State } from './p5Slice';
+import type { P5Data, P5State } from './p5Slice';
+import { isScenarioStale } from './staleness';
 
 export type CheckpointId =
   | 'PLANS_READY'
@@ -34,6 +44,52 @@ export interface CheckpointRuntime {
   adapter: { deps: P5Deps; setRole(role: DemoRole): void };
 }
 
+export interface CheckpointOutcome {
+  id: CheckpointId;
+  path: 'continued' | 'fresh';
+  statusLine: string;
+}
+
+const TARGET_STRATEGY: Partial<Record<CheckpointId, 'A' | 'B'>> = {
+  ALL_AWAITING_EVIDENCE: 'B',
+  EVIDENCE_COMPLETE: 'B',
+  A_LATE_FAILED: 'A',
+};
+
+function getValidApproval(
+  p5Data: P5Data,
+  deps: P5Deps,
+  targetStrategy: 'A' | 'B',
+): ApprovalRecord | null {
+  const appr = [...p5Data.approvals].reverse().find((a) => a.state === 'APPROVED');
+  if (!appr || appr.selectedStrategy !== targetStrategy) return null;
+
+  const scenario = deps.getScenario(targetStrategy);
+  if (
+    !scenario ||
+    scenario.id !== appr.scenarioId ||
+    scenario.version !== appr.scenarioVersion ||
+    scenario.snapshotFingerprint !== appr.snapshotFingerprint
+  ) {
+    return null;
+  }
+
+  const snapshot = deps.getSnapshot();
+  if (isScenarioStale(scenario, snapshot) || appr.snapshotFingerprint !== snapshot.fingerprint) {
+    return null;
+  }
+
+  if (isApprovalExpired(appr, deps.getDemoClockLocal())) {
+    return null;
+  }
+
+  if (isScenarioInfeasible(scenario.feasibility)) {
+    return null;
+  }
+
+  return appr;
+}
+
 /** Which non-Owner role normally does each task (the Owner could do all of them). */
 const DOER: Record<ExecutionAction['actionType'], DemoRole> = {
   PO_DRAFT: 'ProcurementOfficer',
@@ -52,7 +108,7 @@ function addMinutes(hhmm: string, minutes: number): string {
   return `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
 }
 
-export function runCheckpoint(id: CheckpointId, rt: CheckpointRuntime): Result<CheckpointId> {
+export function runCheckpoint(id: CheckpointId, rt: CheckpointRuntime): Result<CheckpointOutcome> {
   const { store, adapter } = rt;
   const deps = adapter.deps;
   const p5 = () => store.getState().p5;
@@ -62,10 +118,6 @@ export function runCheckpoint(id: CheckpointId, rt: CheckpointRuntime): Result<C
     as('Owner');
     const scenario = deps.getScenario(strategy);
     if (!scenario) return fail('SCENARIO_NOT_READY', `Plan ${strategy} has not been published by its owner yet.`);
-    // Same hard blocker as the Compare page: never replay a choice the UI would refuse.
-    if (scenario.feasibility === 'INFEASIBLE' || scenario.feasibility === 'UNKNOWN') {
-      return fail('SCENARIO_NOT_READY', `Plan ${strategy} is not feasible on the current data — recalculate first.`);
-    }
     return step(`Choose Plan ${strategy}`, p5().chooseRecoveryScenario(strategy));
   };
 
@@ -103,11 +155,15 @@ export function runCheckpoint(id: CheckpointId, rt: CheckpointRuntime): Result<C
     if (!appr) return fail('NOT_FOUND', 'No approved plan.');
     const tasks = p5().actions.filter((a) => a.approvalId === appr.id);
     for (const t of tasks.filter((x) => x.actionType === 'MENU_LIMIT_TASK')) {
+      const already = p5().evidence.some((e) => e.actionId === t.id && e.kind === 'MENU_UPDATE');
+      if (already) continue;
       as('OperationsManager');
       const r = p5().recordSimulatedEvidence(t.id, 'MENU_UPDATE', { menuId: t.targetId ?? '', applied: true });
       if (!r.ok) return step('Menu limit confirmation', r);
     }
     for (const t of tasks.filter((x) => x.actionType === 'PREP_BATCH_TASK')) {
+      const already = p5().evidence.some((e) => e.actionId === t.id && e.kind === 'PREP');
+      if (already) continue;
       as('KitchenLead');
       const planned = t.plannedPortions;
       if (planned === undefined) return fail('INVALID_EVIDENCE', `No planned portions published for ${t.targetId ?? t.id}.`);
@@ -120,12 +176,16 @@ export function runCheckpoint(id: CheckpointId, rt: CheckpointRuntime): Result<C
       });
       if (!r.ok) return step('Prep batch result', r);
     }
-    const anchor = tasks[0];
-    if (!anchor) return fail('NOT_FOUND', 'No tasks.');
-    as('OperationsManager');
-    const required = appr.predicted.confirmedChickenPortionsProtected;
-    const f = p5().recordSimulatedEvidence(anchor.id, 'ORDER_FULFILMENT', { confirmedFulfilled: required, confirmedRequired: required });
-    return f.ok ? ok(true) : step('Confirmed orders fulfilled', f);
+    const alreadyFulfilment = p5().evidence.some((e) => e.kind === 'ORDER_FULFILMENT');
+    if (!alreadyFulfilment) {
+      const anchor = tasks[0];
+      if (!anchor) return fail('NOT_FOUND', 'No tasks.');
+      as('OperationsManager');
+      const required = appr.predicted.confirmedChickenPortionsProtected;
+      const f = p5().recordSimulatedEvidence(anchor.id, 'ORDER_FULFILMENT', { confirmedFulfilled: required, confirmedRequired: required });
+      if (!f.ok) return step('Confirmed orders fulfilled', f);
+    }
+    return ok(true);
   };
 
   const recordPlanALateEvidence = (): Result<true> => {
@@ -134,23 +194,37 @@ export function runCheckpoint(id: CheckpointId, rt: CheckpointRuntime): Result<C
     const tasks = p5().actions.filter((a) => a.approvalId === appr.id);
     const receiptTask = tasks.find((t) => t.actionType === 'RECEIPT_CHECK') ?? tasks.find((t) => t.actionType === 'PO_DRAFT');
     if (!receiptTask || !appr.expiresAtIso) return fail('NOT_FOUND', 'Plan A has no delivery check or deadline.');
-    as('ProcurementOfficer');
-    const r = p5().recordSimulatedEvidence(receiptTask.id, 'RECEIPT', {
-      receivedKgMilli: appr.predicted.newPurchaseKgMilli,
-      accepted: true,
-      arrivalLocal: addMinutes(appr.expiresAtIso.slice(11, 16), 15),
-      landedCostSen: appr.predicted.additionalCostSen,
-    });
-    if (!r.ok) return step('Delivery receipt', r);
-    as('Owner');
-    const required = appr.predicted.confirmedChickenPortionsProtected;
-    const f = p5().recordSimulatedEvidence(receiptTask.id, 'ORDER_FULFILMENT', { confirmedFulfilled: required, confirmedRequired: required });
-    return f.ok ? ok(true) : step('Confirmed orders fulfilled', f);
+    const alreadyReceipt = p5().evidence.some((e) => e.actionId === receiptTask.id && e.kind === 'RECEIPT');
+    if (!alreadyReceipt) {
+      as('ProcurementOfficer');
+      const r = p5().recordSimulatedEvidence(receiptTask.id, 'RECEIPT', {
+        receivedKgMilli: appr.predicted.newPurchaseKgMilli,
+        accepted: true,
+        arrivalLocal: addMinutes(appr.expiresAtIso.slice(11, 16), 15),
+        landedCostSen: appr.predicted.additionalCostSen,
+      });
+      if (!r.ok) return step('Delivery receipt', r);
+    }
+    const alreadyFulfilment = p5().evidence.some((e) => e.kind === 'ORDER_FULFILMENT');
+    if (!alreadyFulfilment) {
+      as('Owner');
+      const required = appr.predicted.confirmedChickenPortionsProtected;
+      const f = p5().recordSimulatedEvidence(receiptTask.id, 'ORDER_FULFILMENT', { confirmedFulfilled: required, confirmedRequired: required });
+      if (!f.ok) return step('Confirmed orders fulfilled', f);
+    }
+    return ok(true);
   };
+
+  const targetStrategy = TARGET_STRATEGY[id];
+  const existingValidApproval = targetStrategy ? getValidApproval(p5(), deps, targetStrategy) : null;
+  const isIncremental = Boolean(existingValidApproval);
+  const path: 'continued' | 'fresh' = isIncremental ? 'continued' : 'fresh';
 
   const run = (): Result<unknown> => {
     as('Owner');
-    p5().resetP5();
+    if (!isIncremental) {
+      p5().resetP5();
+    }
     switch (id) {
       case 'PLANS_READY':
         return deps.getScenario('A') || deps.getScenario('B')
@@ -161,22 +235,38 @@ export function runCheckpoint(id: CheckpointId, rt: CheckpointRuntime): Result<C
       case 'B_APPROVED':
         return approve('B');
       case 'ALL_AWAITING_EVIDENCE': {
-        const a = approve('B');
-        return a.ok ? runAllTasks() : a;
+        if (!isIncremental) {
+          const a = approve('B');
+          if (!a.ok) return a;
+        }
+        return runAllTasks();
       }
       case 'EVIDENCE_COMPLETE': {
-        const a = approve('B');
-        if (!a.ok) return a;
-        const t = runAllTasks();
-        return t.ok ? recordPlanBEvidence() : t;
+        if (!isIncremental) {
+          const a = approve('B');
+          if (!a.ok) return a;
+          const t = runAllTasks();
+          if (!t.ok) return t;
+        } else {
+          const t = runAllTasks();
+          if (!t.ok) return t;
+        }
+        return recordPlanBEvidence();
       }
       case 'A_LATE_FAILED': {
-        const a = approve('A');
-        if (!a.ok) return a;
-        const t = runAllTasks();
-        if (!t.ok) return t;
-        const e = recordPlanALateEvidence();
-        if (!e.ok) return e;
+        if (!isIncremental) {
+          const a = approve('A');
+          if (!a.ok) return a;
+          const t = runAllTasks();
+          if (!t.ok) return t;
+          const e = recordPlanALateEvidence();
+          if (!e.ok) return e;
+        } else {
+          const t = runAllTasks();
+          if (!t.ok) return t;
+          const e = recordPlanALateEvidence();
+          if (!e.ok) return e;
+        }
         as('Owner');
         return step('Verify outcome', p5().verifyDemoOutcome(approval()!.incidentId));
       }
@@ -185,5 +275,8 @@ export function runCheckpoint(id: CheckpointId, rt: CheckpointRuntime): Result<C
 
   const res = run();
   as('Owner');
-  return res.ok ? ok(id) : res;
+  if (!res.ok) return res;
+  const cp = CHECKPOINTS.find((c) => c.id === id);
+  const statusLine = `Demo state: ${cp?.label ?? id} — ${path === 'continued' ? 'Continued from your approval' : 'Started fresh'}`;
+  return ok({ id, path, statusLine });
 }

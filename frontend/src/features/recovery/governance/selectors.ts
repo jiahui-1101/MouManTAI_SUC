@@ -3,6 +3,7 @@ import { isApprovalExpired, preflightApproval } from '../../approvals/approvalLo
 import { approvalKey } from '../../approvals/idempotency';
 import { latestEvidence } from '../../outcomes/evidence';
 import { evaluateOutcome } from '../../outcomes/verifyOutcome';
+import { isScenarioInfeasible } from './p5Contracts';
 import type {
   ApprovalRecord,
   DecisionMemoryEntry,
@@ -273,6 +274,10 @@ export function selectWorkflowSteps(
       compareStatus = 'Stale — recalculation required';
       compareTone = 'warning';
       compareIcon = '⚠';
+    } else if (selScenario && isScenarioInfeasible(selScenario.feasibility)) {
+      compareStatus = `Blocked: ${ERROR_LABELS.SCENARIO_INFEASIBLE.label}`;
+      compareTone = 'danger';
+      compareIcon = '✕';
     } else {
       compareStatus = data.selection.strategy === 'A' ? 'Plan A selected' : 'Plan B selected';
       compareTone = data.selection.strategy === 'A' ? 'info' : 'simulated';

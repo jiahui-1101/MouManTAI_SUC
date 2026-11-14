@@ -49,6 +49,10 @@ export const ERROR_LABELS: Record<P5ErrorCode, Label> = {
     label: 'The numbers changed',
     explain: 'Stock or delivery data changed after this plan was calculated; it must be recalculated first.',
   },
+  SCENARIO_INFEASIBLE: {
+    label: "Plan can't be chosen",
+    explain: "This plan can't be chosen — it isn't feasible with the current numbers.",
+  },
   DEMO_FORBIDDEN: { label: 'Not allowed for this role', explain: 'The current demo role is not allowed to do this.' },
   DUPLICATE_REQUEST: { label: 'Already recorded', explain: 'This request was already recorded.' },
   APPROVAL_EXPIRED: {

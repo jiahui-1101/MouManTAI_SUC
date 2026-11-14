@@ -99,7 +99,68 @@ describe('checkpoint guards', () => {
     const h = makeHarness();
     h.env.scenarios.B = { ...h.env.scenarios.B!, feasibility: 'INFEASIBLE' };
     const res = runCheckpoint('B_APPROVED', rt(h));
-    expect(res).toMatchObject({ ok: false, error: 'SCENARIO_NOT_READY' });
+    expect(res).toMatchObject({ ok: false, error: 'SCENARIO_INFEASIBLE' });
     expect(h.p5().approvals).toHaveLength(0);
+  });
+
+  it('runs fresh path when no valid approval exists', () => {
+    const h = makeHarness();
+    const res = runCheckpoint('ALL_AWAITING_EVIDENCE', rt(h));
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.value.path).toBe('fresh');
+      expect(res.value.statusLine).toContain('Started fresh');
+    }
+  });
+
+  it('runs incremental path when valid approval exists, preserving the typed approval reason', () => {
+    const h = makeHarness();
+    h.p5().chooseRecoveryScenario('B');
+    const customReason = 'Owner custom rationale: protect orders and avoid supplier markup';
+    const approved = h.p5().approveDemoScenario(customReason, 1, h.env.snapshot.fingerprint);
+    expect(approved.ok).toBe(true);
+
+    // CP4 incremental
+    const res4 = runCheckpoint('ALL_AWAITING_EVIDENCE', rt(h));
+    expect(res4.ok).toBe(true);
+    if (res4.ok) {
+      expect(res4.value.path).toBe('continued');
+      expect(res4.value.statusLine).toContain('Continued from your approval');
+    }
+    expect(h.p5().approvals).toHaveLength(1);
+    expect(h.p5().approvals[0]!.reason).toBe(customReason);
+
+    // CP5 incremental
+    const res5 = runCheckpoint('EVIDENCE_COMPLETE', rt(h));
+    expect(res5.ok).toBe(true);
+    if (res5.ok) {
+      expect(res5.value.path).toBe('continued');
+      expect(res5.value.statusLine).toContain('Continued from your approval');
+    }
+    expect(h.p5().approvals[0]!.reason).toBe(customReason);
+
+    // Verify outcome & save to Decision Memory: original approval reason persists for the case card
+    const incId = h.env.incidentId ?? 'HP-INC-001';
+    const v = h.p5().verifyDemoOutcome(incId);
+    expect(v.ok).toBe(true);
+    const saved = h.p5().saveDemoDecisionMemory(incId);
+    expect(saved.ok).toBe(true);
+    if (saved.ok) {
+      const memApproval = h.p5().approvals.find((a) => a.scenarioId === saved.value.scenarioId && a.scenarioVersion === saved.value.version);
+      expect(memApproval?.reason).toBe(customReason);
+    }
+  });
+
+  it('falls back to fresh path if existing approval is on a stale snapshot', () => {
+    const h = makeHarness();
+    h.p5().chooseRecoveryScenario('B');
+    h.p5().approveDemoScenario('reason on old snapshot', 1, 'old-fingerprint');
+    // harness env snapshot has fingerprint 'DEV-FP:HP-SNAP-001:v1', so approval is stale
+    const res = runCheckpoint('ALL_AWAITING_EVIDENCE', rt(h));
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.value.path).toBe('fresh');
+      expect(res.value.statusLine).toContain('Started fresh');
+    }
   });
 });

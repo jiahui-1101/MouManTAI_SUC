@@ -30,7 +30,7 @@ export function P5DevControls() {
             data-testid={`p5-checkpoint-${cp.id}`}
             onClick={() => {
               const res = runCheckpoint(cp.id, runtime);
-              setStatus(res.ok ? `Demo state: ${cp.label}` : `Could not reach “${cp.label}”: ${res.detail}`);
+              setStatus(res.ok ? res.value.statusLine : `Could not reach “${cp.label}”: ${res.detail}`);
             }}
           >
             {cp.label}
