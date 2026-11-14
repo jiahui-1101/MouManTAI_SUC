@@ -9,7 +9,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); if (clipboardDescriptor) Obj
 function props(): PlanAWorkspaceProps { return { source: makeCanonicalSourcingInput(), candidates: [makeOfferB(),makeOfferC()], scenarioMetadata: makePlanAScenarioInput().scenarioMetadata }; }
 const view = (p: PlanAWorkspaceProps) => <MemoryRouter><PlanAWorkspace {...p}/></MemoryRouter>;
 const click = (name: string) => fireEvent.click(screen.getByRole("button", {name}));
-function selectAndPreview() { click("Select HP-OFFER-002"); click("Generate Plan A preview"); }
+function selectAndPreview() { click("Select HP-OFFER-002"); click("Generate preview"); }
 function text(name: string) { return (screen.getByRole("textbox",{name}) as HTMLTextAreaElement).value; }
 
 it("creates and reopens separate idempotent draft records without supplier requests or input mutations",()=>{
@@ -22,7 +22,7 @@ it("creates and reopens separate idempotent draft records without supplier reque
   click("Create Internal PO Draft"); const po=text("Internal PO Draft content"); expect(po).toContain("RM255.00"); expect(po).toContain("NOT_APPROVED / NOT_SENT"); expect(po).toContain("HP-PO-1042");
   click("Create Internal PO Draft"); expect(text("Internal PO Draft content")).toBe(po);
   expect(screen.getAllByRole("article",{name:"Internal PO Draft"}).length).toBe(1);
-  expect(screen.getByText("Physical inventory is unchanged. Publication and approval status are tracked separately from this local calculation.")).toBeTruthy();
+  expect(screen.getByText("Physical inventory is unchanged. Incoming stock is not yet received or quality accepted.")).toBeTruthy();
   expect(fetch).not.toHaveBeenCalled(); expect(p).toEqual(before);
 });
 
@@ -36,7 +36,7 @@ it.each(["eta", "quantity", "price", "snapshot"])("invalidates drafts on changed
   r.rerender(view(changed)); expect(text("Internal PO Draft content")).toMatch(/^STALE/); expect(screen.getByRole("button",{name:"Copy Internal PO Draft"}).hasAttribute("disabled")).toBe(true);
   r.rerender(view(original)); expect(text("Internal PO Draft content")).toMatch(/^STALE/);
   click("Review RFQ Draft"); expect(text("RFQ Draft content")).toMatch(/^STALE/);
-  click("Generate Plan A preview"); click("Regenerate Internal PO Draft"); expect(text("Internal PO Draft content")).not.toMatch(/^STALE/);
+  click("Generate preview"); click("Regenerate Internal PO Draft"); expect(text("Internal PO Draft content")).not.toMatch(/^STALE/);
 });
 
 it("copies actual RFQ and PO text and reports permission failures and unavailable clipboard truthfully",async()=>{

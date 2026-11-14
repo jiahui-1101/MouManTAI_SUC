@@ -31,14 +31,15 @@ export function PlanAProposeAction({ publisher, candidate, contextKey, localSens
       : result.message });
     inFlight.current = false; setBusy(false);
   };
+  if (!publisher) return <p className="pa-publication-pending pa-muted" role="status">Shared comparison not connected yet</p>;
   return <section className="pa-panel fm-panel" aria-labelledby="publish-heading">
     <h2 className="pa-heading" id="publish-heading">Propose to shared recovery</h2>
-    {!publisher ? <p role="status">Plan A publication is pending the shared scenario dispatcher. Local previews and unsent drafts remain available.</p> : <>
+    <>
       <p>Explicitly publish a current canonical proposal for shared comparison. P5 owns selection, approval and execution.</p>
       {localSensitivityActive && <p>Reset local ETA sensitivity and regenerate from canonical inputs before proposing.</p>}
       <div className="pa-actions"><Button variant="primary" type="button" disabled={!candidate || localSensitivityActive || busy || currentNotice?.ok === true} onClick={() => void propose()}>{busy ? "Publishing Plan A…" : "Propose Plan A"}</Button></div>
       {currentNotice && <p role={currentNotice.ok ? "status" : "alert"}>{currentNotice.text}</p>}
       {notice && !currentNotice && <p role="status">Previous publication result is stale for this workspace. Review the current shared scenario before proposing again.</p>}
-    </>}
+    </>
   </section>;
 }

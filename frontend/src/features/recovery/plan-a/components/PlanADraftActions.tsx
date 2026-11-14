@@ -63,12 +63,8 @@ export function PlanADraftActions(props: Props) {
     }
   };
   return <section className="pa-panel fm-panel" aria-labelledby="drafts-heading">
-    <span className="pa-kicker">Demo only · Unsent local documents</span>
-    <h2 className="pa-heading" id="drafts-heading">RFQ and internal purchase drafts</h2>
-    <p>Drafts are separate from the proposal preview. They do not send messages, place orders, approve recovery or change accepted stock.</p>
-    {!props.candidate && <p>Select a conditionally qualified supplier to create drafts.</p>}
-    {!props.proposal && <p>A current Plan A preview is required for the internal PO draft.</p>}
-    <p className="pa-muted">Contact authorization: {contactAuthorization === "UNKNOWN" ? "Unknown — review required" : "Authorized demo contact"}. No contact details are inferred.</p>
+    <div className="pa-card-heading"><h2 className="pa-heading" id="drafts-heading">Documents</h2><span className="pa-muted">Unsent · Unapproved</span></div>
+    <p className="pa-muted">{!props.candidate ? "Select a supplier to create drafts." : !props.proposal ? "Generate a preview to prepare an internal PO." : "Review before any supplier contact or approval."}</p>
     {error && <p role="alert">{error}</p>}
     <div className="pa-columns">
       {(["RFQ_DRAFT", "INTERNAL_PO_DRAFT"] as const).map(type => {
@@ -77,15 +73,15 @@ export function PlanADraftActions(props: Props) {
         const name = type === "RFQ_DRAFT" ? "RFQ Draft" : "Internal PO Draft";
         return <article className="pa-offer" key={type} aria-label={name}>
           <h3 className="pa-subheading">{name}</h3>
-          <StatusBadge tone={draft ? "warning" : "neutral"}>{draft ? stale ? "STALE" : draft.value.status : "NOT_CREATED"}</StatusBadge>
-          {stale && <p>Inputs changed. Explicit review and regeneration are required; this document cannot support approval.</p>}
+          <StatusBadge tone={draft ? "warning" : "neutral"}>{draft ? stale ? "STALE" : "Draft" : "Not created"}</StatusBadge>
+          {stale && <p>Inputs changed. Regenerate before use.</p>}
           <div className="pa-actions">
             <Button type="button" disabled={!props.candidate || (type === "INTERNAL_PO_DRAFT" && !props.proposal)} onClick={() => create(type)}>{stale ? "Regenerate" : "Create"} {name}</Button>
             {draft && <Button type="button" aria-expanded={open === type} onClick={() => { setOpen(type); setFeedback(null); }}>Review {name}</Button>}
           </div>
           {draft && open === type && <div className="pa-draft-panel">
             <p>Local reference: {draft.value.id}</p>
-            <p>NOT_APPROVED · NOT_SENT · Synthetic business data</p>
+            <p>NOT_APPROVED · NOT_SENT</p><p className="pa-muted">Contact authorization: {contactAuthorization === "UNKNOWN" ? "Unknown — review required" : "Authorized demo contact"}. No contact details are inferred.</p>
             <label>{name} content<textarea readOnly rows={16} value={`${stale ? "STALE — DO NOT USE. Regenerate against current inputs.\n\n" : ""}${draft.value.text}`}/></label>
             <div className="pa-actions"><Button type="button" disabled={stale} onClick={() => void copy(draft)}>Copy {name}</Button><Button type="button" onClick={() => { setOpen(null); setFeedback(null); }}>Close {name}</Button></div>
             {feedback?.basis === basis && feedback.type === type && !stale && <p role="status">{feedback.text}</p>}

@@ -7,24 +7,19 @@ export interface ComparisonProps {
   onInspect: (id: string) => void; onSelect: (id: string) => void;
 }
 export function SupplierOfferComparison(props: ComparisonProps) {
-  return <DataPanel className="pa-panel">
-    <SectionHeader title="Alternative suppliers" actions={<StatusBadge>{props.offers.length} offers</StatusBadge>}/>
-    <p className="pa-muted pa-section-description">Eligibility first. Price alone cannot qualify an offer.</p>
+  return <DataPanel className="pa-panel pa-supplier-list">
+    <SectionHeader title="Alternative suppliers"/>
     {props.offers.length === 0 ? <p role="status">No supplier offers available. Request a documented quote or review internal recovery.</p> : <div className="pa-offers">{props.offers.map(({ candidate, assessment }) => {
-      const { offer, supplier } = candidate; const selected = props.selectedOfferId === offer.id;
-      const tone = assessment.status === "INCOMPATIBLE" ? "danger" : "warning";
-      return <article key={offer.id} className={`pa-offer ${selected ? "pa-offer-selected" : ""}`} aria-label={offer.id}>
-        <div className="pa-card-heading"><StatusBadge tone={offer.provenance === "SYNTHETIC_BUSINESS" ? "simulated" : "neutral"}>{offer.provenance ? words(offer.provenance) : "Quote source unknown"}</StatusBadge>{selected && <StatusBadge tone="info">Selected</StatusBadge>}</div>
-        <h3 className="pa-card-title">{props.supplierNames[supplier.id] ?? supplier.id}</h3><p className="pa-muted pa-reference">{offer.id} · {supplier.id}</p>
-        <dl className="pa-offer-price"><dt>Total landed cost</dt><dd>{money(assessment.landedCostSen)}</dd></dl>
-        <StatusBadge tone={tone}>{words(assessment.status)}</StatusBadge>
-        <dl className="pa-offer-values">
-          <div><dt>Quantity / specification</dt><dd>{kg(offer.quantityKgMilli)} · {offer.spec ?? "Unknown"}</dd></div><div><dt>Quoted ETA</dt><dd>{offer.etaLocal ?? "Unknown"} MYT</dd></div>
-          <div><dt>Unit price</dt><dd>{money(offer.pricePerKgSen)}/kg</dd></div><div><dt>Freight</dt><dd>{money(offer.freightSen)}</dd></div>
-          <div><dt>Minimum order</dt><dd>{offer.minimumOrderKgMilli == null ? "Not supplied" : kg(offer.minimumOrderKgMilli)}</dd></div><div><dt>Supplier qualification</dt><dd>{words(supplier.status)}</dd></div>
-        </dl>
-        <div className={`pa-offer-note pa-offer-note--${tone}`}><p>{assessment.reasonCodes.length ? reasonText(assessment.reasonCodes[0]!) : "Conditional on supplier confirmation, receipt and quality acceptance."}</p>{assessment.status === "INCOMPATIBLE" && <p>Price cannot override the failed requirements.</p>}</div>
-        <div className="pa-actions"><Button variant="ghost" aria-expanded={props.inspectedOfferId === offer.id} onClick={() => props.onInspect(offer.id)}>Inspect {offer.id}</Button><Button variant={selected ? "primary" : "secondary"} disabled={!assessment.isSelectableForConditionalPlan} aria-pressed={selected} onClick={() => props.onSelect(offer.id)}>Select {offer.id}</Button></div>
+      const { offer, supplier } = candidate;
+      const selected = props.selectedOfferId === offer.id;
+      const inspected = props.inspectedOfferId === offer.id;
+      return <article key={offer.id} className={`pa-offer ${inspected ? "pa-offer-inspected" : ""} ${selected ? "pa-offer-selected" : ""}`} aria-label={offer.id}>
+        <div className="pa-card-heading"><h3 className="pa-card-title">{props.supplierNames[supplier.id] ?? supplier.id}</h3>{selected && <StatusBadge tone="info">Selected</StatusBadge>}</div>
+        <p className="pa-muted">{kg(offer.quantityKgMilli)} · {offer.spec ? words(offer.spec) : "Unknown specification"}</p>
+        <div className="pa-quote-line"><strong>{money(assessment.landedCostSen)} <small>landed</small></strong><span>{offer.etaLocal ?? "Unknown"} ETA</span></div>
+        <StatusBadge tone={assessment.status === "INCOMPATIBLE" ? "danger" : "warning"}>{assessment.status === "QUALIFIED_CONDITIONAL" ? "Conditional" : assessment.status === "INCOMPATIBLE" ? "Incompatible" : "Needs review"}</StatusBadge>
+        <p className="pa-offer-reason">{assessment.reasonCodes.length ? reasonText(assessment.reasonCodes.includes("SPEC_MISMATCH") ? "SPEC_MISMATCH" : assessment.reasonCodes[0]!) : "Requires supplier confirmation and quality acceptance."}</p>
+        <div className="pa-actions"><Button variant="ghost" aria-label={`Inspect ${offer.id}`} aria-expanded={inspected} onClick={() => props.onInspect(offer.id)}>View details</Button><Button variant="secondary" disabled={!assessment.isSelectableForConditionalPlan} aria-label={`Select ${offer.id}`} aria-pressed={selected} onClick={() => props.onSelect(offer.id)}>{selected ? "Selected supplier" : "Select supplier"}</Button></div>
       </article>;
     })}</div>}
   </DataPanel>;
