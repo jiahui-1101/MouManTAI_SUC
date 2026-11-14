@@ -2,6 +2,14 @@ import { CANONICAL_BUSINESS } from "../data/fixtures/happyPotato";
 import { parseMockSupplierMessage } from "../features/messaging/mockMessageRuleExtractor";
 import { useSyncExternalStore } from "react";
 import { CANONICAL_MESSAGE } from "../features/messaging/mockMessageRegistry";
+import {
+  buildCorrectionVersion,
+  buildDecisionVersion,
+  confirmBlockers,
+  ruleExtractionVersion,
+  type CandidateValues,
+  type ExtractionVersion,
+} from "../features/messaging/messageReview";
 
 export type InboxChannel = "WHATSAPP" | "OUTLOOK" | "TELEGRAM";
 export type InboxStage = "PARSED" | "REVIEW_PENDING" | "LINKED" | "UNMATCHED" | "UNVERIFIED";
@@ -285,6 +293,8 @@ function createDemoState() {
       version: number;
       extraction: ReturnType<typeof parseMockSupplierMessage>;
     }[],
+    /** Appended human review versions (v2+). Version 1 is derived from the rule extractor. */
+    extractionHistory: [] as ExtractionVersion[],
   };
 }
 
@@ -371,6 +381,7 @@ export const demoStore = {
       activeFixture: fixture,
       reviews: freshReviews,
       incident: freshIncident,
+      extractionHistory: [],
     };
     emit();
   },
@@ -386,7 +397,54 @@ export const demoStore = {
     state = createDemoState();
     emit();
   },
+  /** Appends an immutable HUMAN_CORRECTION version; raw text and earlier versions are untouched. */
+  saveExtractionCorrection(messageId: InboxMessage["id"], values: CandidateValues, options: { at?: string; note?: string } = {}) {
+    const latest = latestVersionOrThrow(messageId);
+    const next = buildCorrectionVersion(latest, values, options.at ?? new Date().toISOString(), undefined, options.note);
+    appendVersion(next);
+    return next;
+  },
+  decideExtractionReview(messageId: InboxMessage["id"], decision: "REJECTED" | "MARKED_UNRESOLVED", note: string, at?: string) {
+    if (!note.trim()) throw new Error("A reason is required");
+    const latest = latestVersionOrThrow(messageId);
+    if (latest.reviewStatus === "VERIFIED") throw new Error("Confirmed reviews cannot be rejected here");
+    const next = buildDecisionVersion(latest, decision, at ?? new Date().toISOString(), undefined, note.trim());
+    appendVersion(next);
+    return next;
+  },
+  confirmExtractionReview(messageId: InboxMessage["id"], at?: string) {
+    const message = state.messages.find((item) => item.id === messageId);
+    if (!message) throw new Error("Unknown message");
+    const latest = latestVersionOrThrow(messageId);
+    const blockers = confirmBlockers(latest, {
+      senderRegistryId: message.senderRegistryId,
+      canonicalIncidentShortfallKgMilli: state.incident.claimedShortfallKgMilli,
+      incidentPoId: state.incident.poId,
+    });
+    if (blockers.length) throw new Error(blockers.join(" "));
+    appendVersion(buildDecisionVersion(latest, "CONFIRMED", at ?? new Date().toISOString()));
+    dispatch({ type: "MESSAGE_EXTRACTION_REVIEWED", messageId });
+    dispatch({ type: "INCIDENT_VERIFIED", messageIds: [messageId] });
+  },
 };
+
+export function selectExtractionVersions(value: DemoState, messageId: InboxMessage["id"]): readonly ExtractionVersion[] {
+  const message = value.messages.find((item) => item.id === messageId);
+  if (!message) return [];
+  return [ruleExtractionVersion(message), ...value.extractionHistory.filter((v) => v.messageId === messageId)];
+}
+
+function latestVersionOrThrow(messageId: InboxMessage["id"]): ExtractionVersion {
+  const versions = selectExtractionVersions(state, messageId);
+  const latest = versions[versions.length - 1];
+  if (!latest) throw new Error("Unknown message");
+  return latest;
+}
+
+function appendVersion(version: ExtractionVersion) {
+  state = { ...state, extractionHistory: [...state.extractionHistory, version] };
+  emit();
+}
 
 export function useDemoState() {
   return useSyncExternalStore(subscribe, demoStore.getSnapshot, demoStore.getSnapshot);
