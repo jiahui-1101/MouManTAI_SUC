@@ -6,6 +6,7 @@ import type {
   ApprovalRecord,
   DemoRole,
   ExecutionAction,
+  Feasibility,
   ImpactSummaryLike,
   P5Event,
   RecoveryScenarioWithActions,
@@ -19,6 +20,14 @@ import { getP2State, subscribeP2 } from '../../../services/mock/restaurantStore'
 import { buildP5Handoff } from '../../impact/handoff';
 import { HP_BUSINESS, HP_IDS } from '../../../data/fixtures/happyPotato';
 import { devScenarioA, devScenarioB } from '../../../__dev__/mockScenarios';
+import { calculatePlanB, type PlanInput } from '../plan-b/planB';
+import { preview as previewB } from '../plan-b/preview';
+import type {
+  PlanAPublisher,
+  PlanAInputRead,
+  ScenarioAReadyRequest,
+  ScenarioAReadyAcknowledgement,
+} from '../plan-a/integration/types';
 
 /**
  * Minimal structural interfaces mirroring docs/00_SHARED §3–4.
@@ -318,6 +327,71 @@ export function createRootP5Selectors<TRoot extends RootStoreContract = RootStor
 }
 
 /**
+ * In-memory scenario publication cache for P3 / P4 dynamic scenarios.
+ */
+const publishedScenarios: {
+  A?: RecoveryScenarioWithActions | null;
+  B?: RecoveryScenarioWithActions | null;
+} = {};
+
+export function publishScenarioToAdapter(scenario: RecoveryScenarioWithActions): void {
+  publishedScenarios[scenario.strategy] = scenario;
+}
+
+export function getPublishedScenario(strategy: ScenarioStrategy): RecoveryScenarioWithActions | null {
+  return publishedScenarios[strategy] ?? null;
+}
+
+export function clearPublishedScenarios(): void {
+  publishedScenarios.A = null;
+  publishedScenarios.B = null;
+}
+
+/**
+ * Creates a PlanAPublisher that connects P3's external supply recovery proposals
+ * directly to P5's comparison and approval pipeline.
+ */
+export function createPlanAPublisher(
+  onPublished?: (scenario: RecoveryScenarioWithActions) => void,
+): PlanAPublisher {
+  return {
+    readCurrent(): PlanAInputRead {
+      const p2 = getP2State();
+      const inc = p2.restaurant.incidents[0];
+      const snap = p2.restaurant.snapshot;
+      return {
+        source: {
+          incident: inc ? (inc as any) : undefined,
+          snapshot: snap as any,
+        },
+      };
+    },
+    async commitScenarioA(request: ScenarioAReadyRequest): Promise<ScenarioAReadyAcknowledgement> {
+      const p2 = getP2State();
+      const snap = p2.restaurant.snapshot;
+      if (request.expectedSnapshotRevision !== snap.revision) {
+        return {
+          status: 'REJECTED',
+          message: `Snapshot revision mismatch: expected ${request.expectedSnapshotRevision}, current ${snap.revision}`,
+        };
+      }
+      const scenarioWithActions: RecoveryScenarioWithActions = {
+        ...request.scenario,
+        proposedActions: [{ actionType: 'PO_DRAFT' }, { actionType: 'RECEIPT_CHECK' }],
+      };
+      publishScenarioToAdapter(scenarioWithActions);
+      if (onPublished) onPublished(scenarioWithActions);
+      return {
+        status: 'STORED',
+        idempotencyKey: request.idempotencyKey,
+        snapshotRevision: request.expectedSnapshotRevision,
+        storedScenario: request.scenario,
+      };
+    },
+  };
+}
+
+/**
  * Adapts origin/main's mock restaurant store (src/services/mock/restaurantStore.ts)
  * and P2 impact engine (src/features/impact/handoff.ts) into P5DepsAdapter.
  *
@@ -404,11 +478,87 @@ export function createRestaurantStoreAdapter(
   function getScenarioData(strategy: ScenarioStrategy): RecoveryScenarioWithActions {
     const snapRef = getSnapshotRef();
     const incidentData = getActiveIncidentData();
-    const scenario = strategy === 'A' ? devScenarioA(snapRef.fingerprint) : devScenarioB(snapRef.fingerprint);
-    if (incidentData) {
-      scenario.incidentId = incidentData.id;
+
+    // 1. Check if an explicit scenario was published
+    const published = publishedScenarios[strategy];
+    if (published && (!published.snapshotFingerprint || published.snapshotFingerprint === snapRef.fingerprint)) {
+      return {
+        ...published,
+        incidentId: incidentData?.id ?? published.incidentId,
+      };
     }
-    return scenario;
+
+    // 2. Dynamic generation for Strategy B from P4 domain engine
+    if (strategy === 'B') {
+      try {
+        const p2 = getP2State();
+        const chickenLot = p2.restaurant.snapshot.ingredientLots.find(
+          (l) => l.ingredientId === HP_IDS.chicken || l.id === 'HP-LOT-CH-001',
+        );
+        const chickenGrams = chickenLot ? chickenLot.onHandMilli : 10000;
+        const planBInput: PlanInput = {
+          ...previewB,
+          snapshotId: snapRef.id,
+          fingerprint: snapRef.fingerprint,
+          revision: snapRef.revision,
+          incident: incidentData
+            ? {
+                id: incidentData.id,
+                verified: true,
+                po: incidentData.poId,
+                ordered: 20000,
+                claimed: 0,
+              }
+            : previewB.incident,
+          lots: previewB.lots.map((lot) =>
+            lot.ingredient === 'chicken' ? { ...lot, grams: chickenGrams } : lot,
+          ),
+        };
+        const res = calculatePlanB(planBInput);
+        if (res.status === 'READY') {
+          const sc = res.scenario;
+          const proposedActions = [
+            ...sc.proposals.map((p) => ({
+              actionType: 'MENU_LIMIT_TASK' as const,
+              targetId: p.menuId,
+            })),
+            ...sc.batches.map((b) => ({
+              actionType: 'PREP_BATCH_TASK' as const,
+              targetId: b.id,
+              plannedPortions: b.portions,
+            })),
+          ];
+          return {
+            id: sc.id,
+            incidentId: incidentData?.id ?? sc.incidentId,
+            strategy: 'B',
+            snapshotFingerprint: sc.snapshotFingerprint,
+            version: sc.version,
+            feasibility: sc.feasibility === 'BREACH_RISK' ? 'INFEASIBLE' : (sc.feasibility as Feasibility),
+            newPurchaseKgMilli: sc.newPurchaseKgMilli,
+            additionalCostSen: sc.additionalCostSen,
+            forecastChickenPortionsServed: sc.forecastChickenPortionsServed,
+            forecastChickenPortionsUnmet: sc.forecastChickenPortionsUnmet,
+            confirmedChickenPortionsProtected: sc.confirmedChickenPortionsProtected,
+            assumptions: [...sc.assumptions],
+            evidenceRefs: [...sc.evidenceRefs],
+            actionIds: [...sc.actionIds],
+            simulatedCalculation: true,
+            proposedActions,
+          };
+        }
+      } catch {
+        // Fall back to devScenarioB
+      }
+      const b = devScenarioB(snapRef.fingerprint, snapRef.revision);
+      if (incidentData) b.incidentId = incidentData.id;
+      return b;
+    }
+
+    // 3. Fallback for Strategy A to canonical devScenarioA
+    const a = devScenarioA(snapRef.fingerprint, snapRef.revision);
+    if (incidentData) a.incidentId = incidentData.id;
+    return a;
   }
 
   const deps: P5Deps & { resolveMenuDisplayName(menuId: string): string } = {

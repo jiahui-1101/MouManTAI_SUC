@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  clearPublishedScenarios,
+  createPlanAPublisher,
+  createRestaurantStoreAdapter,
   createRootP5Deps,
   createRootP5Selectors,
   createRootStoreAdapter,
+  getPublishedScenario,
   type RootIncident,
   type RootSnapshot,
   type RootStoreContract,
@@ -232,5 +236,61 @@ describe('p5RootAdapter', () => {
     // Execution tasks and awaiting evidence
     expect(selectors.selectExecutionTasks(rootState as any)).toHaveLength(2);
     expect(selectors.selectAwaitingEvidenceCount(rootState as any)).toBe(1);
+  });
+
+  it('createRestaurantStoreAdapter dynamically resolves scenarios and supports publication', async () => {
+    clearPublishedScenarios();
+    const adapter = createRestaurantStoreAdapter();
+    expect(adapter.wired).toBe(true);
+
+    const view = adapter.getView();
+    expect(view.snapshot?.id).toBe('HP-SNAP-001');
+    expect(view.scenarioA?.id).toBe('HP-SC-A-001');
+    expect(view.scenarioB?.id).toBe('HP-SC-B-001');
+    expect(view.scenarioB?.forecastChickenPortionsServed).toBe(72);
+    expect(view.scenarioB?.forecastChickenPortionsUnmet).toBe(78);
+    expect(view.scenarioB?.confirmedChickenPortionsProtected).toBe(60);
+
+    // Test Plan A publisher
+    const publisher = createPlanAPublisher();
+    const current = publisher.readCurrent();
+    expect(current.source).toBeDefined();
+
+    // Commit Plan A scenario
+    const sampleHandoff = {
+      id: 'HP-SC-A-001',
+      incidentId: 'HP-INC-001',
+      strategy: 'A' as const,
+      snapshotFingerprint: view.snapshot?.fingerprint ?? 'fp_snap_001',
+      version: 1,
+      feasibility: 'CONDITIONAL' as const,
+      newPurchaseKgMilli: 15000,
+      additionalCostSen: 25500,
+      forecastChickenPortionsServed: 150,
+      forecastChickenPortionsUnmet: 0,
+      confirmedChickenPortionsProtected: 60,
+      assumptions: ['Sample assumption'],
+      evidenceRefs: ['REF-1'],
+      actionIds: ['ACT-1'],
+      simulatedCalculation: true as const,
+    };
+
+    const ack = await publisher.commitScenarioA({
+      type: 'SCENARIO_A_READY',
+      scenario: sampleHandoff,
+      idempotencyKey: 'test-key-1',
+      expectedSnapshotRevision: 1,
+      detail: {
+        conditions: [],
+        sourceLabels: ['LIVE_CHANNEL', 'SIMULATED_CALCULATION'],
+        selectedOfferAssessment: {} as any,
+      },
+    });
+
+    expect(ack.status).toBe('STORED');
+    expect(getPublishedScenario('A')?.id).toBe('HP-SC-A-001');
+    expect(adapter.deps.getScenario('A')?.additionalCostSen).toBe(25500);
+
+    clearPublishedScenarios();
   });
 });

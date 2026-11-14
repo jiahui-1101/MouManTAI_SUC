@@ -59,7 +59,7 @@ type Filters = typeof EMPTY_FILTERS;
 
 export function IncidentsPage() {
   return (
-    <PageContainer title={titleFor("/incidents")}>
+    <PageContainer title={titleFor("/incidents")} actions={<DemoControls />}>
       <P2ErrorBoundary label="Incident list">
         <IncidentsContent />
       </P2ErrorBoundary>
@@ -100,7 +100,6 @@ function IncidentsContent() {
         <div className="p2-meta__item"><span className="p2-meta__label">Snapshot</span><span className="p2-mono">{store.restaurant.snapshot.id} · r{store.restaurant.snapshot.revision}</span></div>
         <div className="p2-meta__item"><span className="p2-meta__label">Data</span><SyntheticTag /></div>
         <div className="p2-meta__item"><span className="p2-meta__label">Incidents</span><span>{rows.length}</span></div>
-        <DemoControls />
       </div>
 
       <div className={`p2-workspace ${selected ? "p2-workspace--with-detail" : ""}`}>

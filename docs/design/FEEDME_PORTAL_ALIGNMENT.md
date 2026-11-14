@@ -1,6 +1,6 @@
 # FeedMe Portal alignment
 
-Recovery+ is a FeedMe-inspired hackathon prototype for the synthetic Happy Potato demo outlet. This guide describes the project's own design system.
+MouManTAI is a FeedMe-inspired hackathon prototype for the synthetic Happy Potato demo outlet. This guide describes the project's own design system.
 
 The public FeedMe homepage uses Inter and the orange `#FF7823` in its theme metadata and button styles. The POS features page describes FeedMe Portal as the merchant management surface. The Recovery+ spacing, layout, components and semantic colors are project choices. [FeedMe homepage](https://feedme.ai/) · [FeedMe POS features](https://feedme.ai/pos/feature)
 
@@ -20,9 +20,9 @@ Inter (400–700) serves both body and headings. Offline, the interface uses the
 
 ## Layout and shared components
 
-- The sticky top bar shows **FeedMe Portal / Recovery+ / Powered by MouManTAI** at desktop widths. The outlet and concept and synthetic-data indicators remain visible on narrow screens.
+- The sticky top bar uses the **MouManTAI** logo and a right-aligned **Outlet: Happy Potato** label with the logo from [Happy Potato’s website](https://www.happypotato.com.my/). P2 pages retain their synthetic-data indicators.
 - Above 1023 px, the white 232 px sidebar provides group disclosures. Arriving at a route opens its group. At 1023 px and below, the 60 px icon rail exposes every route with named links. At 560 px and below, the header uses a compact stacked layout.
-- Keep page headings and breadcrumbs in `PageContainer`. Use `Button`, `StatusBadge`, `DataPanel`, `SectionHeader`, `AlertBanner`, `EmptyState` and `Tabs` for compatible new screens. Existing P2 presentation shares the semantic colors and follows its own feature layout.
+- Keep page headings in `PageContainer`. Use `Button`, `StatusBadge`, `DataPanel`, `SectionHeader`, `AlertBanner`, `EmptyState` and `Tabs` for compatible new screens. Existing P2 presentation shares the semantic colors and follows its own feature layout.
 - Table and dialog classes provide presentation. Supply captions and header associations for tables and manage dialog focus, Escape and focus return. Use a named, keyboard-reachable scroll region where content needs horizontal scrolling.
 - P2 stacks its workspace below 1280 px and simplifies KPIs and detail grids at 720 px and below. Verify populated states, including graph selection, filters and drawers, at the small end of the range.
 
