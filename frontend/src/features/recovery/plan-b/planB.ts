@@ -49,13 +49,14 @@ function allocate(input: PlanInput) {
     : 0;
   friesLeft -= comboQuota * (combo?.fries ?? 0);
   const rows = input.menus.map(menu => {
+    const friesOnlyReady = menu.chicken === 0 && menu.approved && confirmedFries <= fries;
     let quota = 0;
     if (menu === combo) quota = comboQuota;
-    else if (!blocked && !menu.chicken && menu.fries > 0) {
+    else if (friesOnlyReady && menu.fries > 0) {
       quota = Math.max(0, Math.min(menu.forecast - menu.confirmed, Math.floor(friesLeft / menu.fries)));
       friesLeft -= quota * menu.fries;
     }
-    return { ...menu, quota, protected: blocked ? 0 : menu.confirmed };
+    return { ...menu, quota, protected: !blocked || friesOnlyReady ? menu.confirmed : 0 };
   });
   return { lots, rows, chicken, fries, confirmedChicken, confirmedFries, deficit, blocked, discretionary };
 }

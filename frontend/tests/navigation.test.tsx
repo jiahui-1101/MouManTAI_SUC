@@ -50,9 +50,9 @@ describe("pages", () => {
     expect(screen.getByRole("link", { name: /View Prep Planning/ }).getAttribute("href")).toBe("/prep-planning");
   });
 
-  it("recalculates stock across tabs and resets to the canonical demo", async () => {
+  it("recalculates stock across tabs and restores the baseline with the slider", async () => {
     renderAt("/recovery/plan-b");
-    fireEvent.click(screen.getByRole("button", { name: "8.00 kg" }));
+    fireEvent.change(screen.getByRole("slider", { name: /Accepted chicken stock/ }), { target: { value: "8000" } });
     expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
     expect(screen.getByText(/0.75 kg shortfall/)).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Order Protection" }));
