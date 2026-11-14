@@ -96,8 +96,8 @@ export function parseMockSupplierMessage(input: ParseMockMessageInput): MockMess
   if (input.rawText !== CANONICAL_MESSAGE) return unresolvedResult(input);
 
   const senderRegistryId = isCanonicalSupplierId(input.senderRegistryId) ? input.senderRegistryId : null;
-  const senderIsKnown = senderRegistryId !== null;
   const purchaseOrder = CANONICAL_PO_REGISTRY["HP-PO-1042"];
+  const senderIsKnown = senderRegistryId === purchaseOrder.supplierId;
   const claimedDeliveryKgMilli = 0;
 
   return {

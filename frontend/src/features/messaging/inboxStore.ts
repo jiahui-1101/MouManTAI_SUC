@@ -28,7 +28,10 @@ export interface InboxState {
   selectedId: InboxMessage["id"];
   suppressedDuplicateCount: number;
   activeFixture: DemoFixtureId;
+  preferences: DemoPreferences;
 }
+
+export interface DemoPreferences { unreadFirst: boolean; showProcessingTimeline: boolean; }
 
 export type DemoFixtureId = "CORE_CHANNELS" | "REVIEW_STATES" | "EMPTY";
 
@@ -57,7 +60,8 @@ export const DEMO_FIXTURES: Readonly<Record<DemoFixtureId, { label: string; desc
 } as const;
 
 const fixtureMessages = (fixture: DemoFixtureId) => DEMO_FIXTURES[fixture].messageIds.map((id) => SHARED_MOCK_INBOX.find((message) => message.id === id)!);
-const initialState = (): InboxState => ({ messages: fixtureMessages("REVIEW_STATES"), selectedId: "HP-MSG-WA-001", suppressedDuplicateCount: 1, activeFixture: "REVIEW_STATES" });
+export const DEFAULT_DEMO_PREFERENCES: DemoPreferences = { unreadFirst: false, showProcessingTimeline: true };
+const initialState = (): InboxState => ({ messages: fixtureMessages("REVIEW_STATES"), selectedId: "HP-MSG-WA-001", suppressedDuplicateCount: 1, activeFixture: "REVIEW_STATES", preferences: DEFAULT_DEMO_PREFERENCES });
 let state: InboxState = initialState();
 const listeners = new Set<() => void>();
 
@@ -72,9 +76,10 @@ export const inboxStore = {
   },
   loadFixture(fixture: DemoFixtureId) {
     const messages = fixtureMessages(fixture);
-    state = { messages, selectedId: messages[0]?.id ?? "HP-MSG-WA-001", suppressedDuplicateCount: fixture === "EMPTY" ? 0 : 1, activeFixture: fixture };
+    state = { ...state, messages, selectedId: messages[0]?.id ?? "HP-MSG-WA-001", suppressedDuplicateCount: fixture === "EMPTY" ? 0 : 1, activeFixture: fixture };
     emit();
   },
+  setPreference<K extends keyof DemoPreferences>(key: K, value: DemoPreferences[K]) { state = { ...state, preferences: { ...state.preferences, [key]: value } }; emit(); },
   reset() { state = initialState(); emit(); },
 };
 

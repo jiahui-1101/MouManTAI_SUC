@@ -7,6 +7,20 @@ export const CANONICAL_SUPPLIER_REGISTRY = {
     displayName: "Demo Poultry Supply A",
     verification: "VERIFIED_DEMO_CONTACT",
   },
+  "HP-SUP-002": { id: "HP-SUP-002", displayName: "Demo Poultry Supply B", verification: "APPROVED_DEMO_SUPPLIER" },
+  "HP-SUP-003": { id: "HP-SUP-003", displayName: "Demo Budget Frozen Foods", verification: "APPROVED_DEMO_CONTACT" },
+  "HP-SUP-004": { id: "HP-SUP-004", displayName: "Demo Frozen Fries Distributor", verification: "DEMO_SOURCE" },
+} as const;
+
+export const CANONICAL_RULE_SUMMARY = {
+  method: "RULE_EXTRACTION",
+  supportedMessage: "Canonical PO delivery unavailable sentence",
+  matchedPoId: "HP-PO-1042",
+  incidentType: "UNAVAILABLE",
+  expectedKgMilli: 20_000,
+  claimedDeliveryKgMilli: 0,
+  etaStatus: "UNKNOWN",
+  failClosed: true,
 } as const;
 
 export const CANONICAL_PO_REGISTRY = {

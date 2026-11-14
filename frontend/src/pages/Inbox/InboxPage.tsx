@@ -26,14 +26,14 @@ function channelLabel(channel: InboxChannel) { return channel === "OUTLOOK" ? "O
 function exactTime(iso: string) { return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "medium", timeZone: "Asia/Singapore" }).format(new Date(iso)) + " MYT"; }
 
 export function InboxPage() {
-  const { messages, selectedId, suppressedDuplicateCount } = useInboxState();
+  const { messages, selectedId, suppressedDuplicateCount, preferences } = useInboxState();
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
   const visible = useMemo(() => messages.filter((message) => {
     const matchesChannel = filter === "ALL" || message.channel === filter;
     const haystack = `${message.senderDisplay} ${message.subject ?? ""} ${message.poId ?? ""} ${message.rawText}`.toLowerCase();
     return matchesChannel && haystack.includes(query.trim().toLowerCase());
-  }), [filter, messages, query]);
+  }).sort((a, b) => preferences.unreadFirst ? Number(a.read) - Number(b.read) : 0), [filter, messages, preferences.unreadFirst, query]);
   const selected = messages.find((message) => message.id === selectedId) ?? messages[0]!;
 
   return <PageContainer title={titleFor("/inbox")}>
@@ -59,7 +59,7 @@ export function InboxPage() {
         <section className="message-detail__original" aria-labelledby="original-message-heading"><div><h3 id="original-message-heading">Immutable original message</h3><span>Read-only source evidence</span></div><p>{selected.rawText}</p></section>
         <div className="message-detail__extraction"><div><span>PO match</span><strong>{selected.poId ?? "No matched PO"}</strong></div><div><span>Extraction</span><strong>{selected.extraction}</strong></div><div><span>Linked incident</span><strong>{selected.linkedIncidentId ?? "Not linked"}</strong></div></div>
         {selected.poId && <div className="message-detail__extraction"><div><span>Expected</span><strong>20.000 kg</strong></div><div><span>Claimed today</span><strong>0.000 kg</strong></div><div><span>Delivery ETA</span><strong>Unknown</strong></div></div>}
-        <ol className="message-detail__timeline" aria-label="Processing timeline"><li className="is-done">Received</li><li className="is-done">Parsed</li><li className={selected.stage !== "PARSED" ? "is-done" : ""}>Review</li><li className={selected.stage === "LINKED" ? "is-done" : ""}>Linked to Incident</li></ol>
+        {preferences.showProcessingTimeline && <ol className="message-detail__timeline" aria-label="Processing timeline"><li className="is-done">Received</li><li className="is-done">Parsed</li><li className={selected.stage !== "PARSED" ? "is-done" : ""}>Review</li><li className={selected.stage === "LINKED" ? "is-done" : ""}>Linked to Incident</li></ol>}
         {selected.verification === "UNVERIFIED_SENDER" && <p className="message-detail__warning"><strong>Human review required.</strong> This synthetic sender is not allowlisted, so no verified incident or deficit can be published.</p>}
         {selected.extraction === "UNRESOLVED" && <p className="message-detail__warning"><strong>Unmatched message.</strong> No PO or disruption was inferred from the original text.</p>}
         <p className="message-detail__correlation">Canonical channel messages refer to one disruption. The shared incident remains <strong>HP-INC-001</strong>; the 20 kg PO shortfall is not multiplied.</p>

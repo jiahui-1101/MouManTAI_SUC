@@ -78,6 +78,13 @@ describe("parseMockSupplierMessage", () => {
     expect(result.reviewReasons.join(" ")).toContain("cannot auto-verify");
   });
 
+  it("blocks a registered supplier that is not assigned to the matched PO", () => {
+    const result = parseMockSupplierMessage({ rawText: CANONICAL_MESSAGE, senderRegistryId: "HP-SUP-002" });
+    expect(result.senderRegistryId).toBe("HP-SUP-002");
+    expect(result.senderVerification).toBe("UNVERIFIED_SENDER");
+    expect(result.reviewReasons.join(" ")).toContain("cannot auto-verify");
+  });
+
   it.each([
     "PO HP-PO-1042 may be late today.",
     "PO HP-PO-1042 cannot deliver either 20kg or 10kg chilled chicken today.",
