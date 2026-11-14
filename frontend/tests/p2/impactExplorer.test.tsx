@@ -295,9 +295,11 @@ describe("cross-page consistency", () => {
 
     renderAt("/overview");
     expect(screen.getAllByText(rev).length).toBeGreaterThan(0);
-    const card = screen.getByRole("link", { name: "Open incident HP-INC-001" });
-    expect(dd(card, "Reported PO shortage")).toBe("20kg");
-    expect(dd(card, "Accepted on-hand chicken")).toBe("10kg");
+    expect(screen.getByRole("link", { name: "Open incident" }).getAttribute("href")).toBe("/incidents?incident=HP-INC-001");
+    fireEvent.click(screen.getByRole("button", { name: "Show details: PO shortage" }));
+    expect(dd(document.body, "Reported shortage")).toBe("20kg");
+    fireEvent.click(screen.getByRole("button", { name: "Show details: On-hand stock" }));
+    expect(dd(document.body, "Physical on hand")).toBe("10kg");
     cleanup();
 
     renderAt("/incidents?incident=HP-INC-001");

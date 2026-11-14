@@ -3,13 +3,13 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, Check, Drumstick, Utensils, Package, ShieldCheck, Soup, Layers } from "lucide-react";
 import { PageContainer } from "../../components/layout/PageContainer";
 import { calculatePlanB } from "../../features/recovery/plan-b/planB";
-import { preview } from "../../features/recovery/plan-b/preview";
+import { useDemoState } from "../../store/demoStore";
+import { selectPlanBInput } from "../../integration/planBShared";
+import type { PlanInput } from "../../features/recovery/plan-b/planB";
 import { kg, Pending, Table } from "../../features/recovery/plan-b/RecoveryView";
 import "../../features/recovery/plan-b/recovery.css";
 
 type Tab = "stock" | "orders" | "menu";
-
-const defaultFries = preview.lots.find(lot => lot.ingredient === "fries")?.grams ?? 0;
 
 function MenuUsageChart({ items, available, shortageStock }: { available: number; shortageStock?: number; items: { name: string; grams: number; required: number; portions: number }[] }) {
   const step = Math.max(1, Math.ceil(Math.max(0, ...items.map(item => Math.max(item.grams, item.required))) / 4000));
@@ -39,7 +39,17 @@ function MenuUsageChart({ items, available, shortageStock }: { available: number
 }
 
 export function PlanBPage() {
-  const [chickenGrams, setChickenGrams] = useState(10000);
+  const shared = selectPlanBInput(useDemoState());
+  if (shared.status !== "READY") return <PageContainer title="Plan B — Internal Recovery">
+    <Pending status={shared.status === "STALE" ? "STALE" : "PENDING"} />
+    <p className="p4-alert" data-testid="plan-b-reason">{shared.reason} <Link to="/incidents">Open incidents</Link></p>
+  </PageContainer>;
+  return <PlanBWorkspace key={shared.input.fingerprint} preview={shared.input} baselineChicken={shared.sharedChickenGrams} />;
+}
+
+function PlanBWorkspace({ preview, baselineChicken }: { preview: PlanInput; baselineChicken: number }) {
+  const defaultFries = preview.lots.find(lot => lot.ingredient === "fries")?.grams ?? 0;
+  const [chickenGrams, setChickenGrams] = useState(baselineChicken);
   const [friesGrams, setFriesGrams] = useState(defaultFries);
   const [tab, setTab] = useState<Tab>("stock");
   const [query, setQuery] = useState("");
@@ -47,9 +57,9 @@ export function PlanBPage() {
   const [actionsOpen, setActionsOpen] = useState(false);
   const input = useMemo(() => ({
     ...preview,
-    fingerprint: chickenGrams === 10000 && friesGrams === defaultFries ? preview.fingerprint : `${preview.fingerprint}-chicken-${chickenGrams}-fries-${friesGrams}`,
+    fingerprint: chickenGrams === baselineChicken && friesGrams === defaultFries ? preview.fingerprint : `${preview.fingerprint}-chicken-${chickenGrams}-fries-${friesGrams}`,
     lots: preview.lots.map(lot => lot.ingredient === "chicken" ? { ...lot, grams: chickenGrams } : lot.ingredient === "fries" ? { ...lot, grams: friesGrams } : lot),
-  }), [chickenGrams, friesGrams]);
+  }), [chickenGrams, friesGrams, preview, baselineChicken, defaultFries]);
   const result = useMemo(() => calculatePlanB(input), [input]);
   if (result.status !== "READY") return <PageContainer title="Plan B — Internal Recovery"><Pending status={result.status} /></PageContainer>;
 

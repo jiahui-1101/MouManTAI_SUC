@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { PAGE_ROUTES, routes } from "../src/app/router";
+import { demoStore } from "../src/store/demoStore";
+import { assessImpactAction } from "../src/services/mock/restaurantStore";
 import { NAV_ITEMS } from "../src/constants/navigation";
 
 afterEach(cleanup);
@@ -22,8 +24,13 @@ describe("route configuration", () => {
   });
 });
 
+/** Production Plan B reads shared state: verify HP-INC-001 in P1 and assess it in P2 first. */
+function verifyAndAssessSharedIncident() {
+  act(() => { demoStore.dispatch({ type: "DEMO_RESET" }); demoStore.confirmExtractionReview("HP-MSG-WA-001"); assessImpactAction("HP-INC-001"); });
+}
+
 /** Routes whose pages have been implemented; all others must still be empty shells. */
-const IMPLEMENTED = new Set(["/overview", "/incidents", "/impact", "/recovery/plan-b", "/prep-planning"]);
+const IMPLEMENTED = new Set(["/inbox", "/message-intelligence", "/channels", "/settings", "/overview", "/incidents", "/impact", "/recovery/plan-a", "/recovery/plan-b", "/prep-planning"]);
 
 describe("pages", () => {
   it.each(NAV_ITEMS.map((item) => [item.path, item.title]))("%s shows heading %s", (path, title) => {
@@ -41,7 +48,18 @@ describe("pages", () => {
     },
   );
 
+  it("shows the Plan A waiting workspace rather than an empty shell", () => {
+    renderAt("/recovery/plan-a");
+    expect(screen.getByText("External supply workspace is waiting")).toBeTruthy();
+  });
+
+  it("shows Plan B pending until P1 verification and P2 impact exist", () => {
+    renderAt("/recovery/plan-b");
+    expect(screen.getByText("Waiting for a verified supplier incident and stock snapshot.")).toBeTruthy();
+  });
+
   it("shows the Plan B allocation and menu proposal", () => {
+    verifyAndAssessSharedIncident();
     renderAt("/recovery/plan-b");
     expect(heading()).toBe("Plan B — Internal Recovery");
     expect(screen.getByRole("tab", { name: "Stock Allocation" })).toBeTruthy();
@@ -50,18 +68,19 @@ describe("pages", () => {
     expect(screen.getByRole("link", { name: /View Prep Planning/ }).getAttribute("href")).toBe("/prep-planning");
   });
 
-  it("recalculates stock across tabs and restores the baseline with the slider", async () => {
+  it("recalculates stock across tabs and resets to the canonical demo", async () => {
+    verifyAndAssessSharedIncident();
     renderAt("/recovery/plan-b");
-    fireEvent.change(screen.getByRole("slider", { name: /Accepted chicken stock/ }), { target: { value: "8000" } });
-    expect(screen.getByText("Confirmed demand is under-provisioned")).toBeTruthy();
-    expect(screen.getByText(/0.75 kg shortfall/)).toBeTruthy();
+    fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "8000" } });
+    expect(screen.getByText("Chicken shortfall · 0.75 kg")).toBeTruthy();
+    expect(screen.getByText(/Chicken shortfall · 0.75 kg/)).toBeTruthy();
     fireEvent.click(screen.getByRole("tab", { name: "Order Protection" }));
-    expect(screen.getAllByText("At risk · review")[0]).toBeTruthy();
+    expect(within(screen.getByRole("tabpanel", { name: "Order Protection" })).getAllByText("At risk · review").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Menu Recovery" }));
     expect(screen.getAllByText("At risk").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("tab", { name: "Stock Allocation" }));
-    fireEvent.click(screen.getByRole("button", { name: "Reset Demo" }));
-    expect(screen.getAllByText("10.00 kg", { selector: "strong" })[0]).toBeTruthy();
+    fireEvent.change(screen.getByRole("slider", { name: /Simulated chicken stock/ }), { target: { value: "10000" } });
+    expect(within(screen.getByRole("region", { name: "Plan B summary" })).getByText("10.00 kg", { selector: "strong" })).toBeTruthy();
     expect(screen.getByText("Plan Feasible*")).toBeTruthy();
   });
 
@@ -76,11 +95,11 @@ describe("pages", () => {
 
   it("shows the product name", () => {
     renderAt("/overview");
-    const header = within(screen.getByRole("banner", { name: "Recovery+ portal" }));
-    for (const label of ["FeedMe Portal", "Recovery+", "Powered by MouManTAI", "Concept integration", "Synthetic data"]) {
-      expect(header.getByText(label, { exact: true })).toBeTruthy();
-    }
-    expect(header.getByText(/Happy Potato — Demo Outlet/)).toBeTruthy();
+    const header = within(screen.getByRole("banner", { name: "MouManTAI portal" }));
+    expect(header.getByRole("img", { name: "MouManTAI" })).toBeTruthy();
+    expect(header.queryByText(/FeedMe Portal|Recovery\+|Powered by/)).toBeNull();
+    expect(header.getByText("Outlet: Happy Potato")).toBeTruthy();
+    expect(header.queryByText(/Concept integration|Synthetic data|Demo Outlet/)).toBeNull();
   });
 
   it("redirects / to /overview", () => {
