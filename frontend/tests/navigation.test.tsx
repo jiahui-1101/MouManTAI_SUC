@@ -6,6 +6,9 @@ import { NAV_ITEMS } from "../src/constants/navigation";
 
 afterEach(cleanup);
 
+/** Routes whose pages are implemented (P5: /recovery/compare, /approvals). */
+const IMPLEMENTED_PAGES = new Set(["/recovery/compare", "/approvals"]);
+
 function renderAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   render(<RouterProvider router={router} />);
@@ -29,6 +32,8 @@ describe("pages", () => {
       renderAt(path);
       expect(heading()).toBe(title);
       const body = screen.getByTestId("page-body");
+      // Pages that have been implemented by their owning team are no longer empty placeholders.
+      if (IMPLEMENTED_PAGES.has(path)) return;
       expect(body.childElementCount).toBe(0);
       expect(body.textContent).toBe("");
     },
