@@ -38,6 +38,9 @@ describe("unified supplier inbox", () => {
     renderInbox();
     const list = screen.getByRole("region", { name: "Messages" });
     expect(within(list).getAllByRole("button")).toHaveLength(5);
+    // List first: the detail panel opens only after a message is opened.
+    expect(screen.queryByRole("article", { name: "Selected message" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Demo Poultry Supply A09:01 MYT/ }));
     expect(screen.getByText("Simulation only · no channels connected")).toBeTruthy();
     expect(screen.getByText("20.000 kg")).toBeTruthy();
     expect(screen.getByText("Unknown")).toBeTruthy();
@@ -82,9 +85,25 @@ describe("unified supplier inbox", () => {
 
   it("navigates the selected canonical message to Message Intelligence", async () => {
     const router = renderInbox();
+    fireEvent.click(screen.getByRole("button", { name: /Demo Poultry Supply A09:01 MYT/ }));
     fireEvent.click(screen.getByRole("link", { name: "Open in Message Intelligence" }));
     expect(router.state.location.pathname).toBe("/message-intelligence");
     expect(router.state.location.search).toBe("?message=HP-MSG-WA-001");
     expect(await screen.findByRole("heading", { name: "Message Intelligence" })).toBeTruthy();
+  });
+
+  it("closes the detail panel and paginates five messages per page", () => {
+    inboxStore.loadFixture("SUPPLIER_OFFER");
+    renderInbox();
+    expect(screen.getByText("Showing 1–5 of 6")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(screen.getByText("Showing 6–6 of 6")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Demo Poultry Supply B/ }));
+    expect(screen.getByRole("article", { name: "Selected message" })).toBeTruthy();
+    expect(screen.getByRole("separator", { name: "Resize message list" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close message panel" }));
+    expect(screen.queryByRole("article", { name: "Selected message" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Page 1" }));
+    expect(screen.getByText("Showing 1–5 of 6")).toBeTruthy();
   });
 });
